@@ -7,12 +7,7 @@ import { Users, Building2, UserCog, Activity, Plus, Edit2, Trash2, Power, X, Men
 export default function OfficeDashboard() {
     const [currentView, setCurrentView] = useState('dashboard');
     const [sidebarOpen, setSidebarOpen] = useState(true);
-    const [showCreateModal, setShowCreateModal] = useState(false);
-    const [showEditModal, setShowEditModal] = useState(false);
     const [showProfileMenu, setShowProfileMenu] = useState(false);
-    const [showAdminModal, setShowAdminModal] = useState(false);
-    const [selectedOffice, setSelectedOffice] = useState(null);
-    const [selectedAdmin, setSelectedAdmin] = useState(null);
 
     const [offices, setOffices] = useState([]);
 
@@ -62,14 +57,6 @@ export default function OfficeDashboard() {
         activeCities: 2
     };
 
-    const handleInputChange = (e) => {
-        setFormData({ ...formData, [e.target.name]: e.target.value });
-    };
-
-    const handleAdminInputChange = (e) => {
-        setAdminFormData({ ...adminFormData, [e.target.name]: e.target.value });
-    };
-
     const handleSettingsChange = (e) => {
         const { name, value, type, checked } = e.target;
         setSettings({
@@ -83,7 +70,13 @@ export default function OfficeDashboard() {
     useEffect(() => {
         const fetchOffices = async () => {
             try {
-                const res = await axios.get("http://localhost:5001/office");
+                const token = localStorage.getItem("token"); // ya jahan tumne save kiya ho
+
+                const res = await axios.get("http://localhost:5001/office", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
 
                 if (res.data && res.data.offices) {
                     setOffices(
@@ -105,127 +98,118 @@ export default function OfficeDashboard() {
         fetchOffices();
     }, []);
 
+    // Show Admin Data
+    useEffect(() => {
+        const fetchAdmins = async () => {
+            try {
+                const token = localStorage.getItem("token");
 
-    const handleEditOffice = (office) => {
-        setSelectedOffice(office);
-        setFormData({
-            stateName: office.stateName,
-            cityName: office.cityName,
-            officeName: office.officeName,
-            adminName: office.adminName,
-            adminEmail: office.adminEmail,
-            username: '',
-            password: '',
-            status: office.status
-        });
-        setShowEditModal(true);
-    };
+                const res = await axios.get("http://localhost:5001/admin", {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                });
 
-    const handleUpdateOffice = () => {
-        if (!formData.cityName || !formData.officeName || !formData.adminName || !formData.adminEmail) {
-            alert('Please fill in all required fields');
-            return;
-        }
-        setOffices(offices.map(office =>
-            office.id === selectedOffice.id
-                ? { ...office, ...formData }
-                : office
-        ));
-        setShowEditModal(false);
-        setSelectedOffice(null);
-    };
-
-    const handleDeleteOffice = (id) => {
-        if (window.confirm('Are you sure you want to delete this office?')) {
-            setOffices(offices.filter(office => office.id !== id));
-        }
-    };
-
-    const toggleStatus = (id) => {
-        setOffices(offices.map(office =>
-            office.id === id
-                ? { ...office, status: office.status === 'Active' ? 'Inactive' : 'Active' }
-                : office
-        ));
-    };
-
-    const handleCreateAdmin = () => {
-        if (!adminFormData.name || !adminFormData.email || !adminFormData.city || !adminFormData.office) {
-            alert('Please fill in all required fields');
-            return;
-        }
-        const newAdmin = {
-            id: admins.length + 1,
-            name: adminFormData.name,
-            email: adminFormData.email,
-            phone: adminFormData.phone,
-            city: adminFormData.city,
-            office: adminFormData.office,
-            status: adminFormData.status,
-            lastLogin: new Date().toISOString().split('T')[0]
+                if (res.data && res.data.admins) {
+                    setAdmins(
+                        res.data.admins.map(a => ({
+                            id: a._id,        // ya a.id
+                            name: a.name,
+                            email: a.email,
+                            username: a.username,
+                            role: a.role,
+                        }))
+                    );
+                }
+            } catch (err) {
+                console.error("Failed to fetch admins:", err);
+            }
         };
-        setAdmins([...admins, newAdmin]);
-        setShowAdminModal(false);
-        setAdminFormData({
-            name: '',
-            email: '',
-            phone: '',
-            city: '',
-            office: '',
-            username: '',
-            password: '',
-            status: 'Active'
-        });
-    };
 
-    const handleEditAdmin = (admin) => {
-        setSelectedAdmin(admin);
-        setAdminFormData({
-            name: admin.name,
-            email: admin.email,
-            phone: admin.phone,
-            city: admin.city,
-            office: admin.office,
-            username: '',
-            password: '',
-            status: admin.status
-        });
-        setShowAdminModal(true);
-    };
+        fetchAdmins();
+    }, []);
 
-    const handleUpdateAdmin = () => {
-        if (!adminFormData.name || !adminFormData.email || !adminFormData.city || !adminFormData.office) {
-            alert('Please fill in all required fields');
+    const [userName, setUserName] = useState("");
+    const [roleLabel, setRoleLabel] = useState("Admin");
+
+    useEffect(() => {
+        const token = localStorage.getItem("token");
+        if (!token) return;
+
+        try {
+            const payload = JSON.parse(atob(token.split(".")[1]));
+
+            const name = payload.name || payload.username || "Admin";
+            setUserName(name);
+
+            if (name === "Admin") {
+                setRoleLabel("Super Admin");
+            } else {
+                setRoleLabel("Admin");
+            }
+        } catch (e) {
+            console.error("Invalid token");
+        }
+    }, []);
+
+    const handleDeleteOffice = async (officeId) => {
+        if (!officeId) {
+            console.error("Invalid officeId:", officeId);
             return;
         }
-        setAdmins(admins.map(admin =>
-            admin.id === selectedAdmin.id
-                ? { ...admin, ...adminFormData }
-                : admin
-        ));
-        setShowAdminModal(false);
-        setSelectedAdmin(null);
-    };
 
-    const handleDeleteAdmin = (id) => {
-        if (window.confirm('Are you sure you want to delete this admin?')) {
-            setAdmins(admins.filter(admin => admin.id !== id));
+        if (!confirm("Are you sure you want to delete this office?")) return;
+
+        try {
+            const token = localStorage.getItem("token");
+
+            await axios.delete(
+                `http://localhost:5001/office/${officeId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            setOffices(prev => prev.filter(o => o.id !== officeId));
+            alert("Office deleted successfully");
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.message || "Failed to delete office");
         }
     };
 
-    const toggleAdminStatus = (id) => {
-        setAdmins(admins.map(admin =>
-            admin.id === id
-                ? { ...admin, status: admin.status === 'Active' ? 'Inactive' : 'Active' }
-                : admin
-        ));
-    };
+    const handleDeleteAdmin = async (adminId) => {
+        if (!adminId) {
+            console.error("Invalid adminId:", adminId);
+            return;
+        }
 
-    const handleResetPassword = (admin) => {
-        if (window.confirm(`Reset password for ${admin.name}? A new password will be sent to ${admin.email}`)) {
-            alert(`Password reset email sent to ${admin.email}`);
+        if (!confirm("Are you sure you want to delete this admin?")) return;
+
+        try {
+            const token = localStorage.getItem("token");
+
+            await axios.delete(
+                `http://localhost:5001/admin/${adminId}`,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            // UI se bhi hata do
+            setAdmins(prev => prev.filter(a => a.id !== adminId));
+
+            alert("Admin deleted successfully");
+        } catch (err) {
+            console.error(err);
+            alert(err.response?.data?.message || "Failed to delete admin");
         }
     };
+
 
     const handleSaveSettings = () => {
         alert('Settings saved successfully!');
@@ -263,281 +247,6 @@ export default function OfficeDashboard() {
             </div>
         </div>
     );
-
-    const OfficeFormModal = ({ show, onClose, onSubmit, title, isEdit = false }) => {
-        if (!show) return null;
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between p-6 border-b">
-                        <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
-                    <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">State Name</label>
-                                <input
-                                    type="text"
-                                    name="statename"
-                                    value={formData.statename || ""}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">City Name</label>
-                                <input
-                                    type="text"
-                                    name="cityName"
-                                    value={formData.cityName}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Office Name</label>
-                                <input
-                                    type="text"
-                                    name="officeName"
-                                    value={formData.officeName || ""}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Admin Name</label>
-                                <input
-                                    type="text"
-                                    name="adminName"
-                                    value={formData.adminName}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Admin Email</label>
-                                <input
-                                    type="email"
-                                    name="adminEmail"
-                                    value={formData.adminEmail}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                                <input
-                                    type="text"
-                                    name="username"
-                                    value={formData.username}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Password {isEdit && '(Leave blank to keep current)'}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    autoComplete="new-password"
-                                    value={formData.password}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                <select
-                                    name="status"
-                                    value={formData.status}
-                                    onChange={handleInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={onClose}
-                                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={onSubmit}
-                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                                {isEdit ? 'Update Office' : 'Create Office'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
-
-    const AdminFormModal = ({ show, onClose }) => {
-        if (!show) return null;
-
-        const handleSubmit = () => {
-            if (selectedAdmin) {
-                handleUpdateAdmin();
-            } else {
-                handleCreateAdmin();
-            }
-        };
-
-        return (
-            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-                <div className="bg-white rounded-lg shadow-xl max-w-2xl w-full max-h-[90vh] overflow-y-auto">
-                    <div className="flex items-center justify-between p-6 border-b">
-                        <h2 className="text-2xl font-bold text-gray-800">
-                            {selectedAdmin ? 'Edit Admin' : 'Create New Admin'}
-                        </h2>
-                        <button onClick={onClose} className="text-gray-500 hover:text-gray-700">
-                            <X className="w-6 h-6" />
-                        </button>
-                    </div>
-
-                    <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Full Name</label>
-                                <input
-                                    type="text"
-                                    name="name"
-                                    value={adminFormData.name}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Email</label>
-                                <input
-                                    type="email"
-                                    name="email"
-                                    value={adminFormData.email}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Phone</label>
-                                <input
-                                    type="tel"
-                                    name="phone"
-                                    value={adminFormData.phone}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">City</label>
-                                <select
-                                    name="city"
-                                    value={adminFormData.city}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                >
-                                    <option value="">Select City</option>
-                                    <option value="Indore">Indore</option>
-                                    <option value="Bhopal">Bhopal</option>
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Office</label>
-                                <select
-                                    name="office"
-                                    value={adminFormData.office}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                >
-                                    <option value="">Select Office</option>
-                                    {offices.map(office => (
-                                        <option key={office.id} value={office.officeName}>
-                                            {office.officeName} ({office.cityName})
-                                        </option>
-                                    ))}
-                                </select>
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Username</label>
-                                <input
-                                    type="text"
-                                    name="username"
-                                    value={adminFormData.username}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">
-                                    Password {selectedAdmin && '(Leave blank to keep current)'}
-                                </label>
-                                <input
-                                    type="password"
-                                    name="password"
-                                    value={adminFormData.password}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                />
-                            </div>
-
-                            <div>
-                                <label className="block text-sm font-medium text-gray-700 mb-2">Status</label>
-                                <select
-                                    name="status"
-                                    value={adminFormData.status}
-                                    onChange={handleAdminInputChange}
-                                    className="w-full px-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-green-500 focus:border-transparent"
-                                >
-                                    <option value="Active">Active</option>
-                                    <option value="Inactive">Inactive</option>
-                                </select>
-                            </div>
-                        </div>
-
-                        <div className="flex justify-end gap-3 mt-6">
-                            <button
-                                onClick={onClose}
-                                className="px-6 py-2 border border-gray-300 rounded-lg text-gray-700 hover:bg-gray-50 transition-colors"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                onClick={handleSubmit}
-                                className="px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"
-                            >
-                                {selectedAdmin ? 'Update Admin' : 'Create Admin'}
-                            </button>
-                        </div>
-                    </div>
-                </div>
-            </div>
-        );
-    };
 
     const DashboardView = () => (
         <>
@@ -592,20 +301,6 @@ export default function OfficeDashboard() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleEditOffice(office)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => toggleStatus(office.id)}
-                                                className={`p-2 ${office.status === 'Active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`}
-                                                title={office.status === 'Active' ? 'Disable' : 'Enable'}
-                                            >
-                                                <Power className="w-4 h-4" />
-                                            </button>
                                             <button
                                                 onClick={() => handleDeleteOffice(office.id)}
                                                 className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -672,20 +367,6 @@ export default function OfficeDashboard() {
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex items-center gap-2">
                                             <button
-                                                onClick={() => handleEditOffice(office)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => toggleStatus(office.id)}
-                                                className={`p-2 ${office.status === 'Active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`}
-                                                title={office.status === 'Active' ? 'Disable' : 'Enable'}
-                                            >
-                                                <Power className="w-4 h-4" />
-                                            </button>
-                                            <button
                                                 onClick={() => handleDeleteOffice(office.id)}
                                                 className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
                                                 title="Delete"
@@ -725,9 +406,6 @@ export default function OfficeDashboard() {
                             <tr>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Admin Name</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Contact</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Assigned Office</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Last Login</th>
-                                <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Status</th>
                                 <th className="px-6 py-3 text-left text-xs font-medium text-gray-500 uppercase tracking-wider">Actions</th>
                             </tr>
                         </thead>
@@ -746,46 +424,9 @@ export default function OfficeDashboard() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap">
                                         <div className="text-sm text-gray-900">{admin.email}</div>
-                                        <div className="text-sm text-gray-500">{admin.phone}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <div className="text-sm font-medium text-gray-900">{admin.office}</div>
-                                        <div className="text-sm text-gray-500">{admin.city}</div>
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
-                                        {admin.lastLogin}
-                                    </td>
-                                    <td className="px-6 py-4 whitespace-nowrap">
-                                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${admin.status === 'Active'
-                                            ? 'bg-green-100 text-green-800'
-                                            : 'bg-red-100 text-red-800'
-                                            }`}>
-                                            {admin.status}
-                                        </span>
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex items-center gap-2">
-                                            <button
-                                                onClick={() => handleEditAdmin(admin)}
-                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded transition-colors"
-                                                title="Edit"
-                                            >
-                                                <Edit2 className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => handleResetPassword(admin)}
-                                                className="p-2 text-purple-600 hover:bg-purple-50 rounded transition-colors"
-                                                title="Reset Password"
-                                            >
-                                                <Key className="w-4 h-4" />
-                                            </button>
-                                            <button
-                                                onClick={() => toggleAdminStatus(admin.id)}
-                                                className={`p-2 ${admin.status === 'Active' ? 'text-orange-600 hover:bg-orange-50' : 'text-green-600 hover:bg-green-50'} rounded transition-colors`}
-                                                title={admin.status === 'Active' ? 'Deactivate' : 'Activate'}
-                                            >
-                                                <UserX className="w-4 h-4" />
-                                            </button>
                                             <button
                                                 onClick={() => handleDeleteAdmin(admin.id)}
                                                 className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -821,7 +462,7 @@ export default function OfficeDashboard() {
                 <div className="space-y-6">
                     <div className="border-b pb-6">
                         <h4 className="text-lg font-semibold text-gray-800 mb-4">General Information</h4>
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-black">
                             <div>
                                 <label className="block text-sm font-medium text-gray-700 mb-2">System Name</label>
                                 <input
@@ -1099,8 +740,8 @@ export default function OfficeDashboard() {
                                     <User className="w-6 h-6 text-white" />
                                 </div>
                                 <div className="text-left">
-                                    <p className="text-sm font-semibold text-gray-800">Super Admin</p>
-                                    <p className="text-xs text-gray-500">admin@safaimitra.in</p>
+                                    <p className="text-sm font-semibold text-gray-800">{roleLabel}</p>
+                                    <p className="text-xs text-gray-500">{userName}</p>
                                 </div>
                             </button>
 
@@ -1151,31 +792,6 @@ export default function OfficeDashboard() {
                     {currentView === 'settings' && <SettingsView />}
                 </main>
             </div>
-
-            <OfficeFormModal
-                show={showCreateModal}
-                onClose={() => setShowCreateModal(false)}
-                title="Create New Office"
-            />
-
-            <OfficeFormModal
-                show={showEditModal}
-                onClose={() => {
-                    setShowEditModal(false);
-                    setSelectedOffice(null);
-                }}
-                onSubmit={handleUpdateOffice}
-                title="Edit Office"
-                isEdit={true}
-            />
-
-            <AdminFormModal
-                show={showAdminModal}
-                onClose={() => {
-                    setShowAdminModal(false);
-                    setSelectedAdmin(null);
-                }}
-            />
         </div>
     );
 }

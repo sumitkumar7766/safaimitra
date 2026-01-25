@@ -11,9 +11,8 @@ export default function NewAdminPage() {
   const [formData, setFormData] = useState({
     name: "",
     email: "",
-    username: "",
     role: "admin",
-    office: "",
+    password: ""
   });
 
   const handleChange = (e) => {
@@ -21,13 +20,24 @@ export default function NewAdminPage() {
   };
 
   const handleCreateAdmin = async () => {
-    if (!formData.name || !formData.email || !formData.username) {
-      alert("All required fields fill karo");
+    if (!formData.name || !formData.email || !formData.password) {
+      alert("All required fields must be filled");
       return;
     }
 
     try {
-      await axios.post("http://localhost:5001/admin/register", formData);
+      const token = localStorage.getItem("token");
+
+      await axios.post(
+        "http://localhost:5001/admin/register",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
       alert("Admin created successfully!");
       router.push("/admin");
     } catch (err) {
@@ -36,8 +46,9 @@ export default function NewAdminPage() {
     }
   };
 
+
   return (
-    <div className="min-h-screen bg-gray-100 p-6">
+    <div className="min-h-screen bg-gray-100 p-6 text-black">
       <div className="max-w-2xl mx-auto bg-white rounded-xl shadow-md">
         <div className="flex items-center gap-3 p-6 border-b">
           <button
@@ -75,11 +86,11 @@ export default function NewAdminPage() {
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Username *</label>
+            <label className="block text-sm font-medium mb-1">Password *</label>
             <input
-              type="text"
-              name="username"
-              value={formData.username}
+              type="password"
+              name="password"
+              value={formData.password}
               onChange={handleChange}
               className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
             />
@@ -93,18 +104,6 @@ export default function NewAdminPage() {
               value={formData.role}
               readOnly
               className="w-full px-4 py-2 border rounded-lg bg-gray-100"
-            />
-          </div>
-
-          <div className="md:col-span-2">
-            <label className="block text-sm font-medium mb-1">Office ID</label>
-            <input
-              type="text"
-              name="office"
-              value={formData.office}
-              onChange={handleChange}
-              placeholder="Office ObjectId"
-              className="w-full px-4 py-2 border rounded-lg focus:ring-2 focus:ring-green-500"
             />
           </div>
         </div>

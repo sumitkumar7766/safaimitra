@@ -1,776 +1,604 @@
-import React, { useState } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StyleSheet, 
+// OfficeDashboard.js
+import React, { useState, useEffect } from 'react';
+import {
+  View,
+  Text,
   ScrollView,
+  TouchableOpacity,
+  TextInput,
+  Modal,
+  Alert,
+  Switch,
+  ActivityIndicator,
   StatusBar,
-  Dimensions,
-  Modal
-} from "react-native";
-import { SafeAreaView } from 'react-native-safe-area-context';
-import MapView, { Marker, PROVIDER_GOOGLE } from 'react-native-maps';
+  SafeAreaView
+} from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import axios from 'axios';
+import {
+  Menu,
+  Activity,
+  Building2,
+  Users,
+  UserCog,
+  Shield,
+  Plus,
+  Trash2,
+  Settings,
+  LogOut,
+  User,
+  Save
+} from 'lucide-react-native';
+import AdminPage from '../App';
 
-const { width } = Dimensions.get('window');
+// Added 'goBack' prop here to handle navigation
+export default function OfficeDashboard({ goBack }) {
+  const [screen, setScreen] = useState("home");
+  const [currentView, setCurrentView] = useState('dashboard');
+  const [sidebarOpen, setSidebarOpen] = useState(false);
+  const [showProfileMenu, setShowProfileMenu] = useState(false);
+  const [loading, setLoading] = useState(false);
 
-export default function Admin({ goBack }) {
-  const [selectedFilter, setSelectedFilter] = useState("all");
-  const [selectedReport, setSelectedReport] = useState(null);
-  const [modalVisible, setModalVisible] = useState(false);
+  const [offices, setOffices] = useState([]);
+  const [admins, setAdmins] = useState([]);
+  const [userName, setUserName] = useState('');
+  const [roleLabel, setRoleLabel] = useState('Admin');
 
-  // Mock data for demonstration
+  const [settings, setSettings] = useState({
+    systemName: 'SafaiMitra',
+    adminEmail: 'admin@safaimitra.in',
+    supportEmail: 'support@safaimitra.in',
+    supportPhone: '+91 1234567890',
+    address: 'Municipal Corporation Building, Indore, MP',
+    enableNotifications: true,
+    enableEmailAlerts: true,
+    sessionTimeout: 30,
+    maxLoginAttempts: 5,
+    passwordExpiry: 90,
+    backupFrequency: 'daily',
+    maintenanceMode: false
+  });
+
   const stats = {
-    total: 156,
-    clean: 98,
-    overflow: 42,
-    missed: 16,
-    activeVehicles: 12,
-    pendingComplaints: 23
+    totalCities: 2,
+    totalOffices: offices.length,
+    totalAdmins: admins.length,
+    activeCities: 2
   };
 
-  // Mock report data with locations
-  const reports = [
-    {
-      id: 1,
-      type: "overflow",
-      location: "Sector 4, Main Market",
-      coordinates: { latitude: 23.2599, longitude: 77.4126 },
-      time: "2 hours ago",
-      priority: "high",
-      status: "pending",
-      reportedBy: "Citizen",
-      vehicle: "Not Assigned"
-    },
-    {
-      id: 2,
-      type: "clean",
-      location: "Zone-A, Ward-12",
-      coordinates: { latitude: 23.2645, longitude: 77.4186 },
-      time: "30 mins ago",
-      priority: "low",
-      status: "completed",
-      reportedBy: "Vehicle MH-09-AB-1234",
-      vehicle: "MH-09-AB-1234"
-    },
-    {
-      id: 3,
-      type: "missed",
-      location: "Kolar Road, Block-3",
-      coordinates: { latitude: 23.2520, longitude: 77.4050 },
-      time: "4 hours ago",
-      priority: "high",
-      status: "flagged",
-      reportedBy: "Auto-Detection",
-      vehicle: "MH-09-AB-5678"
-    },
-    {
-      id: 4,
-      type: "overflow",
-      location: "MP Nagar Zone 1",
-      coordinates: { latitude: 23.2315, longitude: 77.4245 },
-      time: "1 hour ago",
-      priority: "critical",
-      status: "urgent",
-      reportedBy: "Citizen",
-      vehicle: "Not Assigned"
-    },
-    {
-      id: 5,
-      type: "clean",
-      location: "New Market Area",
-      coordinates: { latitude: 23.2688, longitude: 77.4068 },
-      time: "15 mins ago",
-      priority: "low",
-      status: "completed",
-      reportedBy: "Vehicle MH-09-AB-9012",
-      vehicle: "MH-09-AB-9012"
-    },
-  ];
+  // --- MIDDLEWARE & AUTH CHECK ---
+  useEffect(() => {
+    // 1. Initial Load Check
+    const checkAuth = async () => {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) {
+        // Agar token nahi hai, seedha bahar (Home Page)
+        if (goBack) goBack();
+      } else {
+        loadUserData();
+        fetchOffices();
+        fetchAdmins();
+      }
+    };
+    checkAuth();
 
-  const getFilteredReports = () => {
-    if (selectedFilter === "all") return reports;
-    return reports.filter(r => r.type === selectedFilter);
-  };
+    // 2. API Interceptor (Middleware for expired sessions)
+    const interceptor = axios.interceptors.response.use(
+      response => response,
+      async error => {
+        if (error.response && error.response.status === 401) {
+          // Agar server ne kaha 401 (Unauthorized), logout karo aur home bhejo
+          await AsyncStorage.multiRemove(["token", "user", "role", "userId"]);
+          Alert.alert("Session Expired", "Please login again.");
+          if (goBack) goBack();
+        }
+        return Promise.reject(error);
+      }
+    );
 
-  const getMarkerColor = (type) => {
-    switch(type) {
-      case "clean": return "#10b981";
-      case "overflow": return "#f59e0b";
-      case "missed": return "#ef4444";
-      default: return "#6b7280";
+    // Cleanup interceptor on unmount
+    return () => {
+      axios.interceptors.response.eject(interceptor);
+    };
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      if (!token) return;
+
+      const payload = JSON.parse(atob(token.split('.')[1]));
+      const name = payload.name || payload.username || 'Admin';
+      setUserName(name);
+      setRoleLabel(name === 'Admin' ? 'Super Admin' : 'Admin');
+    } catch (e) {
+      console.error('Invalid token');
     }
   };
 
-  const getPriorityColor = (priority) => {
-    switch(priority) {
-      case "critical": return "#dc2626";
-      case "high": return "#f59e0b";
-      case "low": return "#10b981";
-      default: return "#6b7280";
+  const fetchOffices = async () => {
+    try {
+      setLoading(true);
+      const token = await AsyncStorage.getItem('token');
+      const res = await axios.get('http://10.13.177.129:5001/office', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data && res.data.offices) {
+        setOffices(
+          res.data.offices.map(o => ({
+            id: o._id,
+            cityName: o.cityName,
+            officeName: o.officeName,
+            adminName: o.adminName,
+            adminEmail: o.adminEmail,
+            status: o.status
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to fetch offices:', err);
+    } finally {
+      setLoading(false);
     }
   };
 
-  const openReportDetails = (report) => {
-    setSelectedReport(report);
-    setModalVisible(true);
+  const fetchAdmins = async () => {
+    try {
+      const token = await AsyncStorage.getItem('token');
+      const res = await axios.get('http://10.13.177.129:5001/admin', {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data && res.data.admins) {
+        setAdmins(
+          res.data.admins.map(a => ({
+            id: a._id,
+            name: a.name,
+            email: a.email,
+            username: a.username,
+            role: a.role
+          }))
+        );
+      }
+    } catch (err) {
+      console.error('Failed to fetch admins:', err);
+    }
   };
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <StatusBar barStyle="light-content" backgroundColor="#7C3AED" />
+  const handleDeleteOffice = async (officeId) => {
+    Alert.alert(
+      'Delete Office',
+      'Are you sure you want to delete this office?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('token');
+              await axios.delete(`http://10.13.177.129:5001/office/${officeId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              setOffices(prev => prev.filter(o => o.id !== officeId));
+              Alert.alert('Success', 'Office deleted successfully');
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to delete office');
+            }
+          }
+        }
+      ]
+    );
+  };
 
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity onPress={goBack} style={styles.backButton}>
-          <Text style={styles.backIcon}>←</Text>
-        </TouchableOpacity>
-        <View style={styles.headerContent}>
-          <Text style={styles.headerTitle}>CleanBin AI</Text>
-          <Text style={styles.headerSubtitle}>Municipal Dashboard</Text>
+  const handleDeleteAdmin = async (adminId) => {
+    Alert.alert(
+      'Delete Admin',
+      'Are you sure you want to delete this admin?',
+      [
+        { text: 'Cancel', style: 'cancel' },
+        {
+          text: 'Delete',
+          style: 'destructive',
+          onPress: async () => {
+            try {
+              const token = await AsyncStorage.getItem('token');
+              await axios.delete(`http://10.13.177.129:5001/admin/${adminId}`, {
+                headers: { Authorization: `Bearer ${token}` }
+              });
+              setAdmins(prev => prev.filter(a => a.id !== adminId));
+              Alert.alert('Success', 'Admin deleted successfully');
+            } catch (err) {
+              Alert.alert('Error', err.response?.data?.message || 'Failed to delete admin');
+            }
+          }
+        }
+      ]
+    );
+  };
+
+  if (screen === "adminPage") return <AdminPage goBack={() => setScreen("home")} />;
+
+  const handleLogout = () => {
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await AsyncStorage.multiRemove(["token", "user", "role", "userId"]);
+            Alert.alert("Success", "Logged out successfully");
+            
+            // Checking if goBack exists before calling to avoid crash
+            if (goBack) {
+              goBack();
+            } else {
+              console.warn("goBack prop not passed to OfficeDashboard");
+            }
+          } catch (error) {
+            console.error("Logout Error", error);
+          }
+        },
+      },
+    ]);
+  };
+
+
+  const StatCard = ({ icon: Icon, title, value, color }) => (
+    <View className={`bg-white rounded-lg shadow-md p-6 mb-3 border-l-4`} style={{ borderLeftColor: color }}>
+      <View className="flex-row items-center justify-between">
+        <View>
+          <Text className="text-gray-500 text-sm font-medium">{title}</Text>
+          <Text className="text-3xl font-bold text-gray-800 mt-2">{value}</Text>
         </View>
-        <View style={styles.liveBadge}>
-          <View style={styles.liveDot} />
-          <Text style={styles.liveText}>LIVE</Text>
+        <View className="p-3 rounded-full" style={{ backgroundColor: `${color}20` }}>
+          <Icon size={32} color={color} />
         </View>
       </View>
+    </View>
+  );
 
-      <ScrollView style={styles.scrollView} contentContainerStyle={styles.content}>
-        
-        {/* Stats Overview */}
-        <View style={styles.statsContainer}>
-          <View style={styles.statsGrid}>
-            <View style={[styles.statCard, { backgroundColor: "#DBEAFE" }]}>
-              <Text style={styles.statNumber}>{stats.total}</Text>
-              <Text style={styles.statLabel}>Total Bins</Text>
+  const DashboardView = () => (
+    <ScrollView className="flex-1 p-4">
+      <View className="mb-6">
+        <StatCard icon={Building2} title="Total Cities" value={stats.totalCities} color="#10b981" />
+        <StatCard icon={Users} title="Total Offices" value={stats.totalOffices} color="#3b82f6" />
+        <StatCard icon={UserCog} title="Total Admins" value={stats.totalAdmins} color="#f59e0b" />
+        <StatCard icon={Activity} title="Active Cities" value={stats.activeCities} color="#8b5cf6" />
+      </View>
+
+      <View className="bg-white rounded-lg shadow-md p-4 mb-4 flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-gray-800">City Offices</Text>
+        <TouchableOpacity className="flex-row items-center gap-2 px-4 py-2 bg-green-600 rounded-lg">
+          <Plus size={20} color="#fff" />
+          <Text className="text-white font-semibold">New Office</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#16a34a" className="mt-8" />
+      ) : (
+        offices.map(office => (
+          <View key={office.id} className="bg-white rounded-lg shadow-md p-4 mb-3">
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">City Name</Text>
+              <Text className="text-sm font-semibold text-gray-900">{office.cityName}</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: "#D1FAE5" }]}>
-              <Text style={[styles.statNumber, { color: "#059669" }]}>{stats.clean}</Text>
-              <Text style={styles.statLabel}>Clean ✅</Text>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">Office Name</Text>
+              <Text className="text-sm text-gray-700">{office.officeName}</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: "#FEF3C7" }]}>
-              <Text style={[styles.statNumber, { color: "#d97706" }]}>{stats.overflow}</Text>
-              <Text style={styles.statLabel}>Overflow ⚠️</Text>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">Assigned Admin</Text>
+              <Text className="text-sm font-medium text-gray-900">{office.adminName}</Text>
+              <Text className="text-sm text-gray-500">{office.adminEmail}</Text>
             </View>
-            <View style={[styles.statCard, { backgroundColor: "#FEE2E2" }]}>
-              <Text style={[styles.statNumber, { color: "#dc2626" }]}>{stats.missed}</Text>
-              <Text style={styles.statLabel}>Missed 🚨</Text>
+
+            <View className="flex-row items-center justify-between">
+              <View className={`px-3 py-1 rounded-full ${office.status === 'Active' ? 'bg-green-100' : 'bg-red-100'}`}>
+                <Text className={`text-xs font-semibold ${office.status === 'Active' ? 'text-green-800' : 'text-red-800'}`}>
+                  {office.status}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleDeleteOffice(office.id)}
+                className="p-2 bg-red-50 rounded"
+              >
+                <Trash2 size={16} color="#dc2626" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+    </ScrollView>
+  );
+
+  const AdminsView = () => (
+    <ScrollView className="flex-1 p-4">
+      <View className="bg-white rounded-lg shadow-md p-4 mb-4 flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-gray-800">City Admins</Text>
+        <TouchableOpacity className="flex-row items-center gap-2 px-4 py-2 bg-green-600 rounded-lg">
+          <Plus size={20} color="#fff" />
+          <Text className="text-white font-semibold">New Admin</Text>
+        </TouchableOpacity>
+      </View>
+
+      {admins.map(admin => (
+        <View key={admin.id} className="bg-white rounded-lg shadow-md p-4 mb-3">
+          <View className="flex-row items-center mb-3">
+            <View className="w-12 h-12 bg-blue-600 rounded-full items-center justify-center mr-3">
+              <Text className="text-white text-lg font-semibold">{admin.name.charAt(0)}</Text>
+            </View>
+            <View className="flex-1">
+              <Text className="text-sm font-medium text-gray-900">{admin.name}</Text>
+              <Text className="text-sm text-gray-500">{admin.email}</Text>
             </View>
           </View>
 
-          {/* Active Info */}
-          <View style={styles.activeInfoRow}>
-            <View style={styles.activeInfoCard}>
-              <Text style={styles.activeInfoIcon}>🚛</Text>
-              <View>
-                <Text style={styles.activeInfoNumber}>{stats.activeVehicles}</Text>
-                <Text style={styles.activeInfoLabel}>Active Vehicles</Text>
-              </View>
-            </View>
-            <View style={styles.activeInfoCard}>
-              <Text style={styles.activeInfoIcon}>📋</Text>
-              <View>
-                <Text style={styles.activeInfoNumber}>{stats.pendingComplaints}</Text>
-                <Text style={styles.activeInfoLabel}>Pending Actions</Text>
-              </View>
-            </View>
+          <TouchableOpacity
+            onPress={() => handleDeleteAdmin(admin.id)}
+            className="p-2 bg-red-600 rounded items-center"
+          >
+            <Text className="text-white font-semibold">Delete</Text>
+          </TouchableOpacity>
+        </View>
+      ))}
+    </ScrollView>
+  );
+
+  const SettingsView = () => (
+    <ScrollView className="flex-1 p-4">
+      <View className="bg-white rounded-lg shadow-md p-6 mb-6">
+        <View className="flex-row items-center justify-between mb-6">
+          <Text className="text-2xl font-bold text-gray-800">Settings</Text>
+          <TouchableOpacity
+            onPress={() => Alert.alert('Success', 'Settings saved!')}
+            className="flex-row items-center gap-2 px-6 py-2 bg-green-600 rounded-lg"
+          >
+            <Save size={20} color="#fff" />
+            <Text className="text-white font-semibold">Save</Text>
+          </TouchableOpacity>
+        </View>
+
+        <View className="mb-6">
+          <Text className="text-lg font-semibold text-gray-800 mb-4">General Information</Text>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">System Name</Text>
+            <TextInput
+              value={settings.systemName}
+              onChangeText={text => setSettings({ ...settings, systemName: text })}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Admin Email</Text>
+            <TextInput
+              value={settings.adminEmail}
+              onChangeText={text => setSettings({ ...settings, adminEmail: text })}
+              keyboardType="email-address"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Support Email</Text>
+            <TextInput
+              value={settings.supportEmail}
+              onChangeText={text => setSettings({ ...settings, supportEmail: text })}
+              keyboardType="email-address"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Support Phone</Text>
+            <TextInput
+              value={settings.supportPhone}
+              onChangeText={text => setSettings({ ...settings, supportPhone: text })}
+              keyboardType="phone-pad"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Address</Text>
+            <TextInput
+              value={settings.address}
+              onChangeText={text => setSettings({ ...settings, address: text })}
+              multiline
+              numberOfLines={2}
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
           </View>
         </View>
 
-        {/* Map View */}
-        <View style={styles.mapCard}>
-          <View style={styles.mapHeader}>
-            <Text style={styles.mapTitle}>🗺️ Live City Map</Text>
-            <Text style={styles.mapSubtitle}>Real-time bin status across Bhopal</Text>
+        <View className="mb-6 border-t border-gray-200 pt-6">
+          <Text className="text-lg font-semibold text-gray-800 mb-4">Notification Settings</Text>
+
+          <View className="flex-row items-center justify-between mb-4 pb-3 border-b border-gray-200">
+            <View className="flex-1">
+              <Text className="font-medium text-gray-700">Enable Notifications</Text>
+              <Text className="text-sm text-gray-500">Send system notifications</Text>
+            </View>
+            <Switch
+              value={settings.enableNotifications}
+              onValueChange={value => setSettings({ ...settings, enableNotifications: value })}
+              trackColor={{ false: '#d1d5db', true: '#16a34a' }}
+              thumbColor="#fff"
+            />
           </View>
-          
-          <View style={styles.mapContainer}>
-            <MapView
-              provider={PROVIDER_GOOGLE}
-              style={styles.map}
-              initialRegion={{
-                latitude: 23.2599,
-                longitude: 77.4126,
-                latitudeDelta: 0.05,
-                longitudeDelta: 0.05,
+
+          <View className="flex-row items-center justify-between">
+            <View className="flex-1">
+              <Text className="font-medium text-gray-700">Email Alerts</Text>
+              <Text className="text-sm text-gray-500">Send critical email alerts</Text>
+            </View>
+            <Switch
+              value={settings.enableEmailAlerts}
+              onValueChange={value => setSettings({ ...settings, enableEmailAlerts: value })}
+              trackColor={{ false: '#d1d5db', true: '#16a34a' }}
+              thumbColor="#fff"
+            />
+          </View>
+        </View>
+
+        <View className="border-t border-gray-200 pt-6">
+          <Text className="text-lg font-semibold text-gray-800 mb-4">Security Settings</Text>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Session Timeout (minutes)</Text>
+            <TextInput
+              value={String(settings.sessionTimeout)}
+              onChangeText={text => setSettings({ ...settings, sessionTimeout: Number(text) })}
+              keyboardType="number-pad"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Max Login Attempts</Text>
+            <TextInput
+              value={String(settings.maxLoginAttempts)}
+              onChangeText={text => setSettings({ ...settings, maxLoginAttempts: Number(text) })}
+              keyboardType="number-pad"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+
+          <View className="mb-4">
+            <Text className="text-sm font-medium text-gray-700 mb-2">Password Expiry (days)</Text>
+            <TextInput
+              value={String(settings.passwordExpiry)}
+              onChangeText={text => setSettings({ ...settings, passwordExpiry: Number(text) })}
+              keyboardType="number-pad"
+              className="w-full px-4 py-2 border border-gray-300 rounded-lg text-gray-900"
+            />
+          </View>
+        </View>
+      </View>
+    </ScrollView>
+  );
+
+  return (
+    <SafeAreaView className="flex-1 bg-gray-900 pt-6">
+      <StatusBar barStyle="light-content" backgroundColor="#15803d" />
+
+      {/* Header */}
+      <View className="bg-gradient-to-r from-green-700 to-green-900 p-4 flex-row items-center justify-between shadow-lg">
+
+        <View className="flex-row items-center gap-2">
+          <Shield size={28} color="#fff" />
+          <Text className="text-xl font-bold text-white">SafaiMitra</Text>
+        </View>
+
+        <TouchableOpacity onPress={() => setShowProfileMenu(!showProfileMenu)} className="p-2">
+          <View className="w-10 h-10 bg-white rounded-full items-center justify-center">
+            <User size={20} color="#15803d" />
+          </View>
+        </TouchableOpacity>
+      </View>
+
+      {/* Navigation Tabs */}
+      <View className="bg-white flex-row border-b border-gray-200">
+        <TouchableOpacity
+          className={`flex-1 py-3 items-center ${currentView === 'dashboard' ? 'border-b-2 border-green-600' : ''}`}
+          onPress={() => setCurrentView('dashboard')}
+        >
+          <Text className={`text-sm ${currentView === 'dashboard' ? 'text-green-600 font-semibold' : 'text-gray-600'}`}>
+            Dashboard
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className={`flex-1 py-3 items-center ${currentView === 'offices' ? 'border-b-2 border-green-600' : ''}`}
+          onPress={() => setCurrentView('offices')}
+        >
+          <Text className={`text-sm ${currentView === 'offices' ? 'text-green-600 font-semibold' : 'text-gray-600'}`}>
+            Offices
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className={`flex-1 py-3 items-center ${currentView === 'admins' ? 'border-b-2 border-green-600' : ''}`}
+          onPress={() => setCurrentView('admins')}
+        >
+          <Text className={`text-sm ${currentView === 'admins' ? 'text-green-600 font-semibold' : 'text-gray-600'}`}>
+            Admins
+          </Text>
+        </TouchableOpacity>
+
+        <TouchableOpacity
+          className={`flex-1 py-3 items-center ${currentView === 'settings' ? 'border-b-2 border-green-600' : ''}`}
+          onPress={() => setCurrentView('settings')}
+        >
+          <Text className={`text-sm ${currentView === 'settings' ? 'text-green-600 font-semibold' : 'text-gray-600'}`}>
+            Settings
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* Content */}
+      {currentView === 'dashboard' && <DashboardView />}
+      {currentView === 'offices' && <DashboardView />}
+      {currentView === 'admins' && <AdminsView />}
+      {currentView === 'settings' && <SettingsView />}
+
+      {/* Profile Menu Modal */}
+      <Modal
+        visible={showProfileMenu}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setShowProfileMenu(false)}
+      >
+        <TouchableOpacity
+          className="flex-1 bg-black/50 justify-start items-end pt-16 pr-4"
+          activeOpacity={1}
+          onPress={() => setShowProfileMenu(false)}
+        >
+          <View className="bg-white rounded-lg w-48 shadow-xl">
+            <View className="p-4 border-b border-gray-200">
+              <Text className="text-base font-semibold text-gray-900">{userName}</Text>
+              <Text className="text-xs text-gray-500">{roleLabel}</Text>
+            </View>
+
+            <TouchableOpacity className="p-4 flex-row items-center gap-2">
+              <User size={16} color="#374151" />
+              <Text className="text-sm text-gray-700">Profile</Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              className="p-4 flex-row items-center gap-2"
+              onPress={() => {
+                setShowProfileMenu(false);
+                setCurrentView('settings');
               }}
             >
-              {reports.map((report) => (
-                <Marker
-                  key={report.id}
-                  coordinate={report.coordinates}
-                  pinColor={getMarkerColor(report.type)}
-                  onPress={() => openReportDetails(report)}
-                >
-                  <View style={[
-                    styles.customMarker,
-                    { backgroundColor: getMarkerColor(report.type) }
-                  ]}>
-                    <Text style={styles.markerText}>
-                      {report.type === "clean" ? "✓" : 
-                       report.type === "overflow" ? "!" : "✕"}
-                    </Text>
-                  </View>
-                </Marker>
-              ))}
-            </MapView>
-          </View>
-
-          {/* Map Legend */}
-          <View style={styles.mapLegend}>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: "#10b981" }]} />
-              <Text style={styles.legendText}>Clean</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: "#f59e0b" }]} />
-              <Text style={styles.legendText}>Overflow</Text>
-            </View>
-            <View style={styles.legendItem}>
-              <View style={[styles.legendDot, { backgroundColor: "#ef4444" }]} />
-              <Text style={styles.legendText}>Missed</Text>
-            </View>
-          </View>
-        </View>
-
-        {/* Filter Tabs */}
-        <View style={styles.filterContainer}>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-            {["all", "overflow", "missed", "clean"].map((filter) => (
-              <TouchableOpacity
-                key={filter}
-                style={[
-                  styles.filterTab,
-                  selectedFilter === filter && styles.filterTabActive
-                ]}
-                onPress={() => setSelectedFilter(filter)}
-              >
-                <Text style={[
-                  styles.filterText,
-                  selectedFilter === filter && styles.filterTextActive
-                ]}>
-                  {filter === "all" ? "All Reports" : 
-                   filter === "overflow" ? "⚠️ Overflow" :
-                   filter === "missed" ? "🚨 Missed" : "✅ Clean"}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-
-        {/* Reports List */}
-        <View style={styles.reportsSection}>
-          <Text style={styles.sectionTitle}>Recent Reports ({getFilteredReports().length})</Text>
-          
-          {getFilteredReports().map((report) => (
-            <TouchableOpacity 
-              key={report.id}
-              style={styles.reportCard}
-              onPress={() => openReportDetails(report)}
-            >
-              <View style={styles.reportHeader}>
-                <View style={[
-                  styles.reportIcon,
-                  { backgroundColor: 
-                    report.type === "clean" ? "#D1FAE5" :
-                    report.type === "overflow" ? "#FEF3C7" : "#FEE2E2"
-                  }
-                ]}>
-                  <Text style={styles.reportEmoji}>
-                    {report.type === "clean" ? "✅" :
-                     report.type === "overflow" ? "⚠️" : "🚨"}
-                  </Text>
-                </View>
-                
-                <View style={styles.reportInfo}>
-                  <Text style={styles.reportLocation}>{report.location}</Text>
-                  <Text style={styles.reportTime}>{report.time}</Text>
-                </View>
-
-                <View style={[
-                  styles.priorityBadge,
-                  { backgroundColor: getPriorityColor(report.priority) + "20" }
-                ]}>
-                  <Text style={[
-                    styles.priorityText,
-                    { color: getPriorityColor(report.priority) }
-                  ]}>
-                    {report.priority.toUpperCase()}
-                  </Text>
-                </View>
-              </View>
-
-              <View style={styles.reportFooter}>
-                <Text style={styles.reportDetail}>
-                  📍 {report.reportedBy}
-                </Text>
-                <Text style={styles.reportDetail}>
-                  🚛 {report.vehicle}
-                </Text>
-              </View>
+              <Settings size={16} color="#374151" />
+              <Text className="text-sm text-gray-700">Settings</Text>
             </TouchableOpacity>
-          ))}
-        </View>
 
-        <View style={{ height: 40 }} />
-      </ScrollView>
+            <View className="h-px bg-gray-200" />
 
-      {/* Report Detail Modal */}
-      <Modal
-        visible={modalVisible}
-        transparent={true}
-        animationType="slide"
-        onRequestClose={() => setModalVisible(false)}
-      >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
-            {selectedReport && (
-              <>
-                <View style={styles.modalHeader}>
-                  <Text style={styles.modalTitle}>Report Details</Text>
-                  <TouchableOpacity 
-                    onPress={() => setModalVisible(false)}
-                    style={styles.modalClose}
-                  >
-                    <Text style={styles.modalCloseText}>✕</Text>
-                  </TouchableOpacity>
-                </View>
-
-                <View style={styles.modalBody}>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Location:</Text>
-                    <Text style={styles.modalValue}>{selectedReport.location}</Text>
-                  </View>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Status:</Text>
-                    <Text style={[
-                      styles.modalValue,
-                      { color: getMarkerColor(selectedReport.type) }
-                    ]}>
-                      {selectedReport.type.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Priority:</Text>
-                    <Text style={[
-                      styles.modalValue,
-                      { color: getPriorityColor(selectedReport.priority) }
-                    ]}>
-                      {selectedReport.priority.toUpperCase()}
-                    </Text>
-                  </View>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Reported By:</Text>
-                    <Text style={styles.modalValue}>{selectedReport.reportedBy}</Text>
-                  </View>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Vehicle:</Text>
-                    <Text style={styles.modalValue}>{selectedReport.vehicle}</Text>
-                  </View>
-                  <View style={styles.modalRow}>
-                    <Text style={styles.modalLabel}>Time:</Text>
-                    <Text style={styles.modalValue}>{selectedReport.time}</Text>
-                  </View>
-                </View>
-
-                <View style={styles.modalActions}>
-                  <TouchableOpacity style={styles.modalActionBtn}>
-                    <Text style={styles.modalActionText}>📞 Call Vehicle</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity style={[styles.modalActionBtn, { backgroundColor: "#7C3AED" }]}>
-                    <Text style={[styles.modalActionText, { color: "#fff" }]}>
-                      🚛 Assign Vehicle
-                    </Text>
-                  </TouchableOpacity>
-                </View>
-              </>
-            )}
+            <TouchableOpacity
+              className="p-4 bg-red-50 rounded-b-lg flex-row items-center gap-0"
+              onPress={() => {
+                setShowProfileMenu(false);
+                handleLogout();
+              }}
+            >
+              <LogOut size={16} color="#dc2626" />
+              <Text className="text-sm text-red-600 font-semibold">Logout</Text>
+            </TouchableOpacity>
           </View>
-        </View>
+        </TouchableOpacity>
       </Modal>
-
     </SafeAreaView>
   );
 }
-
-const styles = StyleSheet.create({
-  container: { 
-    flex: 1, 
-    backgroundColor: "#7C3AED" 
-  },
-  
-  // Header
-  header: {
-    flexDirection: "row",
-    alignItems: "center",
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: "#7C3AED",
-  },
-  backButton: {
-    width: 44,
-    height: 44,
-    backgroundColor: "rgba(255,255,255,0.2)",
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 16,
-  },
-  backIcon: { 
-    fontSize: 24, 
-    color: "#fff",
-    fontWeight: "bold"
-  },
-  headerContent: { 
-    flex: 1 
-  },
-  headerTitle: { 
-    fontSize: 24, 
-    fontWeight: "bold", 
-    color: "#fff",
-    marginBottom: 4
-  },
-  headerSubtitle: { 
-    fontSize: 13, 
-    color: "#DDD6FE" 
-  },
-  liveBadge: {
-    flexDirection: "row",
-    alignItems: "center",
-    backgroundColor: "rgba(255,255,255,0.2)",
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 12,
-    gap: 6,
-  },
-  liveDot: {
-    width: 8,
-    height: 8,
-    backgroundColor: "#10b981",
-    borderRadius: 4,
-  },
-  liveText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-
-  // ScrollView
-  scrollView: {
-    flex: 1,
-    backgroundColor: "#F3F4F6",
-  },
-  content: {
-    paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 20,
-  },
-
-  // Stats Container
-  statsContainer: {
-    marginBottom: 20,
-  },
-  statsGrid: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-    gap: 12,
-    marginBottom: 12,
-  },
-  statCard: {
-    flex: 1,
-    minWidth: (width - 56) / 2,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    alignItems: "center",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  statNumber: {
-    fontSize: 32,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  statLabel: {
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: "600",
-  },
-
-  // Active Info
-  activeInfoRow: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  activeInfoCard: {
-    flex: 1,
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  activeInfoIcon: {
-    fontSize: 28,
-  },
-  activeInfoNumber: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#7C3AED",
-  },
-  activeInfoLabel: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-
-  // Map Card
-  mapCard: {
-    backgroundColor: "#fff",
-    borderRadius: 24,
-    padding: 20,
-    marginBottom: 20,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 5,
-  },
-  mapHeader: {
-    marginBottom: 16,
-  },
-  mapTitle: {
-    fontSize: 20,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  mapSubtitle: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  mapContainer: {
-    height: 300,
-    borderRadius: 16,
-    overflow: "hidden",
-    marginBottom: 16,
-  },
-  map: {
-    flex: 1,
-  },
-  customMarker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-    borderWidth: 3,
-    borderColor: "#fff",
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  markerText: {
-    color: "#fff",
-    fontSize: 18,
-    fontWeight: "bold",
-  },
-  mapLegend: {
-    flexDirection: "row",
-    justifyContent: "center",
-    gap: 20,
-  },
-  legendItem: {
-    flexDirection: "row",
-    alignItems: "center",
-    gap: 8,
-  },
-  legendDot: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-  },
-  legendText: {
-    fontSize: 13,
-    color: "#6b7280",
-    fontWeight: "600",
-  },
-
-  // Filter Tabs
-  filterContainer: {
-    marginBottom: 20,
-  },
-  filterTab: {
-    paddingHorizontal: 20,
-    paddingVertical: 12,
-    backgroundColor: "#fff",
-    borderRadius: 12,
-    marginRight: 12,
-  },
-  filterTabActive: {
-    backgroundColor: "#7C3AED",
-  },
-  filterText: {
-    fontSize: 14,
-    fontWeight: "600",
-    color: "#6b7280",
-  },
-  filterTextActive: {
-    color: "#fff",
-  },
-
-  // Reports Section
-  reportsSection: {
-    marginBottom: 20,
-  },
-  sectionTitle: {
-    fontSize: 18,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 16,
-  },
-  reportCard: {
-    backgroundColor: "#fff",
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  reportHeader: {
-    flexDirection: "row",
-    alignItems: "center",
-    marginBottom: 12,
-  },
-  reportIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 12,
-    justifyContent: "center",
-    alignItems: "center",
-    marginRight: 12,
-  },
-  reportEmoji: {
-    fontSize: 24,
-  },
-  reportInfo: {
-    flex: 1,
-  },
-  reportLocation: {
-    fontSize: 16,
-    fontWeight: "bold",
-    color: "#1f2937",
-    marginBottom: 4,
-  },
-  reportTime: {
-    fontSize: 13,
-    color: "#6b7280",
-  },
-  priorityBadge: {
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 8,
-  },
-  priorityText: {
-    fontSize: 11,
-    fontWeight: "bold",
-  },
-  reportFooter: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingTop: 12,
-    borderTopWidth: 1,
-    borderTopColor: "#f3f4f6",
-  },
-  reportDetail: {
-    fontSize: 12,
-    color: "#6b7280",
-  },
-
-  // Modal
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: "rgba(0,0,0,0.5)",
-    justifyContent: "flex-end",
-  },
-  modalContent: {
-    backgroundColor: "#fff",
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    padding: 24,
-    maxHeight: "80%",
-  },
-  modalHeader: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    alignItems: "center",
-    marginBottom: 24,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontWeight: "bold",
-    color: "#1f2937",
-  },
-  modalClose: {
-    width: 36,
-    height: 36,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 18,
-    justifyContent: "center",
-    alignItems: "center",
-  },
-  modalCloseText: {
-    fontSize: 20,
-    color: "#6b7280",
-  },
-  modalBody: {
-    marginBottom: 24,
-  },
-  modalRow: {
-    flexDirection: "row",
-    justifyContent: "space-between",
-    paddingVertical: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: "#f3f4f6",
-  },
-  modalLabel: {
-    fontSize: 15,
-    color: "#6b7280",
-    fontWeight: "600",
-  },
-  modalValue: {
-    fontSize: 15,
-    color: "#1f2937",
-    fontWeight: "700",
-  },
-  modalActions: {
-    flexDirection: "row",
-    gap: 12,
-  },
-  modalActionBtn: {
-    flex: 1,
-    paddingVertical: 14,
-    backgroundColor: "#f3f4f6",
-    borderRadius: 12,
-    alignItems: "center",
-  },
-  modalActionText: {
-    fontSize: 15,
-    fontWeight: "bold",
-    color: "#1f2937",
-  },
-});

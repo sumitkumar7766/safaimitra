@@ -7,8 +7,6 @@ const LocalStrategy = require("passport-local");
 const session = require("express-session");
 require("dotenv").config();
 const bodyParser = require("body-parser");
-
-const JWT_SECRET = "safaimitra-secret";
 const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
 
 // Models
@@ -43,10 +41,7 @@ const store = MongoStore.create({
 });
 
 // Middlewares
-app.use(cors({
-  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
-  credentials: true,
-}));
+app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -54,7 +49,7 @@ app.use(bodyParser.json());
 app.use(
   session({
     store,
-    secret: process.env.SECRET_KEY || JWT_SECRET,
+    secret: process.env.JWT_SECRET,
     resave: false,
     saveUninitialized: true,
     cookie: {
@@ -112,6 +107,6 @@ app.get("/", (_req, res) => {
 });
 
 // Start server
-app.listen(5001, () => {
+app.listen(5001, "0.0.0.0", () => {
   console.log("Server running on port 5001");
 });

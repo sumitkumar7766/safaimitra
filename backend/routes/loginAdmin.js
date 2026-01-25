@@ -3,7 +3,7 @@ const router = express.Router();
 const Admin = require("../model/AdminModel");
 const jwt = require("jsonwebtoken");
 
-const JWT_SECRET = process.env.SECRET_KEY || "safaimitra-secret";
+const JWT_SECRET = process.env.SECRET_KEY ;
 
 // POST login (Frontend axios.post ke liye)
 router.post("/login", async (req, res) => {
@@ -36,13 +36,11 @@ router.post("/login", async (req, res) => {
 
             // JWT generate karo
             const token = jwt.sign(
-                {
-                    id: user._id,
-                    role: user.role,
-                },
-                JWT_SECRET,
+                { id: user._id, role: user.role, name: user.name },
+                process.env.JWT_SECRET,
                 { expiresIn: "7d" }
             );
+
 
             return res.json({
                 success: true,

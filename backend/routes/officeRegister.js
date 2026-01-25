@@ -2,18 +2,17 @@ const express = require("express");
 const router = express.Router();
 const Office = require("../model/OfficeModel");
 const bcrypt = require("bcrypt");
+const adminAuth = require("../middleware/adminAuth");
 
 // Manual Office Registration
-router.post("/register", async (req, res) => {
+router.post("/register", adminAuth, async (req, res) => {
   try {
-    console.log("Office registration attempt:", req.body);
     const {
       stateName,
       cityName,
       officeName,
       adminName,
       adminEmail,
-      username,
       password,
       status,
     } = req.body;
@@ -24,23 +23,10 @@ router.post("/register", async (req, res) => {
       !officeName ||
       !adminName ||
       !adminEmail ||
-      !username ||
       !password
     ) {
       return res.status(400).json({ message: "All fields are required" });
     }
-
-    // Check if office/admin already exists
-    const existing = await Office.findOne({
-      $or: [{ adminEmail }, { username }],
-    });
-
-    if (existing) {
-      return res.status(409).json({ message: "Office already exists" });
-    }
-
-    // Hash password
-    const hashedPassword = await bcrypt.hash(password, 10);
 
     const newOffice = new Office({
       stateName,
@@ -48,12 +34,12 @@ router.post("/register", async (req, res) => {
       officeName,
       adminName,
       adminEmail,
-      username,
-      password: hashedPassword,
+      username: adminEmail, // login ke liye
       status: status || "Active",
     });
 
-    const office = await newOffice.save();
+    // passport-local-mongoose method
+    const office = await Office.register(newOffice, password);
 
     res.status(201).json({
       message: "Office registered successfully",
@@ -69,19 +55,26 @@ router.post("/register", async (req, res) => {
       },
     });
   } catch (err) {
+    if (err.name === "UserExistsError") {
+      return res.status(409).json({ message: "Office already exists" });
+    }
+
+    console.error("Error during office registration:", err);
     res.status(500).json({ error: err.message });
   }
 });
 
+
 // GET all offices
-router.get("/", async (req, res) => {
+router.get("/", adminAuth, async (req, res) => {
   try {
     const offices = await Office.find().sort({ createdAt: -1 });
 
     res.json({
       success: true,
       offices: offices.map((o) => ({
-        id: o._id,
+        _id: o._id,          // raw Mongo id
+        id: o._id.toString(),// friendly id for frontend
         stateName: o.stateName,
         cityName: o.cityName,
         officeName: o.officeName,
@@ -97,6 +90,19 @@ router.get("/", async (req, res) => {
       success: false,
       message: err.message,
     });
+  }
+});
+
+
+router.delete("/:id", adminAuth, async (req, res) => {
+  try {
+    const office = await Office.findByIdAndDelete(req.params.id);
+    if (!office) {
+      return res.status(404).json({ message: "Office not found" });
+    }
+    res.json({ message: "Office deleted successfully" });
+  } catch (err) {
+    res.status(500).json({ message: err.message });
   }
 });
 

@@ -12,7 +12,6 @@ const OfficeSchema = new Schema(
       required: true,
       trim: true,
     },
-
     cityName: {
       type: String,
       required: true,
@@ -35,22 +34,13 @@ const OfficeSchema = new Schema(
       type: String,
       required: true,
       unique: true,
-      lowercase: true,
-      trim: true,
+      sparse: true,
     },
-
     username: {
       type: String,
       required: true,
-      unique: true,
       trim: true,
     },
-
-    password: {
-      type: String,
-      required: true, // isko hash karke store karna best practice hai
-    },
-
     status: {
       type: String,
       enum: ["Active", "Inactive"],
@@ -61,5 +51,4 @@ const OfficeSchema = new Schema(
 );
 
 OfficeSchema.plugin(passportLocalMongoose);
-
 module.exports = mongoose.model("Office", OfficeSchema);

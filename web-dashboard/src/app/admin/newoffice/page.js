@@ -9,7 +9,7 @@ export default function NewOfficePage() {
   const router = useRouter();
 
   const [formData, setFormData] = useState({
-    statename: "",
+    stateName: "",
     cityName: "",
     officeName: "",
     adminName: "",
@@ -25,7 +25,7 @@ export default function NewOfficePage() {
 
   const handleCreateOffice = async () => {
     if (
-      !formData.statename ||
+      !formData.stateName ||
       !formData.cityName ||
       !formData.officeName ||
       !formData.adminName ||
@@ -37,17 +37,17 @@ export default function NewOfficePage() {
     }
 
     try {
-      await axios.post("http://localhost:5001/office/register", {
-        stateName: formData.statename,
-        cityName: formData.cityName,
-        officeName: formData.officeName,
-        adminName: formData.adminName,
-        adminEmail: formData.adminEmail,
-        username: formData.adminEmail,
-        password: formData.password,
-        status: formData.status,
-      },
-    );
+      const token = localStorage.getItem("token");
+
+      await axios.post(
+        "http://localhost:5001/office/register",
+        formData,
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
 
       alert("Office created successfully!");
       router.push("/admin"); // back to dashboard
@@ -79,8 +79,8 @@ export default function NewOfficePage() {
             <label className="block text-sm font-medium mb-1">State Name</label>
             <input
               type="text"
-              name="statename"
-              value={formData.statename}
+              name="stateName"
+              value={formData.stateName}
               onChange={handleInputChange}
               className="w-full px-4 py-2 border rounded-lg"
             />

@@ -1,10 +1,10 @@
 import { useState, useEffect, useRef } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StatusBar, 
-  TextInput, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
   Alert,
   Animated,
   ScrollView,
@@ -12,6 +12,10 @@ import {
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserRegister from "./screens/userRegister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import AdminPage from "./screens/Admin";
+
 
 // Animated Card Component
 const AnimatedCard = ({ children, delay = 0 }) => {
@@ -63,7 +67,7 @@ const Citizen = ({ goBack }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
+      <Animated.View
         style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
       >
         <View className="p-6 bg-blue-900">
@@ -96,7 +100,7 @@ const Vehicle = ({ goBack }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
+      <Animated.View
         style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
       >
         <View className="p-6 bg-blue-900">
@@ -129,7 +133,7 @@ const Admin = ({ goBack }) => {
 
   return (
     <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
+      <Animated.View
         style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
       >
         <View className="p-6 bg-blue-900">
@@ -153,7 +157,7 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [focusedInput, setFocusedInput] = useState(null);
-  
+
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(50)).current;
   const iconScale = useRef(new Animated.Value(0)).current;
@@ -181,32 +185,82 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
     ]).start();
   }, []);
 
-  const handleLogin = () => {
+  const handleLogin = async () => {
     if (!id || !password) {
-      Alert.alert("Error", "Please enter both ID and Password");
+      Alert.alert("Error", "Please enter both Username and Password");
       return;
     }
-    Alert.alert("Success", "Login successful!");
-    onLoginSuccess();
+
+    console.log("Sending to backend:", {
+      username: id,
+      password: password,
+    });
+
+    try {
+      const res = await axios.post(
+        "http://10.13.177.129:5001/admin/login", // apna actual IP
+        {
+          username: id,
+          password: password,
+        },
+        {
+          headers: {
+            "Content-Type": "application/json",
+          },
+          timeout: 10000,
+        }
+      );
+
+      console.log("Login response:", res.data);
+
+      if (res.data.success) {
+        const { token, user } = res.data;
+
+        await AsyncStorage.setItem("token", token);
+        await AsyncStorage.setItem("user", JSON.stringify(user));
+
+        Alert.alert("Success", "Login successful!");
+
+        if (user.role === "admin") {
+          onLoginSuccess("adminPage");
+        } else if (user.role === "vehicle") {
+          onLoginSuccess("vehicle");
+        } else {
+          onLoginSuccess("citizen");
+        }
+      } else {
+        Alert.alert("Login Failed", res.data.message || "Failed");
+      }
+    } catch (err) {
+      console.log("AXIOS ERROR:", err.message);
+      console.log("AXIOS FULL:", err);
+
+      Alert.alert(
+        "Login Failed",
+        err.response?.data?.message ||
+        "Server not reachable. Check IP & backend."
+      );
+    }
   };
 
 
+
   const roleDetails = {
-    citizen: { 
-      title: "Citizen Login", 
-      icon: "👤", 
+    citizen: {
+      title: "Citizen Login",
+      icon: "👤",
       bgColor: "bg-gradient-to-br from-green-400 to-emerald-500",
       iconBg: "bg-green-100"
     },
-    vehicle: { 
-      title: "Vehicle Staff Login", 
-      icon: "🚛", 
+    vehicle: {
+      title: "Vehicle Staff Login",
+      icon: "🚛",
       bgColor: "bg-gradient-to-br from-yellow-400 to-amber-500",
       iconBg: "bg-yellow-100"
     },
-    admin: { 
-      title: "Admin Login", 
-      icon: "🏢", 
+    admin: {
+      title: "Admin Login",
+      icon: "🏢",
       bgColor: "bg-gradient-to-br from-blue-400 to-indigo-500",
       iconBg: "bg-blue-100"
     }
@@ -217,19 +271,19 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
   return (
     <SafeAreaView className="flex-1 bg-green-500">
       <StatusBar barStyle="light-content" backgroundColor="#1E3A8A" />
-      
+
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
         {/* Header */}
-        <Animated.View 
+        <Animated.View
           style={{ opacity: fadeAnim }}
           className="pt-10 pb-8 px-6 bg-green-500"
         >
           <TouchableOpacity onPress={goBack} className="mb-6">
             <Text className="text-blue-900 text-base font-semibold">← Back</Text>
           </TouchableOpacity>
-          
+
           <View className="items-center">
-            <Animated.View 
+            <Animated.View
               style={{ transform: [{ scale: iconScale }] }}
               className={`w-20 h-20 rounded-2xl justify-center items-center mb-4 ${currentRole.iconBg}`}
             >
@@ -241,8 +295,8 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
         </Animated.View>
 
         {/* Login Form */}
-        <Animated.View 
-          style={{ 
+        <Animated.View
+          style={{
             opacity: fadeAnim,
             transform: [{ translateY: slideAnim }]
           }}
@@ -283,7 +337,7 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
           </View>
 
           {/* Login Button */}
-          <TouchableOpacity 
+          <TouchableOpacity
             className="bg-blue-900 rounded-xl py-4 items-center shadow-lg mb-4"
             onPress={handleLogin}
             activeOpacity={0.8}
@@ -300,7 +354,7 @@ const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
                 <View className="flex-1 h-px bg-gray-300" />
               </View>
 
-              <TouchableOpacity 
+              <TouchableOpacity
                 className="bg-white border-2 border-blue-900 rounded-xl py-4 items-center mb-3"
                 onPress={onRegisterPress}
                 activeOpacity={0.8}
@@ -356,37 +410,41 @@ export default function App() {
   if (screen === "vehicle") return <Vehicle goBack={() => setScreen("home")} />;
   if (screen === "admin") return <Admin goBack={() => setScreen("home")} />;
   if (screen === "register") return <UserRegister goBack={() => setScreen("citizenLogin")} />;
-  
+  if (screen === "adminPage") return <AdminPage goBack={() => setScreen("home")} />;
+
+
   // Login Screens
   if (screen === "citizenLogin") {
     return (
-      <LoginScreen 
-        role="citizen" 
+      <LoginScreen
+        role="citizen"
         goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("citizen")}
-        // Pass the navigation function here
-        onRegisterPress={() => setScreen("register")} 
+        onLoginSuccess={(next) => setScreen(next)}
+        onRegisterPress={() => setScreen("register")}
       />
     );
   }
+
   if (screen === "vehicleLogin") {
     return (
-      <LoginScreen 
-        role="vehicle" 
+      <LoginScreen
+        role="vehicle"
         goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("vehicle")}
+        onLoginSuccess={(next) => setScreen(next)}
       />
     );
   }
+
   if (screen === "adminLogin") {
     return (
-      <LoginScreen 
-        role="admin" 
+      <LoginScreen
+        role="admin"
         goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("admin")}
+        onLoginSuccess={(next) => setScreen(next)}
       />
     );
   }
+
   if (screen === "register") {
     return <UserRegister goBack={() => setScreen("citizenLogin")} />;
   }
@@ -411,13 +469,13 @@ export default function App() {
 
     return (
       <AnimatedCard delay={delay}>
-        <TouchableOpacity 
+        <TouchableOpacity
           onPress={onPress}
           onPressIn={handlePressIn}
           onPressOut={handlePressOut}
           activeOpacity={1}
         >
-          <Animated.View 
+          <Animated.View
             style={{ transform: [{ scale: scaleAnim }] }}
             className="flex-row items-center bg-white p-4 rounded-2xl mb-4 shadow-md"
           >
@@ -438,10 +496,10 @@ export default function App() {
   return (
     <SafeAreaView className="flex-1 bg-green-500">
       <StatusBar barStyle="light-content" backgroundColor="#1E3A8A" />
-      
+
       {/* Header Section */}
-      <Animated.View 
-        style={{ 
+      <Animated.View
+        style={{
           opacity: fadeAnim,
           transform: [{ scale: headerScale }]
         }}
@@ -462,35 +520,35 @@ export default function App() {
           <Text className="text-gray-800 text-xl font-bold mb-6">Select Your Profile</Text>
         </Animated.View>
 
-        <RoleButton 
-          title="Citizen" 
+        <RoleButton
+          title="Citizen"
           description="Report waste & track vehicles"
-          icon="👤" 
+          icon="👤"
           color="bg-green-100"
           onPress={() => setScreen("citizenLogin")}
           delay={100}
         />
 
-        <RoleButton 
-          title="Vehicle Staff" 
+        <RoleButton
+          title="Vehicle Staff"
           description="Route navigation & updates"
-          icon="🚛" 
+          icon="🚛"
           color="bg-yellow-100"
           onPress={() => setScreen("vehicleLogin")}
           delay={200}
         />
 
-        <RoleButton 
-          title="Admin / Office" 
+        <RoleButton
+          title="Admin / Office"
           description="Dashboard & monitoring"
-          icon="🏢" 
+          icon="🏢"
           color="bg-blue-100"
           onPress={() => setScreen("adminLogin")}
           delay={300}
         />
 
         {/* Footer */}
-        <Animated.View 
+        <Animated.View
           style={{ opacity: fadeAnim }}
           className="items-center mt-8 pb-4"
         >

@@ -21,12 +21,7 @@ const AdminSchema = new Schema({
     unique: true,
   },
   role: { type: String, default: "admin" },
-  office: {
-    type: mongoose.Schema.Types.ObjectId,
-    ref: "office",
-  },
 });
 
 AdminSchema.plugin(passportLocalMongoose);
-
 module.exports = mongoose.model("Admin", AdminSchema);
