@@ -15,7 +15,7 @@
     "axios": "^1.13.2",
     "bcrypt": "^6.0.0",
     "body-parser": "^2.2.2",
-    "connect-mongo": "^6.0.0",
+    "connect-mongo": "^4.6.0",
     "cors": "^2.8.6",
     "dotenv": "^17.2.3",
     "express": "^5.2.1",

@@ -5,42 +5,46 @@ const app = express();
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const session = require("express-session");
-const MongoStore = require("connect-mongo");
+const MongoStoreFactory = require("connect-mongo");
 require("dotenv").config();
 const bodyParser = require("body-parser");
 
 const JWT_SECRET = "safaimitra-secret";
+const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
 
 // Models
 const Citizen = require("./model/CitizenModel.js");
 const Vehicle = require("./model/VehicleModel.js");
 const Admin = require("./model/AdminModel.js");
+const Office = require("./model/OfficeModel.js");
 
 // Routes
 const CitizenRegister = require("./routes/citizenRegister.js");
 const VehicleRegister = require("./routes/vehicleRegister.js");
+const OfficeRegister = require("./routes/officeRegister.js");
 const CitizenLogin = require("./routes/loginCitizen.js");
 const VehicleLogin = require("./routes/loginVehicle.js");
 const AdminLogin = require("./routes/loginAdmin.js");
+const OfficeLogin = require("./routes/loginOffice.js");
+const AdminRegister = require("./routes/adminRegister");
+
 
 // DB Connection
 mongoose
-  .connect("mongodb://127.0.0.1:27017/safaimitra")
+  .connect(MONGO_URL)
   .then(() => console.log("DB Connection successful"))
-  .catch((err) => console.log(err));
+  .catch((err) => console.log("Mongo Error:", err));
 
-// Session Store
+// Session Store (OLD API compatible)
+const MongoStore = require("connect-mongo");
+
 const store = MongoStore.create({
-  mongoUrl: "mongodb://127.0.0.1:27017/safaimitra",
-  crypto: { secret: process.env.SECRET_KEY || JWT_SECRET },
+  mongoUrl: MONGO_URL,
   touchAfter: 24 * 3600,
-});
-store.on("error", (err) => {
-  console.log("Error in Mongo Session Store", err);
 });
 
 // Middlewares
-app.use(cors({ origin: "http://localhost:3000", credentials: true }));
+app.use(cors());
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -52,7 +56,6 @@ app.use(
     resave: false,
     saveUninitialized: true,
     cookie: {
-      expires: Date.now() + 7 * 24 * 60 * 60 * 1000,
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
     },
@@ -64,31 +67,45 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Passport Strategies
-passport.use("citizen-local", new LocalStrategy(Citizen.authenticate()));
-passport.use("vehicle-local", new LocalStrategy(Vehicle.authenticate()));
+// passport.use("citizen-local", new LocalStrategy(Citizen.authenticate()));
+// passport.use("vehicle-local", new LocalStrategy(Vehicle.authenticate()));
 passport.use("admin-local", new LocalStrategy(Admin.authenticate()));
 
 passport.serializeUser((user, done) => done(null, user.id));
-passport.deserializeUser((id, done) => {
-  Citizen.findById(id)
-    .then((user) => {
-      if (user) return done(null, user);
-      return Vehicle.findById(id);
-    })
-    .then((user) => {
-      if (user) return done(null, user);
-      return Admin.findById(id);
-    })
-    .then((user) => done(null, user))
-    .catch((err) => done(err));
+passport.deserializeUser(async (id, done) => {
+  try {
+    // Check in all roles (example)
+    const admin = await Admin.findById(id);
+    if (admin) return done(null, admin);
+
+    const citizen = await Citizen.findById(id);
+    if (citizen) return done(null, citizen);
+
+    const vehicle = await Vehicle.findById(id);
+    if (vehicle) return done(null, vehicle);
+
+    const office = await Office.findById(id);
+    if (office) return done(null, office);
+
+    done(null, false);
+  } catch (err) {
+    done(err);
+  }
 });
 
 // Routes
-app.use("/citizen", CitizenRegister);
-app.use("/vehicle", VehicleRegister);
-app.use("/loginc", CitizenLogin);
-app.use("/loginv", VehicleLogin);
-app.use("/logina", AdminLogin);
+app.use("/admin", AdminRegister);
+// app.use("/citizen", CitizenRegister);
+// app.use("/vehicle", VehicleRegister);
+// app.use("/office", OfficeRegister);
+// app.use("/loginc", CitizenLogin);
+// app.use("/loginv", VehicleLogin);
+// app.use("/logina", AdminLogin);
+// app.use("/logino", OfficeLogin);
+app.get("/test", (req, res) => {
+  res.json({ message: "Test route working!", data: req.body });
+  console.log("Test working:", req.body);
+});
 
 // Root
 app.get("/", (_req, res) => {
@@ -96,6 +113,6 @@ app.get("/", (_req, res) => {
 });
 
 // Start server
-app.listen(5000, () => {
-  console.log("Server running on port 5000");
+app.listen(5001, () => {
+  console.log("Server running on port 5001");
 });
