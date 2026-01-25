@@ -5,7 +5,6 @@ const app = express();
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const session = require("express-session");
-const MongoStoreFactory = require("connect-mongo");
 require("dotenv").config();
 const bodyParser = require("body-parser");
 
@@ -44,7 +43,10 @@ const store = MongoStore.create({
 });
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: ["http://localhost:3000", "http://127.0.0.1:3000"],
+  credentials: true,
+}));
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -95,17 +97,14 @@ passport.deserializeUser(async (id, done) => {
 
 // Routes
 app.use("/admin", AdminRegister);
+app.use("/admin", AdminLogin);
 // app.use("/citizen", CitizenRegister);
 // app.use("/vehicle", VehicleRegister);
-// app.use("/office", OfficeRegister);
+app.use("/office", OfficeRegister);
 // app.use("/loginc", CitizenLogin);
 // app.use("/loginv", VehicleLogin);
 // app.use("/logina", AdminLogin);
 // app.use("/logino", OfficeLogin);
-app.get("/test", (req, res) => {
-  res.json({ message: "Test route working!", data: req.body });
-  console.log("Test working:", req.body);
-});
 
 // Root
 app.get("/", (_req, res) => {
