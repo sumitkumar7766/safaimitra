@@ -29,7 +29,9 @@ import {
   User,
   Save
 } from 'lucide-react-native';
-import AdminPage from '../App';
+import AdminPage from '../../App';
+import NewOffice from "./newoffice"; // Path check kar lena apne hisaab se
+import NewAdmin from "./newadmin"; // Path check kar lena apne hisaab se
 
 // Added 'goBack' prop here to handle navigation
 export default function OfficeDashboard({ goBack }) {
@@ -219,6 +221,9 @@ export default function OfficeDashboard({ goBack }) {
   };
 
   if (screen === "adminPage") return <AdminPage goBack={() => setScreen("home")} />;
+  // ... existing navigation logic ...
+  if (screen === "newOfficeScreen") return <NewOffice goBack={() => setScreen("home")} />;
+  if (screen === "newAdminScreen") return <NewAdmin goBack={() => setScreen("home")} />;
 
   const handleLogout = () => {
     Alert.alert("Logout", "Are you sure you want to logout?", [
@@ -230,7 +235,7 @@ export default function OfficeDashboard({ goBack }) {
           try {
             await AsyncStorage.multiRemove(["token", "user", "role", "userId"]);
             Alert.alert("Success", "Logged out successfully");
-            
+
             // Checking if goBack exists before calling to avoid crash
             if (goBack) {
               goBack();
@@ -271,7 +276,64 @@ export default function OfficeDashboard({ goBack }) {
 
       <View className="bg-white rounded-lg shadow-md p-4 mb-4 flex-row items-center justify-between">
         <Text className="text-xl font-bold text-gray-800">City Offices</Text>
-        <TouchableOpacity className="flex-row items-center gap-2 px-4 py-2 bg-green-600 rounded-lg">
+        <TouchableOpacity
+          onPress={() => setScreen("newOfficeScreen")}
+          className="bg-indigo-700 p-3 rounded-xl items-center flex-row bg-green-600"
+        >
+          <Plus size={20} color="#fff" />
+          <Text className="text-white font-semibold">New Office</Text>
+        </TouchableOpacity>
+      </View>
+
+      {loading ? (
+        <ActivityIndicator size="large" color="#16a34a" className="mt-8" />
+      ) : (
+        offices.map(office => (
+          <View key={office.id} className="bg-white rounded-lg shadow-md p-4 mb-3">
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">City Name</Text>
+              <Text className="text-sm font-semibold text-gray-900">{office.cityName}</Text>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">Office Name</Text>
+              <Text className="text-sm text-gray-700">{office.officeName}</Text>
+            </View>
+
+            <View className="mb-3">
+              <Text className="text-xs text-gray-500 uppercase">Assigned Admin</Text>
+              <Text className="text-sm font-medium text-gray-900">{office.adminName}</Text>
+              <Text className="text-sm text-gray-500">{office.adminEmail}</Text>
+            </View>
+
+            <View className="flex-row items-center justify-between">
+              <View className={`px-3 py-1 rounded-full ${office.status === 'Active' ? 'bg-green-100' : 'bg-red-100'}`}>
+                <Text className={`text-xs font-semibold ${office.status === 'Active' ? 'text-green-800' : 'text-red-800'}`}>
+                  {office.status}
+                </Text>
+              </View>
+
+              <TouchableOpacity
+                onPress={() => handleDeleteOffice(office.id)}
+                className="p-2 bg-red-50 rounded"
+              >
+                <Trash2 size={16} color="#dc2626" />
+              </TouchableOpacity>
+            </View>
+          </View>
+        ))
+      )}
+    </ScrollView>
+  );
+
+  const OfficeView = () => (
+    <ScrollView className="flex-1 p-4">
+      <View className="bg-white rounded-lg shadow-md p-4 mb-4 flex-row items-center justify-between">
+        <Text className="text-xl font-bold text-gray-800">City Offices</Text>
+        <TouchableOpacity
+          onPress={() => setScreen("newOfficeScreen")}
+          className="bg-indigo-700 p-3 rounded-xl items-center flex-row bg-green-600"
+        >
           <Plus size={20} color="#fff" />
           <Text className="text-white font-semibold">New Office</Text>
         </TouchableOpacity>
@@ -322,7 +384,10 @@ export default function OfficeDashboard({ goBack }) {
     <ScrollView className="flex-1 p-4">
       <View className="bg-white rounded-lg shadow-md p-4 mb-4 flex-row items-center justify-between">
         <Text className="text-xl font-bold text-gray-800">City Admins</Text>
-        <TouchableOpacity className="flex-row items-center gap-2 px-4 py-2 bg-green-600 rounded-lg">
+        <TouchableOpacity
+          onPress={() => setScreen("newAdminScreen")}
+          className="bg-indigo-700 p-3 rounded-xl items-center flex-row bg-green-600"
+        >
           <Plus size={20} color="#fff" />
           <Text className="text-white font-semibold">New Admin</Text>
         </TouchableOpacity>
@@ -546,7 +611,7 @@ export default function OfficeDashboard({ goBack }) {
 
       {/* Content */}
       {currentView === 'dashboard' && <DashboardView />}
-      {currentView === 'offices' && <DashboardView />}
+      {currentView === 'offices' && <OfficeView />}
       {currentView === 'admins' && <AdminsView />}
       {currentView === 'settings' && <SettingsView />}
 
