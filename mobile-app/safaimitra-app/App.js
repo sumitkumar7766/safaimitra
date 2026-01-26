@@ -1,19 +1,25 @@
 import { useState, useEffect, useRef } from "react";
-import { 
-  View, 
-  Text, 
-  TouchableOpacity, 
-  StatusBar, 
-  TextInput, 
+import {
+  View,
+  Text,
+  TouchableOpacity,
+  StatusBar,
+  TextInput,
   Alert,
   Animated,
   ScrollView,
-  Dimensions
+  ActivityIndicator // Added for loading state
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import UserRegister from "./screens/userRegister";
+import AsyncStorage from "@react-native-async-storage/async-storage";
+import axios from "axios";
+import AdminPage from "./screens/Admin/Admin";
 
-// Animated Card Component
+// --- CONFIGURATION ---
+const API_BASE_URL = "http://10.13.177.129:5001";
+
+// --- ANIMATION COMPONENTS ---
 const AnimatedCard = ({ children, delay = 0 }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const slideAnim = useRef(new Animated.Value(30)).current;
@@ -48,456 +54,401 @@ const AnimatedCard = ({ children, delay = 0 }) => {
   );
 };
 
-// Placeholder screen components with animations
-const Citizen = ({ goBack }) => {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
+// --- CORE LOGIN FUNCTION (Strict Security) ---
+const processStrictLogin = async (username, password, endpoint, expectedRole, onSuccess) => {
+  if (!username || !password) {
+    Alert.alert("Missing Info", "Please enter ID and Password");
+    return;
+  }
 
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  }, []);
+  const fullUrl = `${API_BASE_URL}${endpoint}`;
+  console.log(`Attempting Login at: ${fullUrl} for Role: ${expectedRole}`);
 
-  return (
-    <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
-        style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
-      >
-        <View className="p-6 bg-blue-900">
-          <TouchableOpacity onPress={goBack} className="mb-4">
-            <Text className="text-white text-base font-semibold">← Back</Text>
-          </TouchableOpacity>
-          <Text className="text-white text-3xl font-bold">Citizen Dashboard</Text>
-          <Text className="text-blue-200 text-sm mt-2">Welcome to your personal dashboard</Text>
-        </View>
-        <View className="flex-1 bg-gray-50 rounded-t-3xl mt-6 p-6">
-          <Text className="text-gray-800 text-lg font-bold mb-4">Quick Actions</Text>
-          {/* Add dashboard content here */}
-        </View>
-      </Animated.View>
-    </SafeAreaView>
-  );
+  try {
+    const res = await axios.post(
+      fullUrl,
+      { username, password },
+      { headers: { "Content-Type": "application/json" }, timeout: 10000 }
+    );
+
+    if (res.data.success) {
+      const { token, user } = res.data;
+
+      if (user.role !== expectedRole && !(expectedRole === 'admin' && user.role === 'office')) {
+        Alert.alert(
+          "Access Denied",
+          `You cannot login here. This portal is for ${expectedRole.toUpperCase()} only.`
+        );
+        return;
+      }
+
+      await AsyncStorage.setItem("token", token);
+      await AsyncStorage.setItem("user", JSON.stringify(user));
+
+      Alert.alert("Success", `Welcome back, ${user.username || "User"}`);
+
+      if (expectedRole === "admin" || expectedRole === "office") onSuccess("adminPage");
+      else if (expectedRole === "vehicle") onSuccess("vehicle");
+      else onSuccess("citizen");
+
+    } else {
+      Alert.alert("Login Failed", res.data.message || "Invalid Credentials");
+    }
+  } catch (err) {
+    console.log("LOGIN ERROR:", err);
+    if (err.response) {
+      Alert.alert("Login Failed", err.response.data.message || "Server rejected request");
+    } else {
+      Alert.alert("Connection Error", "Check your internet or server IP.");
+    }
+  }
 };
 
-const Vehicle = ({ goBack }) => {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  return (
-    <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
-        style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
-      >
-        <View className="p-6 bg-blue-900">
-          <TouchableOpacity onPress={goBack} className="mb-4">
-            <Text className="text-white text-base font-semibold">← Back</Text>
-          </TouchableOpacity>
-          <Text className="text-white text-3xl font-bold">Vehicle Staff Dashboard</Text>
-          <Text className="text-blue-200 text-sm mt-2">Manage routes and updates</Text>
-        </View>
-        <View className="flex-1 bg-gray-50 rounded-t-3xl mt-6 p-6">
-          <Text className="text-gray-800 text-lg font-bold mb-4">Today's Routes</Text>
-          {/* Add dashboard content here */}
-        </View>
-      </Animated.View>
-    </SafeAreaView>
-  );
-};
-
-const Admin = ({ goBack }) => {
-  const scaleAnim = useRef(new Animated.Value(0.9)).current;
-
-  useEffect(() => {
-    Animated.spring(scaleAnim, {
-      toValue: 1,
-      tension: 50,
-      friction: 7,
-      useNativeDriver: true,
-    }).start();
-  }, []);
-
-  return (
-    <SafeAreaView className="flex-1 bg-blue-900">
-      <Animated.View 
-        style={{ flex: 1, transform: [{ scale: scaleAnim }] }}
-      >
-        <View className="p-6 bg-blue-900">
-          <TouchableOpacity onPress={goBack} className="mb-4">
-            <Text className="text-white text-base font-semibold">← Back</Text>
-          </TouchableOpacity>
-          <Text className="text-white text-3xl font-bold">Admin Dashboard</Text>
-          <Text className="text-blue-200 text-sm mt-2">Monitor and manage operations</Text>
-        </View>
-        <View className="flex-1 bg-gray-50 rounded-t-3xl mt-6 p-6">
-          <Text className="text-gray-800 text-lg font-bold mb-4">System Overview</Text>
-          {/* Add dashboard content here */}
-        </View>
-      </Animated.View>
-    </SafeAreaView>
-  );
-};
-
-// Login Screen Component with animations
-const LoginScreen = ({ role, goBack, onLoginSuccess, onRegisterPress }) => {
+// --- 1. CITIZEN LOGIN SCREEN ---
+const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
-  const [focusedInput, setFocusedInput] = useState(null);
-  
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
-  const iconScale = useRef(new Animated.Value(0)).current;
-
-  useEffect(() => {
-    Animated.parallel([
-      Animated.timing(fadeAnim, {
-        toValue: 1,
-        duration: 500,
-        useNativeDriver: true,
-      }),
-      Animated.spring(slideAnim, {
-        toValue: 0,
-        tension: 50,
-        friction: 7,
-        useNativeDriver: true,
-      }),
-      Animated.spring(iconScale, {
-        toValue: 1,
-        delay: 200,
-        tension: 50,
-        friction: 5,
-        useNativeDriver: true,
-      }),
-    ]).start();
-  }, []);
 
   const handleLogin = () => {
-    if (!id || !password) {
-      Alert.alert("Error", "Please enter both ID and Password");
-      return;
-    }
-    Alert.alert("Success", "Login successful!");
-    onLoginSuccess();
+    processStrictLogin(id, password, "/citizen/login", "citizen", onLoginSuccess);
   };
-
-
-  const roleDetails = {
-    citizen: { 
-      title: "Citizen Login", 
-      icon: "👤", 
-      bgColor: "bg-gradient-to-br from-green-400 to-emerald-500",
-      iconBg: "bg-green-100"
-    },
-    vehicle: { 
-      title: "Vehicle Staff Login", 
-      icon: "🚛", 
-      bgColor: "bg-gradient-to-br from-yellow-400 to-amber-500",
-      iconBg: "bg-yellow-100"
-    },
-    admin: { 
-      title: "Admin Login", 
-      icon: "🏢", 
-      bgColor: "bg-gradient-to-br from-blue-400 to-indigo-500",
-      iconBg: "bg-blue-100"
-    }
-  };
-
-  const currentRole = roleDetails[role];
 
   return (
-    <SafeAreaView className="flex-1 bg-green-500">
-      <StatusBar barStyle="light-content" backgroundColor="#1E3A8A" />
-      
+    <SafeAreaView className="flex-1 bg-green-600">
+      <StatusBar barStyle="light-content" backgroundColor="#166534" />
       <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <Animated.View 
-          style={{ opacity: fadeAnim }}
-          className="pt-10 pb-8 px-6 bg-green-500"
-        >
-          <TouchableOpacity onPress={goBack} className="mb-6">
-            <Text className="text-blue-900 text-base font-semibold">← Back</Text>
+        <View className="pt-10 pb-8 px-6 bg-green-600 items-center">
+          <TouchableOpacity onPress={goBack} className="self-start mb-4 bg-green-700 px-4 py-2 rounded-full">
+            <Text className="text-white text-sm font-semibold">← Back</Text>
           </TouchableOpacity>
-          
-          <View className="items-center">
-            <Animated.View 
-              style={{ transform: [{ scale: iconScale }] }}
-              className={`w-20 h-20 rounded-2xl justify-center items-center mb-4 ${currentRole.iconBg}`}
-            >
-              <Text className="text-4xl">{currentRole.icon}</Text>
-            </Animated.View>
-            <Text className="text-black text-3xl font-bold mb-2">{currentRole.title}</Text>
-            <Text className="text-black text-sm font-medium">Enter your credentials to continue</Text>
+          <View className="w-20 h-20 bg-green-100 rounded-full justify-center items-center mb-4 shadow-lg">
+            <Text className="text-4xl">👤</Text>
           </View>
-        </Animated.View>
+          <Text className="text-white text-3xl font-bold">Citizen Login</Text>
+        </View>
 
-        {/* Login Form */}
-        <Animated.View 
-          style={{ 
-            opacity: fadeAnim,
-            transform: [{ translateY: slideAnim }]
-          }}
-          className="flex-1 bg-gray-50 rounded-t-3xl px-6 pt-8 pb-6"
-        >
-          {/* ID Input */}
-          <View className="mb-5">
-            <Text className="text-gray-700 text-sm font-semibold mb-2">ID / Username</Text>
-            <View className={`bg-white rounded-xl border-2 ${focusedInput === 'id' ? 'border-blue-500' : 'border-gray-200'}`}>
-              <TextInput
-                className="px-4 py-4 text-base text-gray-800"
-                placeholder="Enter your ID"
-                placeholderTextColor="#9CA3AF"
-                value={id}
-                onChangeText={setId}
-                onFocus={() => setFocusedInput('id')}
-                onBlur={() => setFocusedInput(null)}
-                autoCapitalize="none"
-              />
-            </View>
-          </View>
-
-          {/* Password Input */}
-          <View className="mb-6">
-            <Text className="text-gray-700 text-sm font-semibold mb-2">Password</Text>
-            <View className={`bg-white rounded-xl border-2 ${focusedInput === 'password' ? 'border-blue-500' : 'border-gray-200'}`}>
-              <TextInput
-                className="px-4 py-4 text-base text-gray-800"
-                placeholder="Enter your password"
-                placeholderTextColor="#9CA3AF"
-                value={password}
-                onChangeText={setPassword}
-                onFocus={() => setFocusedInput('password')}
-                onBlur={() => setFocusedInput(null)}
-                secureTextEntry
-              />
-            </View>
-          </View>
-
-          {/* Login Button */}
-          <TouchableOpacity 
-            className="bg-blue-900 rounded-xl py-4 items-center shadow-lg mb-4"
+        <View className="flex-1 bg-white rounded-t-[40px] px-8 pt-10 pb-10 h-screen shadow-2xl">
+          <Text className="text-gray-500 font-semibold mb-2 ml-1">Mobile / User ID</Text>
+          <TextInput
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-gray-800 mb-5 text-lg"
+            placeholder="Enter Citizen ID"
+            value={id}
+            onChangeText={setId}
+            autoCapitalize="none"
+          />
+          <Text className="text-gray-500 font-semibold mb-2 ml-1">Password</Text>
+          <TextInput
+            className="w-full bg-gray-50 border border-gray-200 rounded-2xl px-5 py-4 text-gray-800 mb-8 text-lg"
+            placeholder="Enter Password"
+            value={password}
+            onChangeText={setPassword}
+            secureTextEntry
+          />
+          <TouchableOpacity
+            className="bg-green-600 rounded-2xl py-4 items-center shadow-lg shadow-green-300"
             onPress={handleLogin}
-            activeOpacity={0.8}
           >
-            <Text className="text-white text-base font-bold">Login</Text>
+            <Text className="text-white text-lg font-bold">Secure Login</Text>
           </TouchableOpacity>
-
-          {/* Register Section - Only for Citizen */}
-          {role === "citizen" && (
-            <>
-              <View className="flex-row items-center my-6">
-                <View className="flex-1 h-px bg-gray-300" />
-                <Text className="mx-4 text-gray-500 text-sm font-semibold">OR</Text>
-                <View className="flex-1 h-px bg-gray-300" />
-              </View>
-
-              <TouchableOpacity 
-                className="bg-white border-2 border-blue-900 rounded-xl py-4 items-center mb-3"
-                onPress={onRegisterPress}
-                activeOpacity={0.8}
-              >
-                <Text className="text-blue-900 text-base font-bold">Register Now</Text>
-              </TouchableOpacity>
-
-              <Text className="text-center text-gray-500 text-xs">
-                New user? Create your citizen account
-              </Text>
-            </>
-          )}
-
-          {/* Note for Admin and Vehicle */}
-          {role !== "citizen" && (
-            <View className="bg-blue-50 rounded-xl p-4 mt-4">
-              <Text className="text-center text-gray-600 text-xs leading-5">
-                ℹ️ Note: {role === "admin" ? "Admin" : "Vehicle staff"} accounts are created manually by administrators
-              </Text>
-            </View>
-          )}
-        </Animated.View>
+          <View className="flex-row justify-center mt-8">
+            <Text className="text-gray-500">New here? </Text>
+            <TouchableOpacity onPress={onRegisterPress}>
+              <Text className="text-green-700 font-bold">Create Account</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+// --- 2. VEHICLE LOGIN SCREEN ---
+const VehicleLogin = ({ goBack, onLoginSuccess }) => {
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
+
+  const handleLogin = () => {
+    processStrictLogin(id, password, "/vehicle/login", "vehicle", onLoginSuccess);
+  };
+
+  return (
+    <SafeAreaView className="flex-1 bg-amber-500">
+      <StatusBar barStyle="light-content" backgroundColor="#B45309" />
+      <ScrollView className="flex-1">
+        <View className="pt-10 pb-8 px-6 bg-amber-500 items-center">
+          <TouchableOpacity onPress={goBack} className="self-start mb-4 bg-amber-600 px-4 py-2 rounded-full">
+            <Text className="text-white text-sm font-semibold">← Back</Text>
+          </TouchableOpacity>
+          <View className="w-20 h-20 bg-amber-100 rounded-2xl justify-center items-center mb-4 rotate-3">
+            <Text className="text-4xl">🚛</Text>
+          </View>
+          <Text className="text-white text-3xl font-bold">Vehicle Staff</Text>
+        </View>
+
+        <View className="flex-1 bg-gray-50 rounded-t-[40px] px-8 pt-10 pb-10 h-screen">
+          <View className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+            <Text className="text-gray-800 font-bold text-lg mb-6 text-center">Driver Authentication</Text>
+            <TextInput
+              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 mb-4 text-lg"
+              placeholder="Driver ID"
+              value={id}
+              onChangeText={setId}
+              autoCapitalize="none"
+            />
+            <TextInput
+              className="bg-gray-50 border border-gray-200 rounded-xl px-4 py-4 mb-6 text-lg"
+              placeholder="PIN / Password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+            <TouchableOpacity
+              className="bg-amber-500 rounded-xl py-4 items-center"
+              onPress={handleLogin}
+            >
+              <Text className="text-white text-lg font-bold">Start Duty</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// --- 3. ADMIN / OFFICE LOGIN SCREEN ---
+const AdminLogin = ({ goBack, onLoginSuccess, isOffice }) => {
+  const [id, setId] = useState("");
+  const [password, setPassword] = useState("");
+
+  const themeColor = isOffice ? "bg-indigo-600" : "bg-slate-800";
+  const btnColor = isOffice ? "bg-indigo-600" : "bg-slate-900";
+  const title = isOffice ? "Office Staff" : "System Admin";
+
+  const handleLogin = () => {
+    const specificEndpoint = isOffice ? "/office/login" : "/admin/login";
+    const specificRole = isOffice ? "office" : "admin";
+    processStrictLogin(id, password, specificEndpoint, specificRole, onLoginSuccess);
+  };
+
+  return (
+    <SafeAreaView className={`flex-1 ${themeColor}`}>
+      <StatusBar barStyle="light-content" backgroundColor="#1E293B" />
+      <ScrollView className="flex-1">
+        <View className={`pt-12 pb-10 px-6 ${themeColor} items-center`}>
+          <TouchableOpacity onPress={goBack} className="self-start mb-6 bg-white/20 px-4 py-2 rounded-lg">
+            <Text className="text-white text-sm">← Return</Text>
+          </TouchableOpacity>
+          <Text className="text-white text-3xl font-extrabold tracking-widest uppercase">{title}</Text>
+        </View>
+
+        <View className="flex-1 bg-white rounded-t-3xl px-8 pt-12 pb-10 h-screen">
+          <View className="mb-6">
+            <Text className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Username</Text>
+            <TextInput
+              className="border-b-2 border-gray-300 py-3 text-xl text-gray-800 font-medium"
+              placeholder="Username"
+              value={id}
+              onChangeText={setId}
+              autoCapitalize="none"
+            />
+          </View>
+          <View className="mb-10">
+            <Text className="text-xs font-bold text-gray-400 uppercase tracking-wider mb-2">Password</Text>
+            <TextInput
+              className="border-b-2 border-gray-300 py-3 text-xl text-gray-800 font-medium"
+              placeholder="••••••••"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry
+            />
+          </View>
+          <TouchableOpacity
+            className={`${btnColor} rounded-lg py-5 items-center shadow-xl`}
+            onPress={handleLogin}
+          >
+            <Text className="text-white text-base font-bold tracking-widest">AUTHENTICATE</Text>
+          </TouchableOpacity>
+        </View>
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
+
+// --- DASHBOARDS ---
+const Citizen = ({ goBack }) => (
+  <SafeAreaView className="flex-1 bg-green-50 justify-center items-center">
+    <Text className="text-2xl font-bold text-green-800">Citizen Dashboard</Text>
+    <TouchableOpacity onPress={goBack} className="mt-5 bg-green-600 px-6 py-3 rounded-xl"><Text className="text-white">Logout</Text></TouchableOpacity>
+  </SafeAreaView>
+);
+const Vehicle = ({ goBack }) => (
+  <SafeAreaView className="flex-1 bg-amber-50 justify-center items-center">
+    <Text className="text-2xl font-bold text-amber-800">Vehicle Dashboard</Text>
+    <TouchableOpacity onPress={goBack} className="mt-5 bg-amber-600 px-6 py-3 rounded-xl"><Text className="text-white">Logout</Text></TouchableOpacity>
+  </SafeAreaView>
+);
+const Admin = ({ goBack }) => (
+  <SafeAreaView className="flex-1 bg-slate-50 justify-center items-center">
+    <Text className="text-2xl font-bold text-slate-800">Admin/Office Dashboard</Text>
+    <TouchableOpacity onPress={goBack} className="mt-5 bg-slate-800 px-6 py-3 rounded-xl"><Text className="text-white">Logout</Text></TouchableOpacity>
+  </SafeAreaView>
+);
+
+// --- MAIN APP ---
 export default function App() {
   const [screen, setScreen] = useState("home");
-  const fadeAnim = useRef(new Animated.Value(0)).current;
-  const headerScale = useRef(new Animated.Value(0.8)).current;
+  const [loading, setLoading] = useState(false);
 
-  useEffect(() => {
-    if (screen === "home") {
-      Animated.parallel([
-        Animated.timing(fadeAnim, {
-          toValue: 1,
-          duration: 600,
-          useNativeDriver: true,
-        }),
-        Animated.spring(headerScale, {
-          toValue: 1,
-          tension: 50,
-          friction: 7,
-          useNativeDriver: true,
-        }),
-      ]).start();
+  // ---------------------------------------------------------
+  // 🔥 MIDDLEWARE LOGIC (ADDED HERE)
+  // ---------------------------------------------------------
+  const navigateWithGuard = async (targetDashboard, targetLogin) => {
+    // 1. Token Check: Kya user pehle se login hai?
+    const token = await AsyncStorage.getItem("token");
+    const userStr = await AsyncStorage.getItem("user");
+    const user = userStr ? JSON.parse(userStr) : null;
+
+    if (token && user) {
+      // 2. Already Logged In: Role Check Karo
+      const role = user.role;
+
+      // -- Middleware: Protect Admin --
+      if (targetDashboard === "adminPage" && role !== "admin" && role !== "office") {
+        Alert.alert("Access Denied", "You are logged in, but not as Admin/Office.");
+        return;
+      }
+
+      // -- Middleware: Protect Vehicle --
+      if (targetDashboard === "vehicle" && role !== "vehicle") {
+        Alert.alert("Access Denied", "You are logged in, but not as Vehicle Staff.");
+        return;
+      }
+
+      // -- Middleware: Protect Citizen --
+      if (targetDashboard === "citizen" && role !== "citizen") {
+        // Optional: Allow or deny based on preference
+      }
+
+      // Role match ho gaya -> Direct Dashboard
+      setScreen(targetDashboard);
+    } else {
+      // 3. Not Logged In -> Go to Login Page
+      setScreen(targetLogin);
     }
-  }, [screen]);
+  };
 
-  // Navigation Logic
-  if (screen === "citizen") return <Citizen goBack={() => setScreen("home")} />;
-  if (screen === "vehicle") return <Vehicle goBack={() => setScreen("home")} />;
-  if (screen === "admin") return <Admin goBack={() => setScreen("home")} />;
+  const handleLogout = async () => {
+    await AsyncStorage.clear();
+    setScreen("home");
+  };
+
+  if (loading) return <View className="flex-1 bg-white justify-center items-center"><ActivityIndicator /></View>;
+
+  // --- NAVIGATION LOGIC ---
+  if (screen === "citizen") return <Citizen goBack={handleLogout} />;
+  if (screen === "vehicle") return <Vehicle goBack={handleLogout} />;
+  if (screen === "adminPage") return <AdminPage goBack={handleLogout} />;
+  if (screen === "admin") return <Admin goBack={handleLogout} />;
   if (screen === "register") return <UserRegister goBack={() => setScreen("citizenLogin")} />;
-  
+
   // Login Screens
   if (screen === "citizenLogin") {
-    return (
-      <LoginScreen 
-        role="citizen" 
-        goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("citizen")}
-        // Pass the navigation function here
-        onRegisterPress={() => setScreen("register")} 
-      />
-    );
+    return <CitizenLogin goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} onRegisterPress={() => setScreen("register")} />;
   }
   if (screen === "vehicleLogin") {
-    return (
-      <LoginScreen 
-        role="vehicle" 
-        goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("vehicle")}
-      />
-    );
+    return <VehicleLogin goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} />;
+  }
+  if (screen === "officeLogin") {
+    return <AdminLogin isOffice={true} goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} />;
   }
   if (screen === "adminLogin") {
-    return (
-      <LoginScreen 
-        role="admin" 
-        goBack={() => setScreen("home")}
-        onLoginSuccess={() => setScreen("admin")}
-      />
-    );
-  }
-  if (screen === "register") {
-    return <UserRegister goBack={() => setScreen("citizenLogin")} />;
+    return <AdminLogin isOffice={false} goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} />;
   }
 
-  // Custom Button Component with hover effect
-  const RoleButton = ({ title, icon, color, onPress, description, delay }) => {
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-
-    const handlePressIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.95,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const handlePressOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        useNativeDriver: true,
-      }).start();
-    };
-
+  // --- HOME SCREEN ---
+  const RoleButton = ({ title, icon, color, description, delay, targetDashboard, targetLogin }) => {
     return (
       <AnimatedCard delay={delay}>
-        <TouchableOpacity 
-          onPress={onPress}
-          onPressIn={handlePressIn}
-          onPressOut={handlePressOut}
-          activeOpacity={1}
+        <TouchableOpacity
+          // 🔥 UPDATED: Using Middleware on Press
+          onPress={() => navigateWithGuard(targetDashboard, targetLogin)}
+          activeOpacity={0.9}
+          className="flex-row items-center bg-white p-4 rounded-2xl mb-4 shadow-sm border border-gray-100"
         >
-          <Animated.View 
-            style={{ transform: [{ scale: scaleAnim }] }}
-            className="flex-row items-center bg-white p-4 rounded-2xl mb-4 shadow-md"
-          >
-            <View className={`w-14 h-14 rounded-xl justify-center items-center mr-4 ${color}`}>
-              <Text className="text-3xl">{icon}</Text>
-            </View>
-            <View className="flex-1">
-              <Text className="text-gray-900 text-lg font-bold">{title}</Text>
-              <Text className="text-gray-500 text-xs mt-1">{description}</Text>
-            </View>
-            <Text className="text-gray-300 text-2xl font-light">›</Text>
-          </Animated.View>
+          <View className={`w-14 h-14 rounded-2xl justify-center items-center mr-4 ${color}`}>
+            <Text className="text-3xl">{icon}</Text>
+          </View>
+          <View className="flex-1">
+            <Text className="text-gray-900 text-lg font-bold">{title}</Text>
+            <Text className="text-gray-500 text-xs mt-1">{description}</Text>
+          </View>
+          <View className="bg-gray-50 rounded-full p-2">
+            <Text className="text-gray-400 font-bold">➔</Text>
+          </View>
         </TouchableOpacity>
       </AnimatedCard>
     );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-green-500">
-      <StatusBar barStyle="light-content" backgroundColor="#1E3A8A" />
-      
-      {/* Header Section */}
-      <Animated.View 
-        style={{ 
-          opacity: fadeAnim,
-          transform: [{ scale: headerScale }]
-        }}
-        className="pt-16 pb-10 px-6 bg-green-500"
-      >
-        <View className="items-center mb-4">
-          <View className="bg-blue-800 px-6 py-3 rounded-full mb-4">
-            <Text className="text-white text-sm font-semibold tracking-wide ">♻️ SMART SOLUTION</Text>
-          </View>
-          <Text className="text-white text-4xl font-bold tracking-tight">SafaiMitra</Text>
-          <Text className="text-black text-sm mt-2 font-medium">Smart Waste Management System</Text>
+    <SafeAreaView className="flex-1 bg-green-600">
+      <StatusBar barStyle="light-content" backgroundColor="#166534" />
+      <View className="pt-16 pb-10 px-6 bg-green-600">
+        <View className="bg-white/20 self-start px-4 py-1 rounded-full mb-4">
+          <Text className="text-white text-xs font-bold tracking-wider">SMART CITY INITIATIVE</Text>
         </View>
-      </Animated.View>
+        <Text className="text-white text-4xl font-bold">SafaiMitra</Text>
+        <Text className="text-green-100 text-base mt-2">Select your role to continue</Text>
+      </View>
 
-      {/* Content Section */}
-      <View className="flex-1 bg-gray-50 rounded-t-3xl px-6 pt-8 shadow-2xl">
-        <Animated.View style={{ opacity: fadeAnim }}>
-          <Text className="text-gray-800 text-xl font-bold mb-6">Select Your Profile</Text>
-        </Animated.View>
+      <View className="flex-1 bg-gray-50 rounded-t-[40px] px-6 pt-10 shadow-2xl">
+        <Text className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-6 ml-2">Public Access</Text>
 
-        <RoleButton 
-          title="Citizen" 
-          description="Report waste & track vehicles"
-          icon="👤" 
+        {/* 🔥 UPDATED BUTTONS TO PASS DASHBOARD AND LOGIN TARGETS */}
+        <RoleButton
+          title="Citizen"
+          description="Complaints & Status"
+          icon="👤"
           color="bg-green-100"
-          onPress={() => setScreen("citizenLogin")}
+          targetDashboard="citizen"
+          targetLogin="citizenLogin"
           delay={100}
         />
 
-        <RoleButton 
-          title="Vehicle Staff" 
-          description="Route navigation & updates"
-          icon="🚛" 
-          color="bg-yellow-100"
-          onPress={() => setScreen("vehicleLogin")}
+        <Text className="text-gray-400 font-bold text-xs uppercase tracking-widest mb-6 mt-4 ml-2">Staff Access</Text>
+
+        <RoleButton
+          title="Vehicle Staff"
+          description="Drivers & Helpers"
+          icon="🚛"
+          color="bg-amber-100"
+          targetDashboard="vehicle"
+          targetLogin="vehicleLogin"
           delay={200}
         />
-
-        <RoleButton 
-          title="Admin / Office" 
-          description="Dashboard & monitoring"
-          icon="🏢" 
-          color="bg-blue-100"
-          onPress={() => setScreen("adminLogin")}
+        <RoleButton
+          title="Office"
+          description="Staff Ops"
+          icon="🏢"
+          color="bg-indigo-100"
+          targetDashboard="adminPage"
+          targetLogin="officeLogin"
           delay={300}
         />
+        <RoleButton
+          title="Admin"
+          description="Control"
+          icon="🔐"
+          color="bg-slate-200"
+          targetDashboard="adminPage"
+          targetLogin="adminLogin"
+          delay={400}
+        />
 
-        {/* Footer */}
-        <Animated.View 
-          style={{ opacity: fadeAnim }}
-          className="items-center mt-8 pb-4"
-        >
-          <View className="bg-gray-200 px-4 py-2 rounded-full">
-            <Text className="text-gray-600 text-xs font-semibold">⚡ Powered by CleanBin AI</Text>
-          </View>
-        </Animated.View>
+        <TouchableOpacity onPress={handleLogout} className="mt-auto mb-6 items-center">
+          <Text className="text-gray-400 text-xs">Reset / Logout All Sessions</Text>
+        </TouchableOpacity>
+
       </View>
     </SafeAreaView>
   );

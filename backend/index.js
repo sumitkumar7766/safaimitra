@@ -5,11 +5,8 @@ const app = express();
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const session = require("express-session");
-const MongoStoreFactory = require("connect-mongo");
 require("dotenv").config();
 const bodyParser = require("body-parser");
-
-const JWT_SECRET = "safaimitra-secret";
 const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
 
 // Models
@@ -52,7 +49,7 @@ app.use(bodyParser.json());
 app.use(
   session({
     store,
-    secret: process.env.SECRET_KEY || JWT_SECRET,
+    secret: process.env.JWT_SECRET,
     resave: false,
     saveUninitialized: true,
     cookie: {
@@ -95,17 +92,14 @@ passport.deserializeUser(async (id, done) => {
 
 // Routes
 app.use("/admin", AdminRegister);
+app.use("/admin", AdminLogin);
 // app.use("/citizen", CitizenRegister);
 // app.use("/vehicle", VehicleRegister);
-// app.use("/office", OfficeRegister);
+app.use("/office", OfficeRegister);
 // app.use("/loginc", CitizenLogin);
 // app.use("/loginv", VehicleLogin);
 // app.use("/logina", AdminLogin);
 // app.use("/logino", OfficeLogin);
-app.get("/test", (req, res) => {
-  res.json({ message: "Test route working!", data: req.body });
-  console.log("Test working:", req.body);
-});
 
 // Root
 app.get("/", (_req, res) => {
@@ -113,6 +107,6 @@ app.get("/", (_req, res) => {
 });
 
 // Start server
-app.listen(5001, () => {
+app.listen(5001, "0.0.0.0", () => {
   console.log("Server running on port 5001");
 });
