@@ -78,7 +78,7 @@ export default function SafaiMitra() {
         redirectBase = "/vehicle";
         break;
       case "Office Staff":
-        endpoint = "http://localhost:5001/logino";
+        endpoint = "http://localhost:5001/office/login";
         redirectBase = "/office";
         break;
       case "Administrator":
@@ -107,7 +107,7 @@ export default function SafaiMitra() {
         const userId = res.data.user.id;
         localStorage.setItem("userId", userId);
 
-        router.push("/admin");
+        router.push(`${redirectBase}?id=${userId}`);
       } else {
         alert("Invalid credentials or missing data from server.");
       }

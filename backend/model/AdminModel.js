@@ -1,4 +1,4 @@
-const mongoose = require("mongoose");
+ const mongoose = require("mongoose");
 const { Schema } = mongoose;
 
 // Handle both export styles (function or { default: function })

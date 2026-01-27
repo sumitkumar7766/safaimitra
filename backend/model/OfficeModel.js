@@ -46,6 +46,17 @@ const OfficeSchema = new Schema(
       enum: ["Active", "Inactive"],
       default: "Active",
     },
+    vehicles: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Vehicle",
+      default: null,
+    }],
+    staffId: [{
+      type: mongoose.Schema.Types.ObjectId,
+      ref: "Staff",
+      default: null,
+    }],
+    role: { type: String, default: "Office Staff" },
   },
   { timestamps: true }
 );

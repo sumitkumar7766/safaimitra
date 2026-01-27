@@ -24,6 +24,7 @@ const VehicleLogin = require("./routes/loginVehicle.js");
 const AdminLogin = require("./routes/loginAdmin.js");
 const OfficeLogin = require("./routes/loginOffice.js");
 const AdminRegister = require("./routes/adminRegister");
+const StaffRegister = require("./routes/staffRegister");
 
 
 // DB Connection
@@ -94,12 +95,13 @@ passport.deserializeUser(async (id, done) => {
 app.use("/admin", AdminRegister);
 app.use("/admin", AdminLogin);
 // app.use("/citizen", CitizenRegister);
-// app.use("/vehicle", VehicleRegister);
+app.use("/vehicle", VehicleRegister);
 app.use("/office", OfficeRegister);
 // app.use("/loginc", CitizenLogin);
 // app.use("/loginv", VehicleLogin);
 // app.use("/logina", AdminLogin);
-// app.use("/logino", OfficeLogin);
+app.use("/office", OfficeLogin);
+app.use("/staff", StaffRegister);
 
 // Root
 app.get("/", (_req, res) => {
