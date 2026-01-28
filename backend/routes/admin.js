@@ -2,7 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Admin = require("../model/AdminModel");
 const adminAuth = require("../middleware/adminAuth");
-const { route } = require("./officeRegister");
+const { route } = require("./office");
 
 // Admin Registration
 router.post("/register", adminAuth, async (req, res) => {
@@ -60,7 +60,7 @@ router.get("/", adminAuth, async (req, res) => {
   }
 });
 
-router.delete("/:id", adminAuth, async (req, res) => {
+router.delete("/delete/:id", adminAuth, async (req, res) => {
   try {
     const adminId = req.params.id;
 

@@ -17,14 +17,17 @@ const Office = require("./model/OfficeModel.js");
 
 // Routes
 const CitizenRegister = require("./routes/citizenRegister.js");
-const VehicleRegister = require("./routes/vehicleRegister.js");
-const OfficeRegister = require("./routes/officeRegister.js");
+const VehicleRegister = require("./routes/vehicle.js");
+const OfficeRegister = require("./routes/office.js");
 const CitizenLogin = require("./routes/loginCitizen.js");
 const VehicleLogin = require("./routes/loginVehicle.js");
 const AdminLogin = require("./routes/loginAdmin.js");
 const OfficeLogin = require("./routes/loginOffice.js");
-const AdminRegister = require("./routes/adminRegister");
-const StaffRegister = require("./routes/staffRegister");
+const AdminRegister = require("./routes/admin.js");
+const StaffRegister = require("./routes/staff.js");
+const RouteRegister = require("./routes/route.js");
+const dustbinRoutes = require("./routes/dustbin.js");
+
 
 
 // DB Connection
@@ -102,6 +105,8 @@ app.use("/office", OfficeRegister);
 // app.use("/logina", AdminLogin);
 app.use("/office", OfficeLogin);
 app.use("/staff", StaffRegister);
+app.use("/route", RouteRegister);
+app.use("/dustbin", dustbinRoutes);
 
 // Root
 app.get("/", (_req, res) => {

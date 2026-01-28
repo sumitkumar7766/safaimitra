@@ -4,6 +4,38 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Users, Building2, UserCog, Activity, Plus, Edit2, Trash2, Power, X, Menu, Settings, LogOut, User, Shield, Key, Mail, Phone, MapPin, Save, UserX } from 'lucide-react';
 
+import dynamic from "next/dynamic";
+
+// Leaflet components – SSR off
+const MapContainer = dynamic(
+    () => import("react-leaflet").then((mod) => mod.MapContainer),
+    { ssr: false }
+);
+const TileLayer = dynamic(
+    () => import("react-leaflet").then((mod) => mod.TileLayer),
+    { ssr: false }
+);
+const Marker = dynamic(
+    () => import("react-leaflet").then((mod) => mod.Marker),
+    { ssr: false }
+);
+
+import { useMapEvents } from "react-leaflet";
+
+const MapClickHandler = ({ setFormData }) => {
+    useMapEvents({
+        click(e) {
+            const { lat, lng } = e.latlng;
+            setFormData((prev) => ({
+                ...prev,
+                latitude: lat.toFixed(6),
+                longitude: lng.toFixed(6),
+            }));
+        },
+    });
+    return null;
+};
+
 export default function OfficeDashboard() {
     const [currentView, setCurrentView] = useState('dashboard');
     const [sidebarOpen, setSidebarOpen] = useState(true);
@@ -82,11 +114,14 @@ export default function OfficeDashboard() {
                     setOffices(
                         res.data.offices.map(o => ({
                             id: o._id,
+                            stateName: o.stateName,
                             cityName: o.cityName,
                             officeName: o.officeName,
                             adminName: o.adminName,
                             adminEmail: o.adminEmail,
                             status: o.status,
+                            latitude: o.latitude,
+                            longitude: o.longitude,
                         }))
                     );
                 }
@@ -164,7 +199,7 @@ export default function OfficeDashboard() {
             const token = localStorage.getItem("token");
 
             await axios.delete(
-                `http://localhost:5001/office/${officeId}`,
+                `http://localhost:5001/office/delete/${officeId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -192,7 +227,7 @@ export default function OfficeDashboard() {
             const token = localStorage.getItem("token");
 
             await axios.delete(
-                `http://localhost:5001/admin/${adminId}`,
+                `http://localhost:5001/admin/delete/${adminId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -233,6 +268,65 @@ export default function OfficeDashboard() {
         router.replace("/"); // back to home/login
     };
 
+    const [showEditOfficeModal, setShowEditOfficeModal] = useState(false);
+    const [editOfficeId, setEditOfficeId] = useState(null);
+
+    const openEditOfficeModal = (office) => {
+        setEditOfficeId(office.id);
+        setFormData({
+            stateName: office.stateName || "",
+            cityName: office.cityName || "",
+            officeName: office.officeName || "",
+            adminName: office.adminName || "",
+            adminEmail: office.adminEmail || "",
+            status: office.status || "Active",
+            latitude: office.latitude || "",
+            longitude: office.longitude || "",
+        });
+        setShowEditOfficeModal(true);
+    };
+
+    const handleEditOfficeSubmit = async (e) => {
+        e.preventDefault();
+
+        try {
+            const token = localStorage.getItem("token");
+
+            const payload = {
+                stateName: formData.stateName,
+                cityName: formData.cityName,
+                officeName: formData.officeName,
+                adminName: formData.adminName,
+                adminEmail: formData.adminEmail,
+                status: formData.status,
+                latitude: parseFloat(formData.latitude),
+                longitude: parseFloat(formData.longitude),
+            };
+
+            const res = await axios.put(
+                `http://localhost:5001/office/update/${editOfficeId}`,
+                payload,
+                {
+                    headers: {
+                        Authorization: `Bearer ${token}`,
+                    },
+                }
+            );
+
+            alert("Office updated successfully");
+            setShowEditOfficeModal(false);
+
+            // list refresh
+            setOffices((prev) =>
+                prev.map((o) =>
+                    o.id === editOfficeId ? { ...o, ...payload } : o
+                )
+            );
+        } catch (err) {
+            console.error("Edit Office Error:", err);
+            alert(err.response?.data?.message || "Failed to update office");
+        }
+    };
 
     const StatCard = ({ icon: Icon, title, value, color }) => (
         <div className="bg-white rounded-lg shadow-md p-6 border-l-4" style={{ borderLeftColor: color }}>
@@ -301,6 +395,12 @@ export default function OfficeDashboard() {
                                     </td>
                                     <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                                         <div className="flex items-center gap-2">
+                                            <button
+                                                onClick={() => openEditOfficeModal(office)}
+                                                className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                                            >
+                                                <Edit2 className="w-4 h-4" />
+                                            </button>
                                             <button
                                                 onClick={() => handleDeleteOffice(office.id)}
                                                 className="p-2 text-red-600 hover:bg-red-50 rounded transition-colors"
@@ -790,8 +890,149 @@ export default function OfficeDashboard() {
                     {currentView === 'offices' && <DashboardView2 />}
                     {currentView === 'admins' && <AdminsView />}
                     {currentView === 'settings' && <SettingsView />}
+                    {showEditOfficeModal && (
+                        <div
+                            className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+                            onClick={() => setShowEditOfficeModal(false)}
+                        >
+                            <div
+                                className="bg-white rounded-2xl p-6 w-full max-w-xl shadow-2xl text-black"
+                                onClick={(e) => e.stopPropagation()}
+                            >
+                                <h2 className="text-2xl font-bold mb-4">✏️ Edit Office</h2>
+
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-3">
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="State"
+                                        value={formData.stateName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, stateName: e.target.value })
+                                        }
+                                    />
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="City"
+                                        value={formData.cityName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, cityName: e.target.value })
+                                        }
+                                    />
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="Office Name"
+                                        value={formData.officeName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, officeName: e.target.value })
+                                        }
+                                    />
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="Admin Name"
+                                        value={formData.adminName}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, adminName: e.target.value })
+                                        }
+                                    />
+                                    <input
+                                        className="border p-2 rounded md:col-span-2"
+                                        placeholder="Admin Email"
+                                        value={formData.adminEmail}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, adminEmail: e.target.value })
+                                        }
+                                    />
+                                </div>
+
+                                {/* Lat / Lng Inputs */}
+                                <div className="grid grid-cols-2 gap-3 mt-3">
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="Latitude"
+                                        value={formData.latitude}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, latitude: e.target.value })
+                                        }
+                                    />
+                                    <input
+                                        className="border p-2 rounded"
+                                        placeholder="Longitude"
+                                        value={formData.longitude}
+                                        onChange={(e) =>
+                                            setFormData({ ...formData, longitude: e.target.value })
+                                        }
+                                    />
+                                </div>
+
+                                <div className="mt-4">
+                                    <p className="text-sm text-gray-500 mb-2">
+                                        Map par click karke office location update karo
+                                    </p>
+
+                                    <div className="h-[250px] rounded-lg overflow-hidden border">
+                                        {typeof window !== "undefined" && (
+                                            <MapContainer
+                                                center={[
+                                                    formData.latitude
+                                                        ? parseFloat(formData.latitude)
+                                                        : 23.2599,
+                                                    formData.longitude
+                                                        ? parseFloat(formData.longitude)
+                                                        : 77.4126,
+                                                ]}
+                                                zoom={6}
+                                                style={{ height: "100%", width: "100%" }}
+                                            >
+                                                <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+                                                <MapClickHandler setFormData={setFormData} />
+
+                                                {formData.latitude && formData.longitude && (
+                                                    <Marker
+                                                        position={[
+                                                            parseFloat(formData.latitude),
+                                                            parseFloat(formData.longitude),
+                                                        ]}
+                                                    />
+                                                )}
+                                            </MapContainer>
+                                        )}
+                                    </div>
+                                </div>
+
+                                <button
+                                    onClick={handleEditOfficeSubmit}
+                                    className="mt-4 w-full py-2 bg-green-600 text-white rounded-lg"
+                                >
+                                    Update Office
+                                </button>
+                            </div>
+                        </div>
+                    )}
                 </main>
             </div>
+            <style jsx global>{`
+                @import url('https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
+                
+                .custom-marker {
+                background: transparent !important;
+                border: none !important;
+                }
+
+                .leaflet-popup-content-wrapper {
+                border-radius: 12px;
+                box-shadow: 0 4px 12px rgba(0,0,0,0.15);
+                }
+
+                .leaflet-popup-content {
+                margin: 12px;
+                min-width: 180px;
+                }
+
+                .leaflet-container {
+                font-family: inherit;
+                }
+            `}</style>
         </div>
     );
 }

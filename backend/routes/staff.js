@@ -139,5 +139,92 @@ router.delete("/delete/:staffId", officeAuth, async (req, res) => {
   }
 });
 
+/* ================= UPDATE STAFF ================= */
+router.put("/update/:staffId", officeAuth, async (req, res) => {
+  const { staffId } = req.params;
+  const officeId = req.user.id;
+
+  const { name, role, phone, assignedVehicleId } = req.body;
+
+  try {
+    const staff = await Staff.findOne({ _id: staffId, officeId });
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found for this office",
+      });
+    }
+
+    // Phone duplicate check
+    if (phone && phone !== staff.phone) {
+      const exists = await Staff.findOne({ phone });
+      if (exists) {
+        return res.status(400).json({
+          success: false,
+          message: "Is phone number se koi aur staff already registered hai",
+        });
+      }
+    }
+
+    const oldVehicleId = staff.assignedVehicleId?.toString() || null;
+    const newVehicleId =
+      role === "driver" && assignedVehicleId ? assignedVehicleId : null;
+
+    let reassignedFrom = null;
+
+    // 🔁 Agar ye vehicle kisi aur staff ko already assigned hai
+    if (newVehicleId) {
+      const otherStaff = await Staff.findOne({
+        _id: { $ne: staffId },
+        assignedVehicleId: newVehicleId,
+        officeId,
+      });
+
+      if (otherStaff) {
+        // us staff se vehicle hata do
+        otherStaff.assignedVehicleId = null;
+        await otherStaff.save();
+
+        reassignedFrom = otherStaff.name;
+      }
+    }
+
+    // Staff update
+    staff.name = name;
+    staff.role = role;
+    staff.phone = phone;
+    staff.assignedVehicleId = newVehicleId;
+    await staff.save();
+
+    // Old vehicle se driver hatao
+    if (oldVehicleId && oldVehicleId !== newVehicleId) {
+      await Vehicle.findByIdAndUpdate(oldVehicleId, {
+        $unset: { driverId: "" },
+      });
+    }
+
+    // New vehicle me driver set karo
+    if (newVehicleId && oldVehicleId !== newVehicleId) {
+      await Vehicle.findByIdAndUpdate(newVehicleId, {
+        driverId: staff._id,
+      });
+    }
+
+    return res.json({
+      success: true,
+      message: reassignedFrom
+        ? `Vehicle was reassigned from ${reassignedFrom} to ${staff.name}`
+        : "Staff updated successfully",
+      staff,
+      reassignedFrom,
+    });
+  } catch (err) {
+    console.error("Update Staff Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 module.exports = router;
