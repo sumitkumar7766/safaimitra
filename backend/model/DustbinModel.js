@@ -1,21 +1,47 @@
 const mongoose = require("mongoose");
-const { Schema } = mongoose;
-
-// Handle both export styles (function or { default: function })
-const plm = require("passport-local-mongoose");
-const passportLocalMongoose = plm.default || plm;
 
 // Dustbin Schema
 const DustbinSchema = new mongoose.Schema({
-  officeId: { type: mongoose.Schema.Types.ObjectId, ref: "Office", required: true },
-  routeId: { type: mongoose.Schema.Types.ObjectId, ref: "Route", required: true },
+  officeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Office",
+    required: true,
+  },
 
-  label: { type: String }, // "Near School Gate"
+  name: { type: String, required: true },
+  area: { type: String },
+
   latitude: { type: Number, required: true },
   longitude: { type: Number, required: true },
 
-  status: { type: String, enum: ["active", "inactive"], default: "active" }
+  location: {
+    type: {
+      type: String,
+      enum: ["Point"],
+      default: "Point",
+    },
+    coordinates: {
+      type: [Number], // [lng, lat]
+      required: true,
+    },
+  },
+
+  status: {
+    type: String,
+    enum: ["clean", "overflow", "missed"],
+    default: "clean",
+  },
+
+  routeId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Route",
+    default: null,
+  },
+
+  lastCleanedAt: { type: Date, default: null },
+  active: { type: Boolean, default: true },
 }, { timestamps: true });
 
-DustbinSchema.plugin(passportLocalMongoose);
+DustbinSchema.index({ location: "2dsphere" });
+
 module.exports = mongoose.model("Dustbin", DustbinSchema);

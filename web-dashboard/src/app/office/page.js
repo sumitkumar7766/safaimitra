@@ -2,15 +2,15 @@
 
 import React, { useState, useEffect } from "react";
 import dynamic from 'next/dynamic';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   Users, Building2, UserCog, Activity, Plus, Edit2, Trash2,
   Power, X, Menu, Settings, LogOut, User, Shield, Key, Mail,
   Phone, MapPin, Save, UserX, Truck, Star, MessageSquare,
   MapPin as MapPinIcon, AlertCircle, CheckCircle, Clock, Eye
 } from 'lucide-react';
-import { useSearchParams } from 'next/navigation';
 import axios from "axios";
+import { useMapEvents } from "react-leaflet";
 
 // Dynamically import Leaflet components with no SSR
 const MapContainer = dynamic(
@@ -34,14 +34,36 @@ const Polyline = dynamic(
   { ssr: false }
 );
 
+// MapClickHandler component handles click events on the map
+const MapClickHandler = ({ onLocationSelect }) => {
+  useMapEvents({
+    click(e) {
+      onLocationSelect(e.latlng);
+    },
+  });
+  return null;
+};
+
 export default function OfficeDashboard() {
   const router = useRouter();
+  const searchParams = useSearchParams();
+  
+  // URL Params Handling
+  const urlUserId = searchParams.get('id'); 
+  // Get current view from URL or default to 'dashboard'
+  const currentView = searchParams.get('view') || 'dashboard';
+
+  // Function to handle navigation and update history
+  const navigateTo = (viewName) => {
+    const params = new URLSearchParams(searchParams.toString());
+    params.set('view', viewName);
+    router.push(`?${params.toString()}`);
+  };
 
   // Leaflet instance for custom icons
   const [L, setL] = useState(null);
 
   // UI States
-  const [currentView, setCurrentView] = useState('dashboard');
   const [sidebarOpen, setSidebarOpen] = useState(true);
   const [showProfileMenu, setShowProfileMenu] = useState(false);
   const [showAddModal, setShowAddModal] = useState(false);
@@ -52,10 +74,124 @@ export default function OfficeDashboard() {
   const [selectedComplaint, setSelectedComplaint] = useState(null);
   const [showProfileSettings, setShowProfileSettings] = useState(false);
   const [userData, setUserData] = useState(null);
+  const [showEditStaffModal, setShowEditStaffModal] = useState(false);
+  const [editStaffId, setEditStaffId] = useState(null);
 
-  // 2. URL se params nikalein
-  const searchParams = useSearchParams();
-  const urlUserId = searchParams.get('id'); // URL wala ID yahan aayega
+  const handleEditStaffSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        name: formData.staffName,
+        role: formData.staffRole,
+        phone: formData.staffPhone,
+        assignedVehicleId:
+          formData.staffRole === "driver" && formData.assignedVehicleId
+            ? formData.assignedVehicleId
+            : null,
+      };
+
+      const res = await fetch(
+        `http://localhost:5001/staff/update/${editStaffId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Update failed");
+        return;
+      }
+
+      alert("Staff updated successfully");
+
+      setShowEditStaffModal(false);
+      fetchStaff(); // refresh list
+    } catch (err) {
+      console.error("Edit Staff Error:", err);
+      alert("Server error while updating staff");
+    }
+  };
+
+  const openEditStaffModal = (member) => {
+    setEditStaffId(member._id);
+    setFormData({
+      staffName: member.name,
+      staffRole: member.role,
+      staffPhone: member.phone || "",
+      assignedVehicleId: member.assignedVehicleId?._id || "",
+    });
+    setShowEditStaffModal(true);
+  };
+
+  //update the Vehicle list when staff is edited
+  const [showEditVehicleModal, setShowEditVehicleModal] = useState(false);
+  const [editVehicleId, setEditVehicleId] = useState(null);
+
+  const openEditVehicleModal = (vehicle) => {
+    setEditVehicleId(vehicle._id);
+    setFormData({
+      vehicleNumber: vehicle.vehicleNumber,
+      type: vehicle.type || "",
+      active: vehicle.status === "Active",
+    });
+    setShowEditVehicleModal(true);
+  };
+
+  const handleEditVehicleSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        vehicleNumber: formData.vehicleNumber,
+        type: formData.type,
+        status: formData.active ? "Active" : "Inactive",
+      };
+
+      const res = await fetch(
+        `http://localhost:5001/vehicle/update/${editVehicleId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Vehicle update failed");
+        return;
+      }
+
+      // UI update
+      setVehicles((prev) =>
+        prev.map((v) =>
+          v._id === editVehicleId ? { ...v, ...data.vehicle } : v
+        )
+      );
+
+      alert("Vehicle updated successfully");
+      setShowEditVehicleModal(false);
+    } catch (err) {
+      console.error("Update Vehicle Error:", err);
+      alert("Server error while updating vehicle");
+    }
+  };
 
   useEffect(() => {
     const fetchUserData = async () => {
@@ -110,13 +246,37 @@ export default function OfficeDashboard() {
   });
 
   // Data States
-  const [dustbins, setDustbins] = useState([
-    { id: 1, name: "Main Market Bin", latitude: 23.2599, longitude: 77.4126, status: "clean", area: "Sector 4" },
-    { id: 2, name: "Zone-A Bin", latitude: 23.2645, longitude: 77.4186, status: "overflow", area: "Ward 12" },
-    { id: 3, name: "Kolar Road Bin", latitude: 23.2520, longitude: 77.4050, status: "missed", area: "Block 3" },
-    { id: 4, name: "MP Nagar Bin", latitude: 23.2315, longitude: 77.4245, status: "clean", area: "Zone 1" },
-    { id: 5, name: "Ayodhya Bypass Bin", latitude: 23.2450, longitude: 77.4320, status: "overflow", area: "Bypass" },
-  ]);
+  const [dustbins, setDustbins] = useState([]);
+
+  const fetchDustbins = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!userData?._id) return;
+
+      const res = await fetch(
+        `http://localhost:5001/dustbin/list/${userData._id}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+      if (data.success) {
+        setDustbins(data.dustbins);
+      }
+    } catch (err) {
+      console.error("Fetch Dustbins Error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (userData?._id) {
+      fetchDustbins();
+    }
+  }, [userData]);
 
   const [vehicles, setVehicles] = useState([]);
   const fetchVehicles = async () => {
@@ -135,7 +295,6 @@ export default function OfficeDashboard() {
       );
 
       const data = await res.json();
-      console.log("Fetched Vehicles:", data);
 
       if (data.success) {
         setVehicles(data.vehicles);
@@ -169,7 +328,6 @@ export default function OfficeDashboard() {
       );
 
       const data = await res.json();
-      console.log("Fetched Staff:", data);
 
       if (data.success) {
         setStaff(data.staff);
@@ -185,6 +343,51 @@ export default function OfficeDashboard() {
     }
   }, [userData]);
 
+  const [routes, setRoutes] = useState([]);
+
+  const fetchRoutes = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      if (!userData?._id) return;
+
+      const res = await fetch(
+        `http://localhost:5001/route/list/${userData._id}`,
+        {
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (data.success) {
+        setRoutes(data.routes);
+      }
+    } catch (err) {
+      console.error("Fetch Routes Error:", err);
+    }
+  };
+
+  useEffect(() => {
+    if (userData?._id) {
+      fetchRoutes();
+    }
+  }, [userData]);
+
+  const [showEditRouteModal, setShowEditRouteModal] = useState(false);
+  const [editRouteId, setEditRouteId] = useState(null);
+
+  const openEditRouteModal = (route) => {
+    setEditRouteId(route._id);
+    setFormData({
+      routeName: route.name || "",
+      routeDescription: route.description || "",
+      assignedVehicleId: route.assignedVehicleId?._id || "",
+    });
+    setShowEditRouteModal(true);
+  };
 
 
   const [complaints, setComplaints] = useState([
@@ -299,6 +502,9 @@ export default function OfficeDashboard() {
     staffRole: "",
     staffPhone: "",
     staffVehicle: "",
+    assignedVehicleId: "",
+    routeName: "",
+    routeDescription: "",
   });
 
   // Load Leaflet on client side only
@@ -417,29 +623,55 @@ export default function OfficeDashboard() {
       binLongitude: "",
       binArea: "",
       binStatus: "clean",
+
       vehicleNumber: "",
-      vehicleDriver: "",
-      vehicleStatus: "idle",
+      type: "",
+      active: true,
+
       staffName: "",
       staffRole: "",
       staffPhone: "",
       assignedVehicleId: "",
+
+      routeName: "",
+      routeDescription: "",
     });
+
   };
 
   const handleSubmit = async (e) => {
     e.preventDefault();
 
     if (modalType === "dustbin") {
-      const newBin = {
-        id: dustbins.length + 1,
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        officeId: userData._id,
         name: formData.binName,
+        area: formData.binArea,
         latitude: parseFloat(formData.binLatitude),
         longitude: parseFloat(formData.binLongitude),
         status: formData.binStatus,
-        area: formData.binArea,
+        routeId: formData.routeId || null,
       };
-      setDustbins([...dustbins, newBin]);
+
+      const res = await fetch("http://localhost:5001/dustbin/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message);
+        return;
+      }
+
+      alert("Dustbin added successfully");
+      fetchDustbins(); // backend se reload
     } else if (modalType === "vehicle") {
       try {
         const token = localStorage.getItem("token");
@@ -536,23 +768,99 @@ export default function OfficeDashboard() {
         console.error("Staff Register Error:", err);
         alert("Server error while registering staff");
       }
+    } else if (modalType === "route") {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        officeId: userData._id,
+        name: formData.routeName,
+        description: formData.routeDescription,
+        assignedVehicleId: formData.assignedVehicleId || null,
+      };
+
+      const res = await fetch("http://localhost:5001/route/register", {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Route create failed");
+        return;
+      }
+
+      alert("Route created successfully");
+      fetchRoutes();
     }
 
     setShowAddModal(false);
     alert(`${modalType === "dustbin" ? "Dustbin" : modalType === "vehicle" ? "Vehicle" : "Staff"} added successfully!`);
   };
 
-  const handleDeleteDustbin = (id) => {
-    if (confirm("Are you sure you want to delete this dustbin?")) {
-      setDustbins(dustbins.filter(d => d.id !== id));
+  const handleDeleteDustbin = async (id) => {
+    if (!confirm("Are you sure you want to delete this dustbin?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(`http://localhost:5001/dustbin/delete/${id}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || "Failed to delete dustbin");
+        return;
+      }
+
+      setDustbins((prev) => prev.filter((d) => d._id !== id));
       alert("Dustbin deleted successfully!");
+    } catch (err) {
+      console.error("Delete Dustbin Error:", err);
+      alert("Server error while deleting dustbin");
     }
   };
 
-  const handleDeleteVehicle = (id) => {
-    if (confirm("Are you sure you want to delete this vehicle?")) {
-      setVehicles(vehicles.filter(v => v.id !== id));
-      alert("Vehicle deleted successfully!");
+  const handleDeleteVehicle = async (vehicleId) => {
+    if (!confirm("Are you sure you want to delete this vehicle?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `http://localhost:5001/vehicle/delete/${vehicleId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Failed to delete vehicle");
+        return;
+      }
+
+      // UI se bhi remove kar do
+      setVehicles((prev) => prev.filter((v) => v._id !== vehicleId));
+
+      alert("Vehicle deleted successfully");
+    } catch (err) {
+      console.error("Delete Vehicle Error:", err);
+      alert("Server error while deleting vehicle");
     }
   };
 
@@ -587,6 +895,139 @@ export default function OfficeDashboard() {
     } catch (err) {
       console.error("Delete Staff Error:", err);
       alert("Server error while deleting staff");
+    }
+  };
+
+  const handleDeleteRoute = async (routeId) => {
+    if (!confirm("Are you sure you want to delete this route?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const res = await fetch(
+        `http://localhost:5001/route/delete/${routeId}`,
+        {
+          method: "DELETE",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Failed to delete route");
+        return;
+      }
+
+      // UI se bhi route hata do
+      setRoutes((prev) => prev.filter((r) => r._id !== routeId));
+
+      alert("Route deleted successfully");
+    } catch (err) {
+      console.error("Delete Route Error:", err);
+      alert("Server error while deleting route");
+    }
+  };
+
+  const handleEditRouteSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        name: formData.routeName,
+        description: formData.routeDescription,
+        assignedVehicleId: formData.assignedVehicleId || null,
+      };
+
+      const res = await fetch(
+        `http://localhost:5001/route/update/${editRouteId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Route update failed");
+        return;
+      }
+
+      alert("Route updated successfully");
+
+      setShowEditRouteModal(false);
+      fetchRoutes(); // list refresh
+    } catch (err) {
+      console.error("Edit Route Error:", err);
+      alert("Server error while updating route");
+    }
+  };
+
+  const [showEditDustbinModal, setShowEditDustbinModal] = useState(false);
+  const [editDustbinId, setEditDustbinId] = useState(null);
+
+  const openEditDustbinModal = (bin) => {
+    setEditDustbinId(bin._id);
+    setFormData({
+      binName: bin.name || "",
+      binArea: bin.area || "",
+      binLatitude: bin.latitude?.toString() || "",
+      binLongitude: bin.longitude?.toString() || "",
+      binStatus: bin.status || "clean",
+      routeId: bin.routeId?._id || "",
+    });
+    setShowEditDustbinModal(true);
+  };
+
+  const handleEditDustbinSubmit = async (e) => {
+    e.preventDefault();
+
+    try {
+      const token = localStorage.getItem("token");
+
+      const payload = {
+        name: formData.binName,
+        area: formData.binArea,
+        latitude: parseFloat(formData.binLatitude),
+        longitude: parseFloat(formData.binLongitude),
+        status: formData.binStatus,
+        routeId: formData.routeId || null,
+      };
+
+      const res = await fetch(
+        `http://localhost:5001/dustbin/update/${editDustbinId}`,
+        {
+          method: "PUT",
+          headers: {
+            "Content-Type": "application/json",
+            Authorization: `Bearer ${token}`,
+          },
+          body: JSON.stringify(payload),
+        }
+      );
+
+      const data = await res.json();
+      if (!data.success) {
+        alert(data.message || "Dustbin update failed");
+        return;
+      }
+
+      alert("Dustbin updated successfully");
+      setShowEditDustbinModal(false);
+      fetchDustbins(); // list refresh
+    } catch (err) {
+      console.error("Edit Dustbin Error:", err);
+      alert("Server error while updating dustbin");
     }
   };
 
@@ -673,7 +1114,10 @@ export default function OfficeDashboard() {
         <div className="h-[500px] rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner">
           {typeof window !== 'undefined' && L && (
             <MapContainer
-              center={[23.2599, 77.4126]}
+              center={[
+                userData?.latitude ? Number(userData.latitude) : 0,
+                userData?.longitude ? Number(userData.longitude) : 0,
+              ]}
               zoom={13}
               style={{ height: '100%', width: '100%' }}
               scrollWheelZoom={true}
@@ -686,14 +1130,17 @@ export default function OfficeDashboard() {
               {/* Dustbin Markers */}
               {dustbins.map((bin) => (
                 <Marker
-                  key={`bin-${bin.id}`}
+                  key={`bin-${bin._id || bin.id}`}
                   position={[bin.latitude, bin.longitude]}
                   icon={getBinIcon(bin.status)}
                 >
                   <Popup>
                     <div className="text-center p-2 min-w-[150px]">
                       <p className="font-bold mb-2 text-gray-800 text-base">{bin.name}</p>
-                      <p className="text-xs text-gray-600 mb-2">📍 {bin.area}</p>
+                      <p className="text-xs text-gray-600">📍Area:  {bin.area}</p>
+                      <p className="text-xs text-gray-600">
+                        Route Name: {bin.routeId ? bin.routeId.name : "Not Assigned"}
+                      </p>
                       <div className="flex justify-center">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
                           bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
@@ -785,7 +1232,7 @@ export default function OfficeDashboard() {
       {/* Quick Actions */}
       <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
         <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => setCurrentView('complaints')}>
+          onClick={() => navigateTo('complaints')}>
           <div className="flex items-center justify-between mb-4">
             <MessageSquare className="w-10 h-10" />
             <span className="text-3xl font-bold">{stats.pendingComplaints}</span>
@@ -795,7 +1242,7 @@ export default function OfficeDashboard() {
         </div>
 
         <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => setCurrentView('dustbins')}>
+          onClick={() => navigateTo('dustbins')}>
           <div className="flex items-center justify-between mb-4">
             <Building2 className="w-10 h-10" />
             <span className="text-3xl font-bold">{stats.total}</span>
@@ -805,7 +1252,7 @@ export default function OfficeDashboard() {
         </div>
 
         <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => setCurrentView('vehicles')}>
+          onClick={() => navigateTo('vehicles')}>
           <div className="flex items-center justify-between mb-4">
             <Truck className="w-10 h-10" />
             <span className="text-3xl font-bold">{stats.activeVehicles}</span>
@@ -952,6 +1399,111 @@ export default function OfficeDashboard() {
     </>
   );
 
+  const RouteView = () => (
+    <>
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">
+              🛣️ Route Management
+            </h3>
+            <p className="text-sm text-gray-600 mt-1">
+              {routes.length} total routes created
+            </p>
+          </div>
+          <button
+            onClick={() => openModal("route")}
+            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+          >
+            <Plus className="w-5 h-5" />
+            <span className="font-semibold">Add Route</span>
+          </button>
+        </div>
+      </div>
+
+      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+        <div className="overflow-x-auto">
+          <table className="w-full">
+            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+              <tr>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Route Name
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Description
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Assigned Vehicle
+                </th>
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                  Actions
+                </th>
+              </tr>
+            </thead>
+
+            <tbody className="bg-white divide-y divide-gray-200">
+              {routes.map((route) => (
+                <tr key={route._id} className="hover:bg-gray-50 transition-colors">
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="flex items-center">
+                      <div className="text-2xl mr-3">🛣️</div>
+                      <div className="text-sm font-medium text-gray-900">
+                        {route.name}
+                      </div>
+                    </div>
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">
+                    {route.description || "-"}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                    {route.assignedVehicleId
+                      ? `${route.assignedVehicleId.vehicleNumber}${route.assignedVehicleId.type
+                        ? ` (${route.assignedVehicleId.type})`
+                        : ""
+                      }`
+                      : "Unassigned"}
+                  </td>
+
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+                    <button
+                      onClick={() => openEditRouteModal(route)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleDeleteRoute(route._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Trash2 className="w-4 h-4" />
+                    </button>
+                  </td>
+                </tr>
+              ))}
+
+              {routes.length === 0 && (
+                <tr>
+                  <td
+                    colSpan={4}
+                    className="px-6 py-10 text-center text-gray-500"
+                  >
+                    No routes created yet
+                  </td>
+                </tr>
+              )}
+            </tbody>
+          </table>
+        </div>
+      </div>
+    </>
+  );
+
+
   // View: Dustbins
   const DustbinsView = () => (
     <>
@@ -985,7 +1537,7 @@ export default function OfficeDashboard() {
             </thead>
             <tbody className="bg-white divide-y divide-gray-200">
               {dustbins.map((bin) => (
-                <tr key={bin.id} className="hover:bg-gray-50 transition-colors">
+                <tr key={bin._id || bin.id} className="hover:bg-gray-50 transition-colors">
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
                       <div className="text-2xl mr-3">🗑️</div>
@@ -1005,6 +1557,12 @@ export default function OfficeDashboard() {
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                    <button
+                      onClick={() => openEditDustbinModal(bin)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
                     <button
                       onClick={() => handleDeleteDustbin(bin.id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1099,6 +1657,12 @@ export default function OfficeDashboard() {
 
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
                     <button
+                      onClick={() => openEditVehicleModal(vehicle)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+                    <button
                       onClick={() => handleDeleteVehicle(vehicle._id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
@@ -1169,7 +1733,15 @@ export default function OfficeDashboard() {
                     ? `${member.assignedVehicleId.vehicleNumber} (${member.assignedVehicleId.type || "-"})`
                     : "N/A"}
                   </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium flex gap-2">
+                    <button
+                      onClick={() => openEditStaffModal(member)}
+                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                      title="Edit"
+                    >
+                      <Edit2 className="w-4 h-4" />
+                    </button>
+
                     <button
                       onClick={() => handleDeleteStaff(member._id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
@@ -1364,6 +1936,7 @@ export default function OfficeDashboard() {
               { view: 'dashboard', icon: Activity, label: 'Dashboard' },
               { view: 'complaints', icon: MessageSquare, label: 'Complaints' },
               { view: 'reviews', icon: Star, label: 'Reviews' },
+              { view: 'routes', icon: MapPin, label: 'Routes' },
               { view: 'dustbins', icon: Building2, label: 'Dustbins' },
               { view: 'vehicles', icon: Truck, label: 'Vehicles' },
               { view: 'staff', icon: UserCog, label: 'Staff' },
@@ -1371,7 +1944,7 @@ export default function OfficeDashboard() {
             ].map((item) => (
               <li key={item.view}>
                 <button
-                  onClick={() => setCurrentView(item.view)}
+                  onClick={() => navigateTo(item.view)}
                   className={`w-full flex items-center gap-3 p-3 rounded-lg transition-all ${currentView === item.view
                     ? 'bg-purple-600 shadow-lg'
                     : 'hover:bg-purple-600/50'
@@ -1402,10 +1975,11 @@ export default function OfficeDashboard() {
         <header className="bg-white shadow-md">
           <div className="flex items-center justify-between p-4">
             <div>
-              <h2 className="text-2xl font-bold text-gray-800">
+              <h2 className="text-2xl font-bold text-gray-800 capitalize">
                 {currentView === 'dashboard' && 'Office Dashboard'}
                 {currentView === 'complaints' && 'Complaints Management'}
                 {currentView === 'reviews' && 'User Reviews'}
+                {currentView === 'routes' && 'Routes Management'}
                 {currentView === 'dustbins' && 'Dustbins Management'}
                 {currentView === 'vehicles' && 'Vehicles Management'}
                 {currentView === 'staff' && 'Staff Management'}
@@ -1415,6 +1989,7 @@ export default function OfficeDashboard() {
                 {currentView === 'dashboard' && 'Manage all waste management operations'}
                 {currentView === 'complaints' && 'Track and manage citizen complaints'}
                 {currentView === 'reviews' && 'View user feedback and ratings'}
+                {currentView === 'routes' && 'Optimize and assign collection routes'}
                 {currentView === 'dustbins' && 'Monitor and manage dustbins'}
                 {currentView === 'vehicles' && 'Track and manage collection vehicles'}
                 {currentView === 'staff' && 'Manage staff members and roles'}
@@ -1452,7 +2027,7 @@ export default function OfficeDashboard() {
                   <button
                     onClick={() => {
                       setShowProfileMenu(false);
-                      setCurrentView('settings');
+                      navigateTo('settings');
                     }}
                     className="w-full flex items-center gap-2 px-4 py-3 hover:bg-gray-100 text-gray-700 transition-colors"
                   >
@@ -1478,6 +2053,7 @@ export default function OfficeDashboard() {
           {currentView === 'dashboard' && <DashboardView />}
           {currentView === 'complaints' && <ComplaintsView />}
           {currentView === 'reviews' && <ReviewsView />}
+          {currentView === 'routes' && <RouteView />}
           {currentView === 'dustbins' && <DustbinsView />}
           {currentView === 'vehicles' && <VehiclesView />}
           {currentView === 'staff' && <StaffView />}
@@ -1492,19 +2068,21 @@ export default function OfficeDashboard() {
           onClick={() => setShowAddModal(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-5xl max-h-[90vh] overflow-y-auto shadow-2xl"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
               <h2 className="text-2xl font-bold text-gray-800">
-                {modalType === "dustbin" ? "➕ Add New Dustbin" :
-                  modalType === "vehicle" ? "➕ Add New Vehicle" : "➕ Add New Staff"}
+                {modalType === "dustbin" && "➕ Add New Dustbin"}
+                {modalType === "vehicle" && "➕ Add New Vehicle"}
+                {modalType === "staff" && "➕ Add New Staff"}
+                {modalType === "route" && "➕ Add New Route"}
               </h2>
               <button
                 onClick={() => setShowAddModal(false)}
                 className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-black" />
               </button>
             </div>
 
@@ -1543,7 +2121,7 @@ export default function OfficeDashboard() {
                         value={formData.binLatitude}
                         onChange={(e) => setFormData({ ...formData, binLatitude: e.target.value })}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                        placeholder="23.2599"
+                        placeholder={userData?.latitude ? `${userData.latitude}` : "Enter Longitude"}
                       />
                     </div>
                     <div>
@@ -1555,8 +2133,70 @@ export default function OfficeDashboard() {
                         value={formData.binLongitude}
                         onChange={(e) => setFormData({ ...formData, binLongitude: e.target.value })}
                         className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                        placeholder="77.4126"
+                        placeholder={userData?.longitude ? `${userData.longitude}` : "Enter Longitude"}
                       />
+                    </div>
+                  </div>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assign Route (Optional)
+                    </label>
+                    <select
+                      value={formData.routeId || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, routeId: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border rounded-lg text-black"
+                    >
+                      <option value="">-- Select Route --</option>
+                      {routes.map((r) => (
+                        <option key={r._id} value={r._id}>
+                          {r.name}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
+                  <div className="mt-3">
+                    <p className="text-xs text-gray-500 mb-2">
+                      Map par click karke location select karo
+                    </p>
+
+                    <div className="h-[450px] rounded-lg overflow-hidden border">
+                      {typeof window !== "undefined" && L && (
+                        <MapContainer
+                          center={[
+                            userData.latitude || 0,
+                            userData.longitude || 0,
+                          ]}
+                          zoom={13}
+                          style={{ height: "100%", width: "100%" }}
+                        >
+                          <TileLayer
+                            url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                          />
+
+                          {/* Click handler */}
+                          <MapClickHandler
+                            onLocationSelect={(latlng) => {
+                              setFormData(prev => ({
+                                ...prev,
+                                binLatitude: latlng.lat.toFixed(6),
+                                binLongitude: latlng.lng.toFixed(6)
+                              }))
+                            }}
+                          />
+
+                          {/* Agar already select ho chuka hai to marker dikhao */}
+                          {formData.binLatitude && formData.binLongitude && (
+                            <Marker
+                              position={[
+                                parseFloat(formData.binLatitude),
+                                parseFloat(formData.binLongitude),
+                              ]}
+                            />
+                          )}
+                        </MapContainer>
+                      )}
                     </div>
                   </div>
                   <div>
@@ -1606,26 +2246,6 @@ export default function OfficeDashboard() {
                       placeholder="Mini Truck / Auto Tipper"
                     />
                   </div>
-
-                  {/* <div>
-                    <label className="block text-sm font-medium text-gray-700 mb-2">
-                      Route (Optional)
-                    </label>
-                    <select
-                      value={formData.routeId || ""}
-                      onChange={(e) =>
-                        setFormData({ ...formData, routeId: e.target.value })
-                      }
-                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
-                    >
-                      <option value="">-- Select Route --</option>
-                      {routes.map((r) => (
-                        <option key={r._id} value={r._id}>
-                          {r.name}
-                        </option>
-                      ))}
-                    </select>
-                  </div> */}
 
                   <div>
                     <label className="block text-sm font-medium text-gray-700 mb-2">
@@ -1721,7 +2341,60 @@ export default function OfficeDashboard() {
                       </select>
                     </div>
                   )}
+                </>
+              )}
+              {modalType === "route" && (
+                <>
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Route Name
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      value={formData.routeName || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, routeName: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                      placeholder="e.g., Ward-12 Morning Route"
+                    />
+                  </div>
 
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Description (Optional)
+                    </label>
+                    <textarea
+                      rows={3}
+                      value={formData.routeDescription || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, routeDescription: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                      placeholder="Area details, timing, landmarks, etc."
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-sm font-medium text-gray-700 mb-2">
+                      Assign Vehicle (Optional)
+                    </label>
+                    <select
+                      value={formData.assignedVehicleId || ""}
+                      onChange={(e) =>
+                        setFormData({ ...formData, assignedVehicleId: e.target.value })
+                      }
+                      className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
+                    >
+                      <option value="">-- Select Vehicle --</option>
+                      {vehicles.map((v) => (
+                        <option key={v._id} value={v._id}>
+                          {v.vehicleNumber} {v.type ? `(${v.type})` : ""}
+                        </option>
+                      ))}
+                    </select>
+                  </div>
                 </>
               )}
 
@@ -1729,7 +2402,416 @@ export default function OfficeDashboard() {
                 type="submit"
                 className="w-full py-3 bg-gradient-to-r from-purple-600 to-blue-600 hover:from-purple-700 hover:to-blue-700 rounded-lg font-bold text-white transition-all shadow-md hover:shadow-lg"
               >
-                ✓ Add {modalType === "dustbin" ? "Dustbin" : modalType === "vehicle" ? "Vehicle" : "Staff"}
+                ✓ Add {modalType === "route" ? "Route" : modalType === "dustbin" ? "Dustbin" : modalType === "vehicle" ? "Vehicle" : "Staff"}
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* edit model */}
+      {showEditStaffModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowEditStaffModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">✏️ Edit Staff</h2>
+              <button
+                onClick={() => setShowEditStaffModal(false)}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditStaffSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Staff Name
+                </label>
+                <input
+                  type="text"
+                  value={formData.staffName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, staffName: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Role
+                </label>
+                <select
+                  value={formData.staffRole}
+                  onChange={(e) =>
+                    setFormData({ ...formData, staffRole: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                >
+                  <option value="driver">Driver</option>
+                  <option value="helper">Helper</option>
+                  <option value="supervisor">Supervisor</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Phone
+                </label>
+                <input
+                  type="tel"
+                  value={formData.staffPhone}
+                  onChange={(e) =>
+                    setFormData({ ...formData, staffPhone: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              {formData.staffRole === "driver" && (
+                <div>
+                  <label className="block text-sm font-medium text-gray-700 mb-2">
+                    Assign Vehicle
+                  </label>
+                  <select
+                    value={formData.assignedVehicleId}
+                    onChange={(e) =>
+                      setFormData({ ...formData, assignedVehicleId: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg text-black"
+                  >
+                    <option value="">-- Select Vehicle --</option>
+                    {vehicles.map((v) => (
+                      <option key={v._id} value={v._id}>
+                        {v.vehicleNumber} {v.type ? `(${v.type})` : ""}
+                      </option>
+                    ))}
+                  </select>
+                </div>
+              )}
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-bold text-white"
+              >
+                Update Staff
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* edit the vehicles model */}
+      {showEditVehicleModal && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">✏️ Edit Vehicle</h2>
+              <button
+                onClick={() => setShowEditVehicleModal(false)}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditVehicleSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Vehicle Number</label>
+                <input
+                  type="text"
+                  value={formData.vehicleNumber}
+                  onChange={(e) =>
+                    setFormData({ ...formData, vehicleNumber: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Type</label>
+                <input
+                  type="text"
+                  value={formData.type}
+                  onChange={(e) =>
+                    setFormData({ ...formData, type: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select
+                  value={formData.active ? "active" : "inactive"}
+                  onChange={(e) =>
+                    setFormData({ ...formData, active: e.target.value === "active" })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                >
+                  <option value="active">Active</option>
+                  <option value="inactive">Inactive</option>
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-bold text-white"
+              >
+                Update Vehicle
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {showEditRouteModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowEditRouteModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">✏️ Edit Route</h2>
+              <button
+                onClick={() => setShowEditRouteModal(false)}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditRouteSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Route Name
+                </label>
+                <input
+                  type="text"
+                  required
+                  value={formData.routeName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, routeName: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                  placeholder="Ward-12 Morning Route"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Description
+                </label>
+                <textarea
+                  rows={3}
+                  value={formData.routeDescription}
+                  onChange={(e) =>
+                    setFormData({ ...formData, routeDescription: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                  placeholder="Area details, timing, landmarks…"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  Assign Vehicle (Optional)
+                </label>
+                <select
+                  value={formData.assignedVehicleId}
+                  onChange={(e) =>
+                    setFormData({ ...formData, assignedVehicleId: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                >
+                  <option value="">-- Select Vehicle --</option>
+                  {vehicles.map((v) => (
+                    <option key={v._id} value={v._id}>
+                      {v.vehicleNumber} {v.type ? `(${v.type})` : ""}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-bold text-white"
+              >
+                Update Route
+              </button>
+            </form>
+          </div>
+        </div>
+      )}
+      {/* Dustbin Edit Modal */}
+      {showEditDustbinModal && (
+        <div
+          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          onClick={() => setShowEditDustbinModal(false)}
+        >
+          <div
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            onClick={(e) => e.stopPropagation()}
+          >
+            <div className="flex justify-between items-center mb-6">
+              <h2 className="text-2xl font-bold text-gray-800">✏️ Edit Dustbin</h2>
+              <button
+                onClick={() => setShowEditDustbinModal(false)}
+                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
+              >
+                <X className="w-5 h-5" />
+              </button>
+            </div>
+
+            <form onSubmit={handleEditDustbinSubmit} className="space-y-4">
+              <div>
+                <label className="block text-sm font-medium mb-2">Dustbin Name</label>
+                <input
+                  type="text"
+                  value={formData.binName}
+                  onChange={(e) =>
+                    setFormData({ ...formData, binName: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Area</label>
+                <input
+                  type="text"
+                  value={formData.binArea}
+                  onChange={(e) =>
+                    setFormData({ ...formData, binArea: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                />
+              </div>
+
+              <div className="grid grid-cols-2 gap-3">
+                <div>
+                  <label className="block text-sm font-medium mb-2">Latitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.binLatitude}
+                    onChange={(e) =>
+                      setFormData({ ...formData, binLatitude: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg text-black"
+                  />
+                </div>
+
+                <div>
+                  <label className="block text-sm font-medium mb-2">Longitude</label>
+                  <input
+                    type="number"
+                    step="any"
+                    value={formData.binLongitude}
+                    onChange={(e) =>
+                      setFormData({ ...formData, binLongitude: e.target.value })
+                    }
+                    className="w-full px-4 py-3 border rounded-lg text-black"
+                  />
+                </div>
+              </div>
+              <div className="mt-3">
+                <p className="text-xs text-gray-500 mb-2">
+                  Map par click karke location update karo
+                </p>
+
+                <div className="h-[250px] rounded-lg overflow-hidden border">
+                  {typeof window !== "undefined" && L && (
+                    <MapContainer
+                      center={[
+                        formData.binLatitude
+                          ? parseFloat(formData.binLatitude)
+                          : 23.2599,
+                        formData.binLongitude
+                          ? parseFloat(formData.binLongitude)
+                          : 77.4126,
+                      ]}
+                      zoom={13}
+                      style={{ height: "100%", width: "100%" }}
+                    >
+                      <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+
+                      {/* Click handler */}
+                      <MapClickHandler
+                        onLocationSelect={(latlng) => {
+                          setFormData(prev => ({
+                            ...prev,
+                            binLatitude: latlng.lat.toFixed(6),
+                            binLongitude: latlng.lng.toFixed(6)
+                          }))
+                        }}
+                      />
+
+                      {/* Selected marker */}
+                      {formData.binLatitude && formData.binLongitude && (
+                        <Marker
+                          position={[
+                            parseFloat(formData.binLatitude),
+                            parseFloat(formData.binLongitude),
+                          ]}
+                        />
+                      )}
+                    </MapContainer>
+                  )}
+                </div>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">Status</label>
+                <select
+                  value={formData.binStatus}
+                  onChange={(e) =>
+                    setFormData({ ...formData, binStatus: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                >
+                  <option value="clean">Clean</option>
+                  <option value="overflow">Overflow</option>
+                  <option value="missed">Missed</option>
+                </select>
+              </div>
+
+              <div>
+                <label className="block text-sm font-medium mb-2">
+                  Assign Route (Optional)
+                </label>
+                <select
+                  value={formData.routeId || ""}
+                  onChange={(e) =>
+                    setFormData({ ...formData, routeId: e.target.value })
+                  }
+                  className="w-full px-4 py-3 border rounded-lg text-black"
+                >
+                  <option value="">-- Select Route --</option>
+                  {routes.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+              </div>
+
+              <button
+                type="submit"
+                className="w-full py-3 bg-gradient-to-r from-blue-600 to-purple-600 rounded-lg font-bold text-white"
+              >
+                Update Dustbin
               </button>
             </form>
           </div>
@@ -1847,14 +2929,13 @@ export default function OfficeDashboard() {
 
             <div className="space-y-3 mb-6">
               <p className="text-sm font-bold text-gray-700">Select Available Vehicle:</p>
-              {vehicles.filter(v => v.status === "idle").map((vehicle) => (
+              {vehicles.filter(v => v.status === "idle" || v.status === "Inactive").map((vehicle) => (
                 <button
-                  key={vehicle.id}
-                  onClick={() => assignVehicleToComplaint(vehicle.number)}
-                  className="w-full p-4 bg-gradient-to-r from-green-50 to-green-100 hover:from-green-100 hover:to-green-200 rounded-xl text-left transition-all shadow-md hover:shadow-lg"
+                  key={vehicle._id}
+                  onClick={() => assignVehicleToComplaint(vehicle.vehicleNumber)}
+                  className="w-full p-4 bg-gradient-to-r from-green-50 to-green-100 rounded-xl text-left"
                 >
-                  <p className="font-bold text-gray-800">🚛 {vehicle.number}</p>
-                  <p className="text-sm text-gray-600">Driver: {vehicle.driver}</p>
+                  <p className="font-bold text-gray-800">🚛 {vehicle.vehicleNumber}</p>
                   <p className="text-xs text-green-600 font-semibold mt-1">✓ Available</p>
                 </button>
               ))}

@@ -12,6 +12,7 @@ const OfficeSchema = new Schema(
       required: true,
       trim: true,
     },
+
     cityName: {
       type: String,
       required: true,
@@ -36,30 +37,67 @@ const OfficeSchema = new Schema(
       unique: true,
       sparse: true,
     },
+
     username: {
       type: String,
       required: true,
       trim: true,
     },
+
+    // 🔴 City / Office location
+    latitude: {
+      type: Number,
+      required: true,
+    },
+
+    longitude: {
+      type: Number,
+      required: true,
+    },
+
+    // GeoJSON for map & geo queries
+    location: {
+      type: {
+        type: String,
+        enum: ["Point"],
+        default: "Point",
+      },
+      coordinates: {
+        type: [Number], // [lng, lat]
+        required: true,
+      },
+    },
+
     status: {
       type: String,
       enum: ["Active", "Inactive"],
       default: "Active",
     },
-    vehicles: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Vehicle",
-      default: null,
-    }],
-    staffId: [{
-      type: mongoose.Schema.Types.ObjectId,
-      ref: "Staff",
-      default: null,
-    }],
+
+    vehicles: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Vehicle",
+        default: null,
+      },
+    ],
+
+    staffId: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Staff",
+        default: null,
+      },
+    ],
+
     role: { type: String, default: "Office Staff" },
   },
   { timestamps: true }
 );
 
+// Geo index (same as Dustbin)
+OfficeSchema.index({ location: "2dsphere" });
+
 OfficeSchema.plugin(passportLocalMongoose);
+
 module.exports = mongoose.model("Office", OfficeSchema);

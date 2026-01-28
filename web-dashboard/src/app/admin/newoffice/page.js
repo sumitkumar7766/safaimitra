@@ -1,9 +1,28 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { ArrowLeft, Save } from "lucide-react";
+import dynamic from "next/dynamic";
+
+// Leaflet dynamic imports
+const MapContainer = dynamic(
+  () => import("react-leaflet").then((m) => m.MapContainer),
+  { ssr: false }
+);
+const TileLayer = dynamic(
+  () => import("react-leaflet").then((m) => m.TileLayer),
+  { ssr: false }
+);
+const Marker = dynamic(
+  () => import("react-leaflet").then((m) => m.Marker),
+  { ssr: false }
+);
+const useMapEvents = dynamic(
+  () => import("react-leaflet").then((m) => m.useMapEvents),
+  { ssr: false }
+);
 
 export default function NewOfficePage() {
   const router = useRouter();
@@ -17,10 +36,42 @@ export default function NewOfficePage() {
     username: "",
     password: "",
     status: "Active",
+    latitude: "",
+    longitude: "",
   });
+
+  useEffect(() => {
+    if (typeof window !== "undefined") {
+      import("leaflet").then((L) => {
+        delete L.default.Icon.Default.prototype._getIconUrl;
+        L.default.Icon.Default.mergeOptions({
+          iconRetinaUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon-2x.png",
+          iconUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-icon.png",
+          shadowUrl:
+            "https://cdnjs.cloudflare.com/ajax/libs/leaflet/1.7.1/images/marker-shadow.png",
+        });
+      });
+    }
+  }, []);
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
+  };
+
+  const MapClickHandler = () => {
+    const MapEvents = require("react-leaflet").useMapEvents;
+    MapEvents({
+      click(e) {
+        setFormData((prev) => ({
+          ...prev,
+          latitude: e.latlng.lat.toFixed(6),
+          longitude: e.latlng.lng.toFixed(6),
+        }));
+      },
+    });
+    return null;
   };
 
   const handleCreateOffice = async () => {
@@ -30,27 +81,23 @@ export default function NewOfficePage() {
       !formData.officeName ||
       !formData.adminName ||
       !formData.adminEmail ||
-      !formData.password
+      !formData.password ||
+      !formData.latitude ||
+      !formData.longitude
     ) {
-      alert("Please fill in all required fields");
+      alert("All fields including map location are required");
       return;
     }
 
     try {
       const token = localStorage.getItem("token");
 
-      await axios.post(
-        "http://localhost:5001/office/register",
-        formData,
-        {
-          headers: {
-            Authorization: `Bearer ${token}`,
-          },
-        }
-      );
+      await axios.post("http://localhost:5001/office/register", formData, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
       alert("Office created successfully!");
-      router.push("/admin"); // back to dashboard
+      router.push("/admin");
     } catch (err) {
       console.error(err);
       alert(err.response?.data?.message || "Failed to create office");
@@ -75,83 +122,68 @@ export default function NewOfficePage() {
         </div>
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
+          {[
+            ["stateName", "State Name"],
+            ["cityName", "City Name"],
+            ["officeName", "Office Name"],
+            ["adminName", "Admin Name"],
+            ["adminEmail", "Admin Email"],
+            ["password", "Password", "password"],
+          ].map(([name, label, type = "text"]) => (
+            <div key={name}>
+              <label className="block text-sm font-medium mb-1">{label}</label>
+              <input
+                type={type}
+                name={name}
+                value={formData[name]}
+                onChange={handleInputChange}
+                className="w-full px-4 py-2 border rounded-lg"
+              />
+            </div>
+          ))}
+
           <div>
-            <label className="block text-sm font-medium mb-1">State Name</label>
+            <label className="block text-sm font-medium mb-1">Latitude</label>
             <input
-              type="text"
-              name="stateName"
-              value={formData.stateName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
+              type="number"
+              value={formData.latitude}
+              readOnly
+              className="w-full px-4 py-2 border rounded-lg bg-gray-100"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">City Name</label>
+            <label className="block text-sm font-medium mb-1">Longitude</label>
             <input
-              type="text"
-              name="cityName"
-              value={formData.cityName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
+              type="number"
+              value={formData.longitude}
+              readOnly
+              className="w-full px-4 py-2 border rounded-lg bg-gray-100"
             />
           </div>
+        </div>
 
-          <div>
-            <label className="block text-sm font-medium mb-1">Office Name</label>
-            <input
-              type="text"
-              name="officeName"
-              value={formData.officeName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Admin Name</label>
-            <input
-              type="text"
-              name="adminName"
-              value={formData.adminName}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Admin Email</label>
-            <input
-              type="email"
-              name="adminEmail"
-              value={formData.adminEmail}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Password</label>
-            <input
-              type="password"
-              name="password"
-              value={formData.password}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
-            />
-          </div>
-
-          <div>
-            <label className="block text-sm font-medium mb-1">Status</label>
-            <select
-              name="status"
-              value={formData.status}
-              onChange={handleInputChange}
-              className="w-full px-4 py-2 border rounded-lg"
+        <div className="px-6 pb-6">
+          <p className="text-sm text-gray-500 mb-2">
+            Map par click karke city location select karo
+          </p>
+          <div className="h-[300px] rounded-lg overflow-hidden border">
+            <MapContainer
+              center={[23.2599, 77.4126]}
+              zoom={6}
+              style={{ height: "100%", width: "100%" }}
             >
-              <option value="Active">Active</option>
-              <option value="Inactive">Inactive</option>
-            </select>
+              <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
+              <MapClickHandler />
+              {formData.latitude && formData.longitude && (
+                <Marker
+                  position={[
+                    parseFloat(formData.latitude),
+                    parseFloat(formData.longitude),
+                  ]}
+                />
+              )}
+            </MapContainer>
           </div>
         </div>
 
