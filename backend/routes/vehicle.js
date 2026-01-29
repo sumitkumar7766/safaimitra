@@ -160,7 +160,7 @@ router.delete("/delete/:vehicleId", officeAuth, async (req, res) => {
     // 2. Office se vehicleId remove karo (agar Office schema me array hai)
     await Office.findByIdAndUpdate(
       officeId,
-      { $pull: { vehicleId: vehicle._id } }
+      { $pull: { vehicles: vehicle._id } }
     );
 
     // 3. Agar kisi staff se linked hai to us staff ko unlink karo

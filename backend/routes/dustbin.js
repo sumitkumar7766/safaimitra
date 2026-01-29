@@ -2,6 +2,7 @@ const express = require("express");
 const router = express.Router();
 const Dustbin = require("../model/DustbinModel");
 const Route = require("../model/RouteModel");
+const Office = require("../model/OfficeModel");
 const officeAuth = require("../middleware/officeAuth");
 
 /* ================= REGISTER DUSTBIN ================= */
@@ -17,9 +18,11 @@ router.post("/register", officeAuth, async (req, res) => {
   }
 
   try {
+    let route = null;
+
     // Agar route diya gaya hai to verify karo
     if (routeId) {
-      const route = await Route.findOne({ _id: routeId, officeId });
+      route = await Route.findOne({ _id: routeId, officeId });
       if (!route) {
         return res.status(404).json({
           success: false,
@@ -43,9 +46,21 @@ router.post("/register", officeAuth, async (req, res) => {
       active: true,
     });
 
+    // 🔗 Route ke andar dustbin ka ID push karo
+    if (routeId) {
+      await Route.findByIdAndUpdate(routeId, {
+        $addToSet: { dustbins: dustbin._id }, // duplicate se bachaata hai
+      });
+    }
+
+    // 🏢 Office ke andar bhi dustbin ID save karo
+    await Office.findByIdAndUpdate(officeId, {
+      $addToSet: { dustbins: dustbin._id },
+    });
+
     return res.json({
       success: true,
-      message: "Dustbin successfully registered",
+      message: "Dustbin successfully registered and linked to route",
       dustbin,
     });
   } catch (err) {
@@ -95,15 +110,32 @@ router.put("/update/:dustbinId", officeAuth, async (req, res) => {
       });
     }
 
-    // Route verify
-    if (routeId) {
-      const route = await Route.findOne({ _id: routeId, officeId });
-      if (!route) {
+    // Agar route change ho raha hai
+    if (routeId && String(routeId) !== String(dustbin.routeId)) {
+
+      // Naya route verify karo
+      const newRoute = await Route.findOne({ _id: routeId, officeId });
+      if (!newRoute) {
         return res.status(404).json({
           success: false,
           message: "Route not found for this office",
         });
       }
+
+      // Purane route se hatao (agar pehle assigned tha)
+      if (dustbin.routeId) {
+        await Route.findByIdAndUpdate(dustbin.routeId, {
+          $pull: { dustbins: dustbin._id },
+        });
+      }
+
+      // Naye route me add karo
+      await Route.findByIdAndUpdate(routeId, {
+        $addToSet: { dustbins: dustbin._id },
+      });
+
+      // Dustbin me naya route set karo
+      dustbin.routeId = routeId;
     }
 
     dustbin.name = name ?? dustbin.name;
@@ -143,11 +175,24 @@ router.delete("/delete/:dustbinId", officeAuth, async (req, res) => {
       });
     }
 
+    // 🔗 Agar kisi route se linked hai to waha se bhi hatao
+    if (dustbin.routeId) {
+      await Route.findByIdAndUpdate(dustbin.routeId, {
+        $pull: { dustbins: dustbin._id },
+      });
+    }
+
+    // 🏢 Office ke andar se bhi dustbin hatao (agar office me array hai)
+    await Office.findByIdAndUpdate(officeId, {
+      $pull: { dustbins: dustbin._id },
+    });
+
+    // 🗑️ Ab dustbin delete karo
     await Dustbin.findByIdAndDelete(dustbinId);
 
     return res.json({
       success: true,
-      message: "Dustbin successfully deleted",
+      message: "Dustbin successfully deleted and unlinked from route",
     });
   } catch (err) {
     console.error("Delete Dustbin Error:", err);

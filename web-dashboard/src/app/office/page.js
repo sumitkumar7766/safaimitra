@@ -47,9 +47,9 @@ const MapClickHandler = ({ onLocationSelect }) => {
 export default function OfficeDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
-  
+
   // URL Params Handling
-  const urlUserId = searchParams.get('id'); 
+  const urlUserId = searchParams.get('id');
   // Get current view from URL or default to 'dashboard'
   const currentView = searchParams.get('view') || 'dashboard';
 
@@ -1070,6 +1070,68 @@ export default function OfficeDashboard() {
     setShowProfileSettings(false);
   };
 
+  const handleRemoveVehicles = async (routeId) => {
+    const isConfirmed = window.confirm(
+      "Are you sure you want to remove the vehicle from this route?"
+    );
+
+    if (!isConfirmed) return; // user ne Cancel kiya
+
+    const token = localStorage.getItem("token"); // 👈 yahan se token lo
+
+    try {
+      await axios.put(
+        `http://localhost:5001/route/remove-vehicle/${routeId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // UI update (local state refresh)
+      setRoutes((prev) =>
+        prev.map((r) =>
+          r._id === routeId ? { ...r, assignedVehicleId: null } : r
+        )
+      );
+    } catch (err) {
+      console.error("Remove Vehicle Error:", err);
+    }
+  };
+
+  const handleRemoveVehiclesFromStaff = async (staffId) => {
+    const isConfirmed = window.confirm(
+      "Are you sure you want to remove the vehicle from this staff?"
+    );
+
+    if (!isConfirmed) return;
+
+    const token = localStorage.getItem("token");
+
+    try {
+      await axios.put(
+        `http://localhost:5001/staff/remove-vehicle/${staffId}`,
+        {},
+        {
+          headers: {
+            Authorization: `Bearer ${token}`,
+          },
+        }
+      );
+
+      // UI update
+      setStaff((prev) =>
+        prev.map((s) =>
+          s._id === staffId ? { ...s, assignedVehicleId: null } : s
+        )
+      );
+    } catch (err) {
+      console.error("Remove Vehicle From Staff Error:", err);
+    }
+  };
+
   // Component: Stat Card
   const StatCard = ({ icon: Icon, title, value, color }) => (
     <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 hover:shadow-xl transition-shadow" style={{ borderLeftColor: color }}>
@@ -1162,7 +1224,12 @@ export default function OfficeDashboard() {
 
               {/* Vehicle Markers */}
               {vehicles
-                .filter(v => v.latitude != null && v.longitude != null)
+                .filter(
+                  (v) =>
+                    v.status === "online" &&        // 👈 sirf online vehicles
+                    v.latitude != null &&
+                    v.longitude != null
+                )
                 .map((vehicle) => (
                   <Marker
                     key={`vehicle-${vehicle._id}`}
@@ -1181,9 +1248,9 @@ export default function OfficeDashboard() {
 
                         <div className="flex justify-center mb-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.status === "Active"
-                              ? "bg-purple-100 text-purple-800"
-                              : "bg-gray-100 text-gray-800"
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.status === "online"
+                                ? "bg-green-100 text-green-800"
+                                : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {vehicle.status}
@@ -1193,7 +1260,7 @@ export default function OfficeDashboard() {
                         <div className="mt-2 pt-2 border-t border-gray-200">
                           <p className="text-xs text-gray-500">Current Location:</p>
                           <p className="text-xs font-mono text-gray-700">
-                            {vehicle.latitude?.toFixed(4) ?? "N/A"}, {vehicle.longitude?.toFixed(4) ?? "N/A"}
+                            {vehicle.latitude?.toFixed(4)}, {vehicle.longitude?.toFixed(4)}
                           </p>
                         </div>
                       </div>
@@ -1482,6 +1549,14 @@ export default function OfficeDashboard() {
                     >
                       <Trash2 className="w-4 h-4" />
                     </button>
+
+                    <button
+                      onClick={() => handleRemoveVehicles(route._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Truck className="w-4 h-4" />
+                    </button>
                   </td>
                 </tr>
               ))}
@@ -1564,7 +1639,7 @@ export default function OfficeDashboard() {
                       <Edit2 className="w-4 h-4" />
                     </button>
                     <button
-                      onClick={() => handleDeleteDustbin(bin.id)}
+                      onClick={() => handleDeleteDustbin(bin._id)}
                       className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
                       title="Delete"
                     >
@@ -1748,6 +1823,14 @@ export default function OfficeDashboard() {
                       title="Delete"
                     >
                       <Trash2 className="w-4 h-4" />
+                    </button>
+
+                    <button
+                      onClick={() => handleRemoveVehiclesFromStaff(member._id)}
+                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                      title="Delete"
+                    >
+                      <Truck className="w-4 h-4" />
                     </button>
                   </td>
                 </tr>
@@ -2425,7 +2508,7 @@ export default function OfficeDashboard() {
                 onClick={() => setShowEditStaffModal(false)}
                 className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-black" />
               </button>
             </div>
 
@@ -2511,7 +2594,7 @@ export default function OfficeDashboard() {
       {showEditVehicleModal && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-black"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2520,7 +2603,7 @@ export default function OfficeDashboard() {
                 onClick={() => setShowEditVehicleModal(false)}
                 className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-black" />
               </button>
             </div>
 
@@ -2579,7 +2662,7 @@ export default function OfficeDashboard() {
           onClick={() => setShowEditRouteModal(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-black"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2588,7 +2671,7 @@ export default function OfficeDashboard() {
                 onClick={() => setShowEditRouteModal(false)}
                 className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200"
               >
-                <X className="w-5 h-5" />
+                <X className="w-5 h-5 text-black" />
               </button>
             </div>
 
@@ -2661,7 +2744,7 @@ export default function OfficeDashboard() {
           onClick={() => setShowEditDustbinModal(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-md shadow-2xl text-black"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">
@@ -2956,7 +3039,7 @@ export default function OfficeDashboard() {
           onClick={() => setShowProfileSettings(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl"
+            className="bg-white rounded-2xl p-6 w-full max-w-md max-h-[90vh] overflow-y-auto shadow-2xl text-black"
             onClick={(e) => e.stopPropagation()}
           >
             <div className="flex justify-between items-center mb-6">

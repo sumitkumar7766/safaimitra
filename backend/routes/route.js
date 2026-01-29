@@ -2,7 +2,9 @@ const express = require("express");
 const router = express.Router();
 const Route = require("../model/RouteModel");
 const Vehicle = require("../model/VehicleModel");
+const Office = require("../model/OfficeModel");
 const officeAuth = require("../middleware/officeAuth");
+const Dustbin = require("../model/DustbinModel");
 
 /* ================= REGISTER ROUTE ================= */
 router.post("/register", officeAuth, async (req, res) => {
@@ -49,6 +51,11 @@ router.post("/register", officeAuth, async (req, res) => {
       dustbins: dustbins || [],
       assignedVehicleId: assignedVehicleId || null,
       active: true,
+    });
+
+    // 🏢 Office ke andar bhi dustbin ID save karo
+    await Office.findByIdAndUpdate(officeId, {
+      $addToSet: { route: route._id },
     });
 
     return res.json({
@@ -109,6 +116,17 @@ router.delete("/delete/:routeId", officeAuth, async (req, res) => {
         { $unset: { routeId: "" } } // agar vehicle me routeId field hai
       );
     }
+
+    // Sab dustbins se ye route hata do
+    await Dustbin.updateMany(
+      { routeId: routeId, officeId: officeId },
+      { $unset: { routeId: "" } }
+    );
+
+    // 🏢 Office ke andar se bhi dustbin hatao (agar office me array hai)
+    await Office.findByIdAndUpdate(officeId, {
+      $pull: { route: route._id },
+    });
 
     // 3. Route delete karo
     await Route.findByIdAndDelete(routeId);
@@ -206,5 +224,40 @@ router.put("/update/:routeId", officeAuth, async (req, res) => {
   }
 });
 
+router.put("/remove-vehicle/:routeId", officeAuth, async (req, res) => {
+  const { routeId } = req.params;
+  const officeId = req.user.id;
+
+  try {
+    const route = await Route.findOne({ _id: routeId, officeId });
+    if (!route) {
+      return res.status(404).json({
+        success: false,
+        message: "Route not found",
+      });
+    }
+
+    // Agar koi vehicle assigned hai to vehicle se bhi route hatao
+    if (route.assignedVehicleId) {
+      await Vehicle.findByIdAndUpdate(route.assignedVehicleId, {
+        $unset: { routeId: "" },
+      });
+    }
+
+    // Route se vehicle hatao
+    route.assignedVehicleId = null;
+    await route.save();
+
+    res.json({
+      success: true,
+      message: "Vehicle removed from route",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
 
 module.exports = router;

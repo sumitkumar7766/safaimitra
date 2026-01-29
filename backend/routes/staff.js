@@ -4,19 +4,21 @@ const router = express.Router();
 const Staff = require("../model/StaffModel");
 const Vehicle = require("../model/VehicleModel");
 const Office = require("../model/OfficeModel");
+const Route = require("../model/RouteModel");
+const Dustbin = require("../model/DustbinModel");
 const officeAuth = require("../middleware/officeAuth");
+const staffAuth = require("../middleware/staffAuth");
 
 /* ================= STAFF REGISTER ================= */
 router.post("/register", officeAuth, async (req, res) => {
   const { name, role, phone, assignedVehicleId } = req.body;
-  const officeId = req.user.id; // token se aayega
+  const officeId = req.user.id;
+  console.log(name, role, assignedVehicleId)
 
-  console.log("Staff Register Attempt:", name, role, "Office:", officeId);
-
-  if (!name || !role) {
+  if (!name || !role || !phone) {
     return res.status(400).json({
       success: false,
-      message: "Name aur Role required hai",
+      message: "Name, Role aur Username required hai",
     });
   }
 
@@ -32,35 +34,42 @@ router.post("/register", officeAuth, async (req, res) => {
       }
     }
 
-    const staff = await Staff.create({
+    // 🔐 Auto password: last 5 digits of mobile number
+    const password = phone?.toString().slice(-5);
+    const username = phone;
+
+    const staff = new Staff({
       officeId,
       name,
-      role, // "driver" | "helper" | "supervisor"
+      role,
       phone,
       assignedVehicleId: assignedVehicleId || null,
       active: true,
+      username, // ensure username is set
     });
 
-    // Office ke andar staffId push karo
+    const registeredStaff = await Staff.register(staff, password);
+
     await Office.findByIdAndUpdate(
       officeId,
-      { $push: { staffId: staff._id } },
-      { new: true }
+      { $push: { staffId: registeredStaff._id } }
     );
 
-    // Sirf tab vehicle update karo jab assignedVehicleId ho
     if (assignedVehicleId) {
       await Vehicle.findByIdAndUpdate(
         assignedVehicleId,
-        { $set: { driverId: staff._id } },
-        { new: true }
+        { $set: { driverId: registeredStaff._id } }
       );
     }
 
     return res.json({
       success: true,
       message: "Staff successfully registered",
-      staff,
+      staff: registeredStaff,
+      loginInfo: {
+        username,
+        password, // so office can tell staff their login
+      },
     });
   } catch (err) {
     console.error("Staff Register Error:", err);
@@ -112,8 +121,9 @@ router.delete("/delete/:staffId", officeAuth, async (req, res) => {
     // 2. Office se staffId remove karo
     await Office.findByIdAndUpdate(
       officeId,
-      { $pull: { staffId: staff._id } }
+      { $pull: { staff: staff._id } }
     );
+
 
     // 3. Agar kisi vehicle se assigned tha to wahan se bhi hatao
     if (staff.assignedVehicleId) {
@@ -181,11 +191,15 @@ router.put("/update/:staffId", officeAuth, async (req, res) => {
       });
 
       if (otherStaff) {
-        // us staff se vehicle hata do
-        otherStaff.assignedVehicleId = null;
-        await otherStaff.save();
+        // // us staff se vehicle hata do
+        // otherStaff.assignedVehicleId = null;
+        // await otherStaff.save();
 
-        reassignedFrom = otherStaff.name;
+        // reassignedFrom = otherStaff.name;
+        return res.status(400).json({
+          success: false,
+          message: "Ye vehicle already kisi aur route me assigned hai",
+        });
       }
     }
 
@@ -226,5 +240,139 @@ router.put("/update/:staffId", officeAuth, async (req, res) => {
     });
   }
 });
+
+router.put("/remove-vehicle/:staffId", officeAuth, async (req, res) => {
+  const { staffId } = req.params;
+  const officeId = req.user.id;
+
+  try {
+    const staff = await Staff.findOne({ _id: staffId, officeId });
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found",
+      });
+    }
+
+    if (staff.assignedVehicleId) {
+      await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
+        $unset: { driverId: "" },
+      });
+    }
+
+    staff.assignedVehicleId = null;
+    await staff.save();
+
+    res.json({
+      success: true,
+      message: "Vehicle removed from staff",
+    });
+  } catch (err) {
+    res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+router.get("/dashboard", staffAuth, async (req, res) => {
+  const staffId = req.user.id;
+
+  try {
+    // 1. Staff nikalo
+    const staff = await Staff.findById(staffId);
+    if (!staff) {
+      return res.status(404).json({
+        success: false,
+        message: "Staff not found",
+      });
+    }
+
+    // 2. Staff ke assigned vehicle ko lao
+    if (!staff.assignedVehicleId) {
+      return res.json({
+        success: true,
+        message: "No vehicle assigned",
+        staff,
+        vehicle: null,
+        route: null,
+        dustbins: [],
+      });
+    }
+
+    const vehicle = await Vehicle.findById(staff.assignedVehicleId);
+    if (!vehicle || !vehicle.routeId) {
+      return res.json({
+        success: true,
+        staff,
+        vehicle,
+        route: null,
+        dustbins: [],
+      });
+    }
+
+    // 3. Vehicle ka route
+    const route = await Route.findById(vehicle.routeId);
+
+    // 4. Us route ke saare dustbins
+    const dustbins = await Dustbin.find({
+      routeId: route._id,
+      officeId: route.officeId,
+    });
+
+    return res.json({
+      success: true,
+      staff,
+      vehicle,
+      route,
+      dustbins,
+    });
+  } catch (err) {
+    console.error("Staff Dashboard Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+router.post("/update-vehicle-location", staffAuth, async (req, res) => {
+  const staffId = req.user.id;
+  const { latitude, longitude } = req.body;
+
+  const staff = await Staff.findById(staffId);
+  if (!staff || !staff.assignedVehicleId) {
+    return res.status(404).json({ success: false });
+  }
+
+  await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
+    latitude,
+    longitude,
+    isOnline: true,
+    lastSeen: new Date(),
+    location: {
+      type: "Point",
+      coordinates: [longitude, latitude],
+    },
+  });
+
+  res.json({ success: true });
+});
+
+router.post("/set-offline", staffAuth, async (req, res) => {
+  const staff = await Staff.findById(req.user.id);
+  if (!staff || !staff.assignedVehicleId) {
+    return res.json({ success: true });
+  }
+
+  await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
+    isOnline: false,
+    lastSeen: new Date(),
+  });
+
+  res.json({ success: true });
+});
+
+
 
 module.exports = router;

@@ -14,19 +14,21 @@ const Citizen = require("./model/CitizenModel.js");
 const Vehicle = require("./model/VehicleModel.js");
 const Admin = require("./model/AdminModel.js");
 const Office = require("./model/OfficeModel.js");
+const Staff = require("./model/StaffModel.js");
 
 // Routes
 const CitizenRegister = require("./routes/citizenRegister.js");
 const VehicleRegister = require("./routes/vehicle.js");
 const OfficeRegister = require("./routes/office.js");
 const CitizenLogin = require("./routes/loginCitizen.js");
-const VehicleLogin = require("./routes/loginVehicle.js");
+const VehicleLogin = require("./routes/loginStaff.js");
 const AdminLogin = require("./routes/loginAdmin.js");
 const OfficeLogin = require("./routes/loginOffice.js");
 const AdminRegister = require("./routes/admin.js");
 const StaffRegister = require("./routes/staff.js");
 const RouteRegister = require("./routes/route.js");
 const dustbinRoutes = require("./routes/dustbin.js");
+const StaffLogin = require("./routes/loginStaff.js")
 
 
 
@@ -45,7 +47,10 @@ const store = MongoStore.create({
 });
 
 // Middlewares
-app.use(cors());
+app.use(cors({
+  origin: ["http://10.13.177.129:3000", "http://localhost:3000"],
+  credentials: true
+}));
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -71,6 +76,8 @@ app.use(passport.session());
 // passport.use("citizen-local", new LocalStrategy(Citizen.authenticate()));
 // passport.use("vehicle-local", new LocalStrategy(Vehicle.authenticate()));
 passport.use("admin-local", new LocalStrategy(Admin.authenticate()));
+passport.use("staff-local", new LocalStrategy(Staff.authenticate()));
+passport.use("office-local", new LocalStrategy(Office.authenticate()));
 
 passport.serializeUser((user, done) => done(null, user.id));
 passport.deserializeUser(async (id, done) => {
@@ -87,6 +94,9 @@ passport.deserializeUser(async (id, done) => {
 
     const office = await Office.findById(id);
     if (office) return done(null, office);
+
+    const staff = await Staff.findById(id);
+    if (staff) return done(null, staff);
 
     done(null, false);
   } catch (err) {
@@ -105,6 +115,7 @@ app.use("/office", OfficeRegister);
 // app.use("/logina", AdminLogin);
 app.use("/office", OfficeLogin);
 app.use("/staff", StaffRegister);
+app.use("/staff", StaffLogin);
 app.use("/route", RouteRegister);
 app.use("/dustbin", dustbinRoutes);
 
@@ -115,5 +126,5 @@ app.get("/", (_req, res) => {
 
 // Start server
 app.listen(5001, "0.0.0.0", () => {
-  console.log("Server running on port 5001");
+  console.log("Server running on 0.0.0.0:5001");
 });
