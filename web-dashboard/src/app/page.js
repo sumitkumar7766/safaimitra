@@ -74,8 +74,8 @@ export default function SafaiMitra() {
         redirectBase = "/citizen";
         break;
       case "Vehicle Staff":
-        endpoint = "http://localhost:5001/loginv";
-        redirectBase = "/vehicle";
+        endpoint = "http://localhost:5001/staff/login";
+        redirectBase = "/staff";
         break;
       case "Office Staff":
         endpoint = "http://localhost:5001/office/login";

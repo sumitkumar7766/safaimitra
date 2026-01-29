@@ -7,7 +7,7 @@ export function middleware(request) {
 
   console.log(`Checking: ${pathname} | Role: ${role} | Token: ${token ? "Yes" : "No"}`);
 
-  const protectedPaths = ['/admin', '/citizen', '/vehicle', '/office'];
+  const protectedPaths = ['/admin', '/citizen', '/staff', '/office'];
   const isProtectedPath = protectedPaths.some((path) => pathname.startsWith(path));
 
   // 1. Not logged in → redirect to home
@@ -24,7 +24,7 @@ export function middleware(request) {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
-  if (pathname.startsWith('/vehicle') && role !== 'Vehicle Staff') {
+  if (pathname.startsWith('/staff') && role !== 'Vehicle Staff') {
     return NextResponse.redirect(new URL('/', request.url));
   }
 
@@ -36,5 +36,5 @@ export function middleware(request) {
 }
 
 export const config = {
-  matcher: ['/admin/:path*', '/citizen/:path*', '/vehicle/:path*', '/office/:path*'],
+  matcher: ['/admin/:path*', '/citizen/:path*', '/staff/:path*', '/office/:path*'],
 };

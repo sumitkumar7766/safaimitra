@@ -82,10 +82,26 @@ const OfficeSchema = new Schema(
       },
     ],
 
-    staffId: [
+    staff: [
       {
         type: mongoose.Schema.Types.ObjectId,
         ref: "Staff",
+        default: null,
+      },
+    ],
+
+    dustbins: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Dustbin",
+        default: null,
+      },
+    ],
+
+    route: [
+      {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Route",
         default: null,
       },
     ],
