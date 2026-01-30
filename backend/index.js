@@ -5,7 +5,8 @@ const app = express();
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const session = require("express-session");
-require("dotenv").config();
+const dotenv = require("dotenv");
+dotenv.config();
 const bodyParser = require("body-parser");
 const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
 
@@ -29,8 +30,14 @@ const StaffRegister = require("./routes/staff.js");
 const RouteRegister = require("./routes/route.js");
 const dustbinRoutes = require("./routes/dustbin.js");
 const StaffLogin = require("./routes/loginStaff.js")
+const predictRoutes = require("./routes/predict.routes");
 
-
+// 👇 2. ADD THIS DEBUG BLOCK (Delete later)
+console.log("--- DEBUGGING ENV VARS ---");
+console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ MISSING");
+console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ Loaded" : "❌ MISSING");
+console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✅ Loaded" : "❌ MISSING");
+console.log("--------------------------");
 
 // DB Connection
 mongoose
@@ -118,6 +125,7 @@ app.use("/staff", StaffRegister);
 app.use("/staff", StaffLogin);
 app.use("/route", RouteRegister);
 app.use("/dustbin", dustbinRoutes);
+app.use("/api", predictRoutes);
 
 // Root
 app.get("/", (_req, res) => {

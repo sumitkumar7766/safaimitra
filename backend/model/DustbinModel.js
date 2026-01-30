@@ -28,9 +28,11 @@ const DustbinSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ["clean", "overflow", "missed"],
+    enum: ["clean", "overflow", "missed", "skiped", "suspecies"],
     default: "clean",
   },
+  
+  imageUrl: String, 
 
   routeId: {
     type: mongoose.Schema.Types.ObjectId,
