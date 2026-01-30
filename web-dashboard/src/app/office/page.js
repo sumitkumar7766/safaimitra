@@ -1132,6 +1132,45 @@ export default function OfficeDashboard() {
     }
   };
 
+  // --- YE FUNCTION ADD KAREIN ---
+  const handleManualClean = async (id) => {
+    if (!confirm("Are you sure you want to manually mark this bin as CLEAN?")) return;
+
+    try {
+      const token = localStorage.getItem("token");
+
+      // Backend API call to update status
+      const res = await fetch(`http://localhost:5001/dustbin/update-status/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify({ status: "clean" }), // Force status to clean
+      });
+
+      const data = await res.json();
+
+      if (!data.success) {
+        alert(data.message || "Failed to update status");
+        return;
+      }
+
+      // Local state update karein taaki refresh na karna pade
+      setDustbins((prev) =>
+        prev.map((bin) => (bin._id === id ? { ...bin, status: "clean" } : bin))
+      );
+
+      // Map par bhi reflect hone ke liye refresh call kar sakte hain
+      fetchDustbins();
+
+      alert("Dustbin marked as CLEAN manually!");
+    } catch (err) {
+      console.error("Manual Clean Error:", err);
+      alert("Server error while updating status");
+    }
+  };
+
   // Component: Stat Card
   const StatCard = ({ icon: Icon, title, value, color }) => (
     <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 hover:shadow-xl transition-shadow" style={{ borderLeftColor: color }}>
@@ -1197,13 +1236,19 @@ export default function OfficeDashboard() {
                   icon={getBinIcon(bin.status)}
                 >
                   <Popup>
-                    <div className="text-center p-2 min-w-[150px]">
+                    <div className="text-center p-2 min-w-[200px]"> {/* Width badha di */}
                       <p className="font-bold mb-2 text-gray-800 text-base">{bin.name}</p>
+
+                      {/* 👇 IMAGE IN POPUP */}
+                      {bin.imageUrl && (
+                        <div className="mb-2 w-full h-32 rounded-lg overflow-hidden border">
+                          <img src={bin.imageUrl} alt="Bin State" className="w-full h-full object-cover" />
+                        </div>
+                      )}
+
                       <p className="text-xs text-gray-600">📍Area:  {bin.area}</p>
-                      <p className="text-xs text-gray-600">
-                        Route Name: {bin.routeId ? bin.routeId.name : "Not Assigned"}
-                      </p>
-                      <div className="flex justify-center">
+
+                      <div className="flex justify-center my-2">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
                           bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
                             'bg-red-100 text-red-800'
@@ -1211,12 +1256,17 @@ export default function OfficeDashboard() {
                           {bin.status.toUpperCase()}
                         </span>
                       </div>
-                      <div className="mt-2 pt-2 border-t border-gray-200">
-                        <p className="text-xs text-gray-500">Coordinates:</p>
-                        <p className="text-xs font-mono text-gray-700">
-                          {bin.latitude.toFixed(4)}, {bin.longitude.toFixed(4)}
-                        </p>
-                      </div>
+
+                      {/* 👇 MANUAL CLEAN BUTTON IN POPUP */}
+                      {bin.status !== 'clean' && (
+                        <button
+                          onClick={() => handleManualClean(bin._id)}
+                          className="w-full mt-2 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600"
+                        >
+                          Mark Clean ✅
+                        </button>
+                      )}
+
                     </div>
                   </Popup>
                 </Marker>
@@ -1249,8 +1299,8 @@ export default function OfficeDashboard() {
                         <div className="flex justify-center mb-2">
                           <span
                             className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.status === "online"
-                                ? "bg-green-100 text-green-800"
-                                : "bg-gray-100 text-gray-800"
+                              ? "bg-green-100 text-green-800"
+                              : "bg-gray-100 text-gray-800"
                               }`}
                           >
                             {vehicle.status}
@@ -1580,6 +1630,7 @@ export default function OfficeDashboard() {
 
 
   // View: Dustbins
+  // View: Dustbins
   const DustbinsView = () => (
     <>
       <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
@@ -1603,6 +1654,8 @@ export default function OfficeDashboard() {
           <table className="w-full">
             <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
               <tr>
+                {/* 👇 NEW HEADER: Image */}
+                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Live Image</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Name</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Area</th>
                 <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Coordinates</th>
@@ -1613,9 +1666,25 @@ export default function OfficeDashboard() {
             <tbody className="bg-white divide-y divide-gray-200">
               {dustbins.map((bin) => (
                 <tr key={bin._id || bin.id} className="hover:bg-gray-50 transition-colors">
+
+                  {/* 👇 NEW COLUMN: Image Display */}
+                  <td className="px-6 py-4 whitespace-nowrap">
+                    <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                      {bin.imageUrl ? (
+                        <img
+                          src={bin.imageUrl}
+                          alt="Bin Status"
+                          className="w-full h-full object-cover cursor-pointer"
+                          onClick={() => window.open(bin.imageUrl, '_blank')} // Click to zoom
+                        />
+                      ) : (
+                        <div className="flex items-center justify-center h-full text-xs text-gray-400">No Img</div>
+                      )}
+                    </div>
+                  </td>
+
                   <td className="px-6 py-4 whitespace-nowrap">
                     <div className="flex items-center">
-                      <div className="text-2xl mr-3">🗑️</div>
                       <div className="text-sm font-medium text-gray-900">{bin.name}</div>
                     </div>
                   </td>
@@ -1628,23 +1697,38 @@ export default function OfficeDashboard() {
                       bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
                         'bg-red-100 text-red-800'
                       }`}>
-                      {bin.status}
+                      {bin.status.toUpperCase()}
                     </span>
                   </td>
                   <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => openEditDustbinModal(bin)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteDustbin(bin._id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
+                    <div className="flex items-center gap-2">
+
+                      {/* 👇 NEW BUTTON: Mark Clean Manually */}
+                      {bin.status !== 'clean' && (
+                        <button
+                          onClick={() => handleManualClean(bin._id)}
+                          className="p-2 text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
+                          title="Mark as Clean Manually"
+                        >
+                          <CheckCircle className="w-4 h-4" />
+                        </button>
+                      )}
+
+                      <button
+                        onClick={() => openEditDustbinModal(bin)}
+                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
+                        title="Edit"
+                      >
+                        <Edit2 className="w-4 h-4" />
+                      </button>
+                      <button
+                        onClick={() => handleDeleteDustbin(bin._id)}
+                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                        title="Delete"
+                      >
+                        <Trash2 className="w-4 h-4" />
+                      </button>
+                    </div>
                   </td>
                 </tr>
               ))}

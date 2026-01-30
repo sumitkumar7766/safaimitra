@@ -4,6 +4,7 @@ const Dustbin = require("../model/DustbinModel");
 const Route = require("../model/RouteModel");
 const Office = require("../model/OfficeModel");
 const officeAuth = require("../middleware/officeAuth");
+const upload = require("../utils/cloudinaryConfig");
 
 /* ================= REGISTER DUSTBIN ================= */
 router.post("/register", officeAuth, async (req, res) => {
@@ -200,6 +201,52 @@ router.delete("/delete/:dustbinId", officeAuth, async (req, res) => {
       success: false,
       message: err.message,
     });
+  }
+});
+
+router.post("/mark-clean", upload.single("image"), async (req, res) => {
+  try {
+    // Extract status from body (sent by frontend)
+    const { dustbinId, status } = req.body;
+
+    if (!req.file) {
+      return res.status(400).json({ success: false, message: "No image uploaded" });
+    }
+
+    if (!dustbinId) {
+      return res.status(400).json({ success: false, message: "Dustbin ID missing" });
+    }
+
+    const imageUrl = req.file.path;
+
+    // Determine the status to save
+    // If frontend sent "suspecies", use that. Otherwise default to "clean"
+    const finalStatus = status === "suspecies" ? "suspecies" : "clean";
+
+    // Update Database
+    const updatedBin = await Dustbin.findByIdAndUpdate(
+      dustbinId,
+      {
+        status: finalStatus, // 👈 Saving the correct status
+        imageUrl: imageUrl,
+        lastCleanedAt: new Date()
+      },
+      { new: true }
+    );
+
+    if (!updatedBin) {
+      return res.status(404).json({ success: false, message: "Dustbin not found" });
+    }
+
+    res.json({
+      success: true,
+      message: `Dustbin marked as ${finalStatus}`,
+      data: updatedBin
+    });
+
+  } catch (err) {
+    console.error("Mark Clean Error:", err);
+    res.status(500).json({ success: false, message: "Server Error" });
   }
 });
 
