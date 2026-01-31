@@ -354,6 +354,7 @@ router.post("/update-vehicle-location", staffAuth, async (req, res) => {
       type: "Point",
       coordinates: [longitude, latitude],
     },
+    status: "Active",
   });
 
   res.json({ success: true });
@@ -368,9 +369,63 @@ router.post("/set-offline", staffAuth, async (req, res) => {
   await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
     isOnline: false,
     lastSeen: new Date(),
+    status: "Inactive",
   });
 
   res.json({ success: true });
+});
+
+/* ============================================================ */
+/* 👇 VEHICLE HEARTBEAT & OFFLINE LOGIC 👇                      */
+/* ============================================================ */
+
+// 1. Heartbeat: Har 1 min me call hoga to update Vehicle status
+router.post("/ping-vehicle", staffAuth, async (req, res) => {
+  try {
+    const driverId = req.user._id; // Logged in Staff ID
+
+    // Wo vehicle dhoondo jiska driver ye staff hai
+    const vehicle = await Vehicle.findOne({ driverId: driverId });
+
+    if (!vehicle) {
+      return res.status(404).json({ success: false, message: "No vehicle assigned" });
+    }
+
+    // Vehicle ko Online mark karo aur Time update karo
+    vehicle.isOnline = true;
+    vehicle.lastSeen = new Date();
+    // Optional: Status ko bhi Active kar sakte hain
+    vehicle.status = "Active";
+
+    await vehicle.save();
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Ping Error:", err);
+    res.status(500).json({ success: false });
+  }
+});
+
+// 2. Set Offline: Jab Tab close ho ya Logout ho
+router.post("/set-vehicle-offline", staffAuth, async (req, res) => {
+  try {
+    const driverId = req.user._id;
+
+    // Vehicle ko find karke Offline kar do
+    await Vehicle.findOneAndUpdate(
+      { driverId: driverId },
+      {
+        isOnline: false,
+        lastSeen: new Date(),
+        status: "Inactive" 
+      }
+    );
+
+    res.json({ success: true });
+  } catch (err) {
+    console.error("Offline Error:", err);
+    res.status(500).json({ success: false });
+  }
 });
 
 

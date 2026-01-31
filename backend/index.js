@@ -8,6 +8,7 @@ const session = require("express-session");
 const dotenv = require("dotenv");
 dotenv.config();
 const bodyParser = require("body-parser");
+const cron = require("node-cron");
 const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
 
 // Models
@@ -16,6 +17,7 @@ const Vehicle = require("./model/VehicleModel.js");
 const Admin = require("./model/AdminModel.js");
 const Office = require("./model/OfficeModel.js");
 const Staff = require("./model/StaffModel.js");
+const Dustbin = require("./model/DustbinModel.js");
 
 // Routes
 const CitizenRegister = require("./routes/citizenRegister.js");
@@ -130,6 +132,66 @@ app.use("/api", predictRoutes);
 // Root
 app.get("/", (_req, res) => {
   res.send("Welcome to SafaiMitra backend!");
+});
+
+/* ============================================================ */
+/* 👇 4:00 AM DAILY CLEANING SCHEDULE (IDEAL DUSTBIN) 👇        */
+/* ============================================================ */
+
+// '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
+cron.schedule("32 23 * * *", async () => {
+  console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
+
+  try {
+    const result = await Dustbin.updateMany(
+      { active: true },
+      {
+        $set: {
+          status: "ideal",           // Status wapas 'ideal' set
+          imageUrl: ""               // Purani photo hata di
+        }
+      }
+    );
+    console.log(`✅ System Reset: ${result.modifiedCount} dustbins are now Ideal & Ready.`);
+  } catch (err) {
+    console.error("❌ Error in Daily Reset Job:", err);
+  }
+}, {
+  scheduled: true,
+  timezone: "Asia/Kolkata" // India Time ke hisaab se 4 AM
+});
+
+/* ============================================================ */
+/* 👇 AUTO OFFLINE VEHICLE CHECKER (Har 2 Minute mein) 👇       */
+/* ============================================================ */
+
+cron.schedule("*/2 * * * *", async () => {
+  // console.log("🕵️ Checking for inactive vehicles...");
+  
+  // 5 Minute se purana time
+  const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
+
+  try {
+    // Aise VEHICLES dhoondo jo 'Online' hain par 5 min se inactive hain
+    const result = await Vehicle.updateMany(
+      { 
+        isOnline: true, 
+        lastSeen: { $lt: fiveMinutesAgo } // lastSeen < 5 min pehle
+      },
+      { 
+        $set: { 
+          isOnline: false,
+          status: "Inactive" // Status bhi inactive kar do
+        } 
+      }
+    );
+
+    if (result.modifiedCount > 0) {
+      console.log(`💤 Auto-offlined ${result.modifiedCount} inactive vehicles.`);
+    }
+  } catch (err) {
+    console.error("❌ Error in Auto-Offline Job:", err);
+  }
 });
 
 // Start server
