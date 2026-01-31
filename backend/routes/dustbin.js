@@ -5,6 +5,7 @@ const Route = require("../model/RouteModel");
 const Office = require("../model/OfficeModel");
 const officeAuth = require("../middleware/officeAuth");
 const upload = require("../utils/cloudinaryConfig");
+const staffAuth = require("../middleware/staffAuth");
 
 /* ================= REGISTER DUSTBIN ================= */
 router.post("/register", officeAuth, async (req, res) => {
@@ -204,10 +205,27 @@ router.delete("/delete/:dustbinId", officeAuth, async (req, res) => {
   }
 });
 
-router.post("/mark-clean", upload.single("image"), async (req, res) => {
+function getDistanceFromLatLonInM(lat1, lon1, lat2, lon2) {
+  var R = 6371; // Radius of the earth in km
+  var dLat = deg2rad(lat2 - lat1);
+  var dLon = deg2rad(lon2 - lon1);
+  var a =
+    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+    Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+  var c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+  var d = R * c; // Distance in km
+  return d * 1000; // Distance in meters
+}
+
+function deg2rad(deg) {
+  return deg * (Math.PI / 180);
+}
+
+router.post("/mark-clean", staffAuth, upload.single("image"), async (req, res) => {
   try {
     // Extract status from body (sent by frontend)
-    const { dustbinId, status } = req.body;
+    const { dustbinId, status, latitude, longitude } = req.body;
 
     if (!req.file) {
       return res.status(400).json({ success: false, message: "No image uploaded" });
@@ -215,6 +233,31 @@ router.post("/mark-clean", upload.single("image"), async (req, res) => {
 
     if (!dustbinId) {
       return res.status(400).json({ success: false, message: "Dustbin ID missing" });
+    }
+
+    // 1. Dustbin find karo
+    const dustbin = await Dustbin.findById(dustbinId);
+    if (!dustbin) return res.status(404).json({ success: false, message: "Dustbin not found" });
+
+    if (latitude && longitude) {
+      const dist = getDistanceFromLatLonInM(
+        parseFloat(latitude),
+        parseFloat(longitude),
+        dustbin.latitude,
+        dustbin.longitude
+      );
+
+      console.log(`Driver Distance: ${dist} meters`);
+
+      // Agar 100m se zyada dur hai, toh request REJECT kar do
+      if (dist > 100) {
+        return res.status(400).json({
+          success: false,
+          message: `You are too far! Distance: ${Math.round(dist)}m. Must be under 100m.`
+        });
+      }
+    } else {
+      return res.status(400).json({ success: false, message: "Location data missing!" });
     }
 
     const imageUrl = req.file.path;
@@ -247,6 +290,83 @@ router.post("/mark-clean", upload.single("image"), async (req, res) => {
   } catch (err) {
     console.error("Mark Clean Error:", err);
     res.status(500).json({ success: false, message: "Server Error" });
+  }
+});
+
+/* ================= MANUAL UPDATE STATUS (No Image) ================= */
+// Frontend route: /dustbin/update-status/:id
+router.put("/update-status/:dustbinId", officeAuth, async (req, res) => {
+  const { dustbinId } = req.params;
+  const { status } = req.body; // Frontend sends { status: "clean" }
+
+  try {
+    // Check if dustbin exists
+    const dustbin = await Dustbin.findById(dustbinId);
+
+    if (!dustbin) {
+      return res.status(404).json({
+        success: false,
+        message: "Dustbin not found",
+      });
+    }
+
+    // Update status
+    dustbin.status = status || "clean";
+
+    // Agar status clean hai, to timestamp update karo
+    if (status === "clean") {
+      dustbin.lastCleanedAt = new Date();
+    }
+
+    await dustbin.save();
+
+    return res.json({
+      success: true,
+      message: "Dustbin status updated manually",
+      data: dustbin,
+    });
+  } catch (err) {
+    console.error("Manual Status Update Error:", err);
+    return res.status(500).json({
+      success: false,
+      message: err.message,
+    });
+  }
+});
+
+/* ============================================================ */
+/* 👇 DRIVER SKIP/UPDATE ROUTE (No Office Auth) 👇              */
+/* ============================================================ */
+router.put("/driver-update-status/:dustbinId", staffAuth, async (req, res) => {
+  try {
+    const { dustbinId } = req.params;
+    const { status } = req.body;
+
+    // Check header for basic safety (Optional: You can add staffAuth middleware if you have it)
+    const authHeader = req.headers['authorization'];
+    if (!authHeader) {
+      return res.status(401).json({ success: false, message: "No token provided" });
+    }
+
+    const updatedBin = await Dustbin.findByIdAndUpdate(
+      dustbinId,
+      {
+        status: status,       // "skiped" save hoga
+        imageUrl: null,       // Image null kar di
+        lastCleanedAt: new Date() // Time update
+      },
+      { new: true }
+    );
+
+    if (!updatedBin) {
+      return res.status(404).json({ success: false, message: "Dustbin not found" });
+    }
+
+    res.json({ success: true, data: updatedBin });
+
+  } catch (err) {
+    console.error("Driver Update Error:", err);
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

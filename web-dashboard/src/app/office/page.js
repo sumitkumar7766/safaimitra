@@ -76,6 +76,7 @@ export default function OfficeDashboard() {
   const [userData, setUserData] = useState(null);
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [editStaffId, setEditStaffId] = useState(null);
+  const [filterRoute, setFilterRoute] = useState("");
 
   const handleEditStaffSubmit = async (e) => {
     e.preventDefault();
@@ -265,17 +266,30 @@ export default function OfficeDashboard() {
 
       const data = await res.json();
       if (data.success) {
-        setDustbins(data.dustbins);
+        // 👇 SMART UPDATE LOGIC
+        setDustbins((prevDustbins) => {
+          if (JSON.stringify(prevDustbins) === JSON.stringify(data.dustbins)) {
+            return prevDustbins;
+          }
+          return data.dustbins;
+        });
       }
     } catch (err) {
       console.error("Fetch Dustbins Error:", err);
     }
   };
 
+  // --- 🔄 Auto-Refresh Dustbins (Every 5 Seconds) ---
   useEffect(() => {
-    if (userData?._id) {
+    if (!userData?._id) return;
+
+    fetchDustbins(); // Initial call
+
+    const intervalId = setInterval(() => {
       fetchDustbins();
-    }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [userData]);
 
   const [vehicles, setVehicles] = useState([]);
@@ -297,17 +311,34 @@ export default function OfficeDashboard() {
       const data = await res.json();
 
       if (data.success) {
-        setVehicles(data.vehicles);
+        // 👇 SMART UPDATE LOGIC
+        setVehicles((prevVehicles) => {
+          // Agar naya data aur purana data bilkul same hai, to update mat karo
+          if (JSON.stringify(prevVehicles) === JSON.stringify(data.vehicles)) {
+            return prevVehicles; // Purana reference wapas kar do (No Re-render)
+          }
+          return data.vehicles; // Naya data set karo (Re-render triggered)
+        });
       }
     } catch (err) {
       console.error("Fetch Vehicles Error:", err);
     }
   };
 
+  // --- 🔄 Auto-Refresh Vehicles (Every 5 Seconds) ---
   useEffect(() => {
-    if (userData?._id) {
+    if (!userData?._id) return;
+
+    // 1. Pehli baar turant call karo
+    fetchVehicles();
+
+    // 2. Har 5 second mein repeat karo
+    const intervalId = setInterval(() => {
       fetchVehicles();
-    }
+    }, 5000); // 5000ms = 5 seconds
+
+    // 3. Jab component band ho to interval clear karo (Memory Leak se bachne ke liye)
+    return () => clearInterval(intervalId);
   }, [userData]);
 
   const [staff, setStaff] = useState([]);
@@ -330,17 +361,30 @@ export default function OfficeDashboard() {
       const data = await res.json();
 
       if (data.success) {
-        setStaff(data.staff);
+        // 👇 SMART UPDATE LOGIC
+        setStaff((prevStaff) => {
+          if (JSON.stringify(prevStaff) === JSON.stringify(data.staff)) {
+            return prevStaff;
+          }
+          return data.staff;
+        });
       }
     } catch (err) {
       console.error("Fetch Staff Error:", err);
     }
   };
 
+  // --- 🔄 Auto-Refresh Staff (Every 5 Seconds) ---
   useEffect(() => {
-    if (userData?._id) {
+    if (!userData?._id) return;
+
+    fetchStaff(); // Initial call
+
+    const intervalId = setInterval(() => {
       fetchStaff();
-    }
+    }, 5000);
+
+    return () => clearInterval(intervalId);
   }, [userData]);
 
   const [routes, setRoutes] = useState([]);
@@ -558,15 +602,17 @@ export default function OfficeDashboard() {
     const colors = {
       clean: '#10b981',
       overflow: '#f59e0b',
-      missed: '#ef4444'
+      skiped: '#ef4444',
+      suspecies: '#cc760e',
+      ideal: '#000000'
     };
     return createCustomIcon(colors[status] || '#6b7280', '🗑️');
   };
 
   const getVehicleIcon = (status) => {
     const colors = {
-      active: '#8b5cf6',
-      idle: '#6b7280'
+      true: '#8b5cf6',
+      false: '#6b7280'
     };
     return createCustomIcon(colors[status] || '#6b7280', '🚛');
   };
@@ -1186,6 +1232,29 @@ export default function OfficeDashboard() {
     </div>
   );
 
+  // --- 🆕 ROUTE PATH CALCULATION LOGIC ---
+  const routePaths = React.useMemo(() => {
+    const paths = {};
+
+    dustbins.forEach((bin) => {
+      // Check karein ki bin kisi route me hai aur coordinates valid hain
+      if (bin.routeId && bin.routeId._id && bin.latitude && bin.longitude) {
+        const routeId = bin.routeId._id;
+
+        if (!paths[routeId]) {
+          paths[routeId] = {
+            name: bin.routeId.name,
+            positions: []
+          };
+        }
+
+        paths[routeId].positions.push([bin.latitude, bin.longitude]);
+      }
+    });
+
+    return Object.values(paths);
+  }, [dustbins]);
+
   // View: Dashboard
   const DashboardView = () => (
     <>
@@ -1246,12 +1315,16 @@ export default function OfficeDashboard() {
                         </div>
                       )}
 
-                      <p className="text-xs text-gray-600">📍Area:  {bin.area}</p>
+                      <p className="text-xs text-gray-600">Route:  {bin.routeId.name}</p>
 
                       <div className="flex justify-center my-2">
                         <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
-                          bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
+                          bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' : bin.status === 'missed' ?
                             'bg-red-100 text-red-800'
+                            : bin.status === 'skiped' ? 'bg-blue-100 text-blue-800'
+                              : bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800'
+                                : bin.status === 'ideal' ? 'bg-black text-white'
+                                  : 'bg-gray-100 text-gray-800'
                           }`}>
                           {bin.status.toUpperCase()}
                         </span>
@@ -1269,6 +1342,21 @@ export default function OfficeDashboard() {
 
                     </div>
                   </Popup>
+                  {/* 👇 ROUTE LINES (Thin Blue Dashed Lines) */}
+                  {routePaths.map((route, idx) => (
+                    <Polyline
+                      key={`dashboard-route-${idx}`}
+                      positions={route.positions}
+                      pathOptions={{
+                        color: '#3b82f6', // Blue Color
+                        weight: 2,        // Thin Line
+                        opacity: 0.6,
+                        dashArray: '5, 10' // Dashed Style
+                      }}
+                    >
+                      <Popup>Route: {route.name}</Popup>
+                    </Polyline>
+                  ))}
                 </Marker>
               ))}
 
@@ -1276,7 +1364,7 @@ export default function OfficeDashboard() {
               {vehicles
                 .filter(
                   (v) =>
-                    v.status === "online" &&        // 👈 sirf online vehicles
+                    v.isOnline === true &&        // 👈 sirf online vehicles
                     v.latitude != null &&
                     v.longitude != null
                 )
@@ -1284,7 +1372,7 @@ export default function OfficeDashboard() {
                   <Marker
                     key={`vehicle-${vehicle._id}`}
                     position={[vehicle.latitude, vehicle.longitude]}
-                    icon={getVehicleIcon(vehicle.status)}
+                    icon={getVehicleIcon(vehicle.isOnline)}
                   >
                     <Popup>
                       <div className="text-center p-2 min-w-[180px]">
@@ -1298,12 +1386,12 @@ export default function OfficeDashboard() {
 
                         <div className="flex justify-center mb-2">
                           <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.status === "online"
+                            className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.isOnline === true
                               ? "bg-green-100 text-green-800"
                               : "bg-gray-100 text-gray-800"
                               }`}
                           >
-                            {vehicle.status}
+                            {vehicle.isOnline === true ? "Online" : "Offline"}
                           </span>
                         </div>
 
@@ -1323,25 +1411,43 @@ export default function OfficeDashboard() {
 
         {/* Map Legend */}
         <div className="mt-4 flex flex-wrap items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
+          {/* Clean Bins */}
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-green-500"></div>
-            <span className="text-sm font-medium text-gray-700">Clean Bins</span>
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#10b981' }}></div>
+            <span className="text-sm font-medium text-gray-700">Clean</span>
           </div>
+
+          {/* Overflow */}
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-yellow-500"></div>
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
             <span className="text-sm font-medium text-gray-700">Overflow</span>
           </div>
+
+          {/* Skipped */}
           <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-red-500"></div>
-            <span className="text-sm font-medium text-gray-700">Missed</span>
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
+            <span className="text-sm font-medium text-gray-700">Skipped</span>
           </div>
+
+          {/* Suspecies */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#cc760e' }}></div>
+            <span className="text-sm font-medium text-gray-700">Suspect Case</span>
+          </div>
+
+          {/* Ideal */}
+          <div className="flex items-center gap-2">
+            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#000000' }}></div>
+            <span className="text-sm font-medium text-gray-700">Ideal</span>
+          </div>
+
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full bg-purple-500"></div>
             <span className="text-sm font-medium text-gray-700">Active Vehicles</span>
           </div>
           <div className="flex items-center gap-2">
             <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-            <span className="text-sm font-medium text-gray-700">Idle Vehicles</span>
+            <span className="text-sm font-medium text-gray-700">Offline Vehicles</span>
           </div>
         </div>
       </div>
@@ -1631,212 +1737,269 @@ export default function OfficeDashboard() {
 
   // View: Dustbins
   // View: Dustbins
-  const DustbinsView = () => (
-    <>
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800">🗑️ Dustbins Management</h3>
-            <p className="text-sm text-gray-600 mt-1">{dustbins.length} total dustbins registered</p>
+  // View: Dustbins
+  const DustbinsView = () => {
+    // Logic to filter dustbins based on selected route
+    const filteredDustbins = dustbins.filter((bin) => {
+      if (!filterRoute) return true; // Show all if no filter
+      return bin.routeId?._id === filterRoute;
+    });
+
+    return (
+      <>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">🗑️ Dustbins Management</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {filteredDustbins.length} dustbins shown (Total: {dustbins.length})
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* 👇 ROUTE FILTER DROPDOWN */}
+              <div className="relative">
+                <select
+                  value={filterRoute}
+                  onChange={(e) => setFilterRoute(e.target.value)}
+                  className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 py-2 pl-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
+                >
+                  <option value="">All Routes</option>
+                  {routes.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                    <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                  </svg>
+                </div>
+              </div>
+
+              <button
+                onClick={() => openModal("dustbin")}
+                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="font-semibold">Add Dustbin</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => openModal("dustbin")}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="font-semibold">Add Dustbin</span>
-          </button>
         </div>
-      </div>
 
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-              <tr>
-                {/* 👇 NEW HEADER: Image */}
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Live Image</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Name</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Area</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Coordinates</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {dustbins.map((bin) => (
-                <tr key={bin._id || bin.id} className="hover:bg-gray-50 transition-colors">
-
-                  {/* 👇 NEW COLUMN: Image Display */}
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
-                      {bin.imageUrl ? (
-                        <img
-                          src={bin.imageUrl}
-                          alt="Bin Status"
-                          className="w-full h-full object-cover cursor-pointer"
-                          onClick={() => window.open(bin.imageUrl, '_blank')} // Click to zoom
-                        />
-                      ) : (
-                        <div className="flex items-center justify-center h-full text-xs text-gray-400">No Img</div>
-                      )}
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="text-sm font-medium text-gray-900">{bin.name}</div>
-                    </div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700">{bin.area}</td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                    {bin.latitude.toFixed(4)}, {bin.longitude.toFixed(4)}
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
-                      bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                      {bin.status.toUpperCase()}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-
-                      {/* 👇 NEW BUTTON: Mark Clean Manually */}
-                      {bin.status !== 'clean' && (
-                        <button
-                          onClick={() => handleManualClean(bin._id)}
-                          className="p-2 text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors"
-                          title="Mark as Clean Manually"
-                        >
-                          <CheckCircle className="w-4 h-4" />
-                        </button>
-                      )}
-
-                      <button
-                        onClick={() => openEditDustbinModal(bin)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                        title="Edit"
-                      >
-                        <Edit2 className="w-4 h-4" />
-                      </button>
-                      <button
-                        onClick={() => handleDeleteDustbin(bin._id)}
-                        className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                        title="Delete"
-                      >
-                        <Trash2 className="w-4 h-4" />
-                      </button>
-                    </div>
-                  </td>
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Live Image</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Name</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Area/Route</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Coordinates</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredDustbins.map((bin) => (
+                  <tr key={bin._id || bin.id} className="hover:bg-gray-50 transition-colors">
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="w-16 h-16 rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                        {bin.imageUrl ? (
+                          <img
+                            src={bin.imageUrl}
+                            alt="Bin Status"
+                            className="w-full h-full object-cover cursor-pointer"
+                            onClick={() => window.open(bin.imageUrl, '_blank')}
+                          />
+                        ) : (
+                          <div className="flex items-center justify-center h-full text-xs text-gray-400">No Img</div>
+                        )}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm font-medium text-gray-900">{bin.name}</div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <div className="text-sm text-gray-700">{bin.area}</div>
+                      <div className="text-xs text-blue-600 font-semibold mt-1">
+                        {bin.routeId ? `🛣️ ${bin.routeId.name}` : "🚫 No Route"}
+                      </div>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
+                      {bin.latitude.toFixed(4)}, {bin.longitude.toFixed(4)}
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap">
+                      <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
+                        bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
+                          bin.status === 'missed' ? 'bg-red-100 text-red-800' :
+                            bin.status === 'skiped' ? 'bg-blue-100 text-blue-800' :
+                              bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800' :
+                                'bg-gray-100 text-gray-800'
+                        }`}>
+                        {bin.status ? bin.status.toUpperCase() : "UNKNOWN"}
+                      </span>
+                    </td>
+                    <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                      <div className="flex items-center gap-2">
+                        {bin.status !== 'clean' && (
+                          <button onClick={() => handleManualClean(bin._id)} className="p-2 text-white bg-green-500 hover:bg-green-600 rounded-lg transition-colors" title="Mark Clean">
+                            <CheckCircle className="w-4 h-4" />
+                          </button>
+                        )}
+                        <button onClick={() => openEditDustbinModal(bin)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteDustbin(bin._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </div>
+                    </td>
+                  </tr>
+                ))}
+                {filteredDustbins.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
+                      No dustbins found for the selected route.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   // View: Vehicles
-  const VehiclesView = () => (
-    <>
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800">🚛 Vehicles Management</h3>
-            <p className="text-sm text-gray-600 mt-1">{vehicles.length} total vehicles • {stats.activeVehicles} active</p>
+  // View: Vehicles
+  const VehiclesView = () => {
+
+    // Logic to filter vehicles based on selected route
+    const filteredVehicles = vehicles.filter((vehicle) => {
+      if (!filterRoute) return true; // Show all if no filter
+
+      // Find the route object selected
+      const selectedRouteObj = routes.find(r => r._id === filterRoute);
+
+      // Check if this route has an assigned vehicle and if it matches the current vehicle
+      return selectedRouteObj?.assignedVehicleId?._id === vehicle._id;
+    });
+
+    return (
+      <>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">🚛 Vehicles Management</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                {filteredVehicles.length} vehicles shown (Total: {vehicles.length})
+              </p>
+            </div>
+
+            <div className="flex items-center gap-3">
+              {/* 👇 ROUTE FILTER DROPDOWN */}
+              <div className="relative">
+                <select
+                  value={filterRoute}
+                  onChange={(e) => setFilterRoute(e.target.value)}
+                  className="appearance-none bg-gray-50 border border-gray-300 text-gray-700 py-2 pl-4 pr-8 rounded-lg leading-tight focus:outline-none focus:bg-white focus:border-purple-500"
+                >
+                  <option value="">All Routes</option>
+                  {routes.map((r) => (
+                    <option key={r._id} value={r._id}>
+                      {r.name}
+                    </option>
+                  ))}
+                </select>
+                <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center px-2 text-gray-700">
+                  <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20"><path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" /></svg>
+                </div>
+              </div>
+
+              <button
+                onClick={() => openModal("vehicle")}
+                className="flex items-center gap-2 px-6 py-2 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
+              >
+                <Plus className="w-5 h-5" />
+                <span className="font-semibold">Add Vehicle</span>
+              </button>
+            </div>
           </div>
-          <button
-            onClick={() => openModal("vehicle")}
-            className="flex items-center gap-2 px-6 py-3 bg-gradient-to-r from-green-600 to-green-700 text-white rounded-lg hover:from-green-700 hover:to-green-800 transition-all shadow-md hover:shadow-lg"
-          >
-            <Plus className="w-5 h-5" />
-            <span className="font-semibold">Add Vehicle</span>
-          </button>
         </div>
-      </div>
 
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Vehicle Number
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Type
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Status
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Location
-                </th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
-                  Actions
-                </th>
-              </tr>
-            </thead>
-
-            <tbody className="bg-white divide-y divide-gray-200">
-              {vehicles.map((vehicle) => (
-                <tr key={vehicle._id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="flex items-center">
-                      <div className="text-2xl mr-3">🚛</div>
-                      <div className="text-sm font-bold text-gray-900">
-                        {vehicle.vehicleNumber}
-                      </div>
-                    </div>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
-                    {vehicle.type || "-"}
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${vehicle.status === "Active"
-                        ? "bg-green-100 text-green-800"
-                        : "bg-gray-100 text-gray-800"
-                        }`}
-                    >
-                      {vehicle.status}
-                    </span>
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
-                    {vehicle.latitude != null && vehicle.longitude != null
-                      ? `${vehicle.latitude.toFixed(4)}, ${vehicle.longitude.toFixed(4)}`
-                      : "N/A"}
-                  </td>
-
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <button
-                      onClick={() => openEditVehicleModal(vehicle)}
-                      className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg"
-                    >
-                      <Edit2 className="w-4 h-4" />
-                    </button>
-                    <button
-                      onClick={() => handleDeleteVehicle(vehicle._id)}
-                      className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
-                      title="Delete"
-                    >
-                      <Trash2 className="w-4 h-4" />
-                    </button>
-                  </td>
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Vehicle Number</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Assigned Route</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredVehicles.map((vehicle) => {
+                  // Find route name for this vehicle for display
+                  const assignedRoute = routes.find(r => r.assignedVehicleId?._id === vehicle._id);
+
+                  return (
+                    <tr key={vehicle._id} className="hover:bg-gray-50 transition-colors">
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex items-center">
+                          <div className="text-2xl mr-3">🚛</div>
+                          <div className="text-sm font-bold text-gray-900">{vehicle.vehicleNumber}</div>
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                        {vehicle.type || "-"}
+                      </td>
+                      {/* New Column to show Route */}
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-blue-600 font-bold">
+                        {assignedRoute ? assignedRoute.name : <span className="text-gray-400 font-normal">Not Assigned</span>}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${vehicle.status === "Active" ? "bg-green-100 text-green-800" : "bg-gray-100 text-gray-800"
+                          }`}>
+                          {vehicle.status}
+                        </span>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-mono">
+                        {vehicle.latitude != null && vehicle.longitude != null
+                          ? `${vehicle.latitude.toFixed(4)}, ${vehicle.longitude.toFixed(4)}`
+                          : "N/A"}
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <button onClick={() => openEditVehicleModal(vehicle)} className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg">
+                          <Edit2 className="w-4 h-4" />
+                        </button>
+                        <button onClick={() => handleDeleteVehicle(vehicle._id)} className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors" title="Delete">
+                          <Trash2 className="w-4 h-4" />
+                        </button>
+                      </td>
+                    </tr>
+                  );
+                })}
+                {filteredVehicles.length === 0 && (
+                  <tr>
+                    <td colSpan="6" className="px-6 py-10 text-center text-gray-500">
+                      No vehicles assigned to the selected route.
+                    </td>
+                  </tr>
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   // View: Staff
   const StaffView = () => (
@@ -2325,15 +2488,15 @@ export default function OfficeDashboard() {
                   </div>
                   <div className="mt-3">
                     <p className="text-xs text-gray-500 mb-2">
-                      Map par click karke location select karo
+                      Click on the map to select the dustbin location:
                     </p>
 
                     <div className="h-[450px] rounded-lg overflow-hidden border">
                       {typeof window !== "undefined" && L && (
                         <MapContainer
                           center={[
-                            userData.latitude || 0,
-                            userData.longitude || 0,
+                            userData.latitude || 23.2599, // Fallback to city center
+                            userData.longitude || 77.4126,
                           ]}
                           zoom={13}
                           style={{ height: "100%", width: "100%" }}
@@ -2342,7 +2505,7 @@ export default function OfficeDashboard() {
                             url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
                           />
 
-                          {/* Click handler */}
+                          {/* 1. Click Handler for New Bin */}
                           <MapClickHandler
                             onLocationSelect={(latlng) => {
                               setFormData(prev => ({
@@ -2353,15 +2516,52 @@ export default function OfficeDashboard() {
                             }}
                           />
 
-                          {/* Agar already select ho chuka hai to marker dikhao */}
+                          {/* 2. Marker for CURRENT Selection (New Bin) */}
                           {formData.binLatitude && formData.binLongitude && (
                             <Marker
                               position={[
                                 parseFloat(formData.binLatitude),
                                 parseFloat(formData.binLongitude),
                               ]}
-                            />
+                            // Default Blue icon for new selection
+                            >
+                              <Popup>New Location Selected</Popup>
+                            </Marker>
                           )}
+
+                          {/* 3. SHOW EXISTING DUSTBINS (Read Only) */}
+                          {dustbins.map((existingBin) => (
+                            <Marker
+                              key={`modal-bin-${existingBin._id}`}
+                              position={[existingBin.latitude, existingBin.longitude]}
+                              icon={getBinIcon(existingBin.status)} // Same colored icons
+                            >
+                              <Popup>
+                                <div className="text-center min-w-[150px]">
+                                  <p className="font-bold text-gray-800 text-sm mb-1">
+                                    {existingBin.name}
+                                  </p>
+                                  <p className="text-xs text-gray-600 bg-gray-100 rounded px-2 py-1 inline-block">
+                                    Route: {existingBin.routeId ? existingBin.routeId.name : "N/A"}
+                                  </p>
+                                </div>
+                              </Popup>
+                            </Marker>
+                          ))}
+                          {/* 👇 ROUTE LINES IN MODAL */}
+                          {routePaths.map((route, idx) => (
+                            <Polyline
+                              key={`modal-route-${idx}`}
+                              positions={route.positions}
+                              pathOptions={{
+                                color: '#6b7280', // Gray Color for modal
+                                weight: 1.5,      // Very thin
+                                opacity: 0.5,
+                                dashArray: '4, 8'
+                              }}
+                            />
+                          ))}
+
                         </MapContainer>
                       )}
                     </div>
@@ -2373,9 +2573,12 @@ export default function OfficeDashboard() {
                       onChange={(e) => setFormData({ ...formData, binStatus: e.target.value })}
                       className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
                     >
-                      <option value="clean">Clean</option>
-                      <option value="overflow">Overflow</option>
-                      <option value="missed">Missed</option>
+                      <option value="clean">Clean (Green)</option>
+                      <option value="overflow">Overflow (Yellow)</option>
+                      <option value="missed">Missed (Red)</option>
+                      <option value="skiped">Skipped (Blue)</option>
+                      <option value="suspecies">Suspicious (Orange)</option>
+                      <option value="ideal">Ideal / Inactive (Black)</option>
                     </select>
                   </div>
                 </>
@@ -2946,11 +3149,14 @@ export default function OfficeDashboard() {
                   onChange={(e) =>
                     setFormData({ ...formData, binStatus: e.target.value })
                   }
-                  className="w-full px-4 py-3 border rounded-lg text-black"
+                  className="w-full px-4 py-3 border border-gray-300 rounded-lg focus:ring-2 focus:ring-purple-500 focus:border-transparent text-black"
                 >
-                  <option value="clean">Clean</option>
-                  <option value="overflow">Overflow</option>
-                  <option value="missed">Missed</option>
+                  <option value="clean">Clean (Green)</option>
+                  <option value="overflow">Overflow (Yellow)</option>
+                  <option value="missed">Missed (Red)</option>
+                  <option value="skiped">Skipped (Blue)</option>
+                  <option value="suspecies">Suspicious (Orange)</option>
+                  <option value="ideal">Ideal / Inactive (Black)</option>
                 </select>
               </div>
 

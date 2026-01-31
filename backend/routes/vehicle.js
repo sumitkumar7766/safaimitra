@@ -12,7 +12,7 @@ router.post("/register", officeAuth, async (req, res) => {
   if (!officeId || !vehicleNumber) {
     return res.status(400).json({
       success: false,
-      message: "OfficeId aur Vehicle Number required hai",
+      message: "officeId and vehicleNumber are required",
     });
   }
 
@@ -115,7 +115,7 @@ router.put("/update/:vehicleId", officeAuth, async (req, res) => {
       if (exists) {
         return res.status(400).json({
           success: false,
-          message: "Is vehicle number se pehle hi ek vehicle registered hai",
+          message: "This vehicle number is already registered",
         });
       }
     }
