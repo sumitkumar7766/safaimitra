@@ -41,6 +41,7 @@ const DustbinSchema = new mongoose.Schema({
   },
 
   lastCleanedAt: { type: Date, default: null },
+  reportedAt: { type: Date, default: null },
   active: { type: Boolean, default: true },
 }, { timestamps: true });
 

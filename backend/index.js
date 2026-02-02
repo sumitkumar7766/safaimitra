@@ -20,7 +20,7 @@ const Staff = require("./model/StaffModel.js");
 const Dustbin = require("./model/DustbinModel.js");
 
 // Routes
-const CitizenRegister = require("./routes/citizenRegister.js");
+const CitizenRegister = require("./routes/citizen.js");
 const VehicleRegister = require("./routes/vehicle.js");
 const OfficeRegister = require("./routes/office.js");
 const CitizenLogin = require("./routes/loginCitizen.js");
@@ -57,8 +57,8 @@ const store = MongoStore.create({
 
 // Middlewares
 app.use(cors({
-  origin: ["http://10.13.177.129:3000", "http://localhost:3000"],
-  credentials: true
+  origin: "http://localhost:3000", // Apne frontend ka URL yahan likhein
+  credentials: true // Agar cookies/headers bhej rahe hain to ye zaroori hai
 }));
 app.use(express.json());
 app.use(bodyParser.json());
@@ -82,8 +82,8 @@ app.use(passport.initialize());
 app.use(passport.session());
 
 // Passport Strategies
-// passport.use("citizen-local", new LocalStrategy(Citizen.authenticate()));
-// passport.use("vehicle-local", new LocalStrategy(Vehicle.authenticate()));
+passport.use("citizen-local", new LocalStrategy(Citizen.authenticate()));
+passport.use("vehicle-local", new LocalStrategy(Staff.authenticate()));
 passport.use("admin-local", new LocalStrategy(Admin.authenticate()));
 passport.use("staff-local", new LocalStrategy(Staff.authenticate()));
 passport.use("office-local", new LocalStrategy(Office.authenticate()));
@@ -116,10 +116,10 @@ passport.deserializeUser(async (id, done) => {
 // Routes
 app.use("/admin", AdminRegister);
 app.use("/admin", AdminLogin);
-// app.use("/citizen", CitizenRegister);
+app.use("/citizen", CitizenRegister);
 app.use("/vehicle", VehicleRegister);
 app.use("/office", OfficeRegister);
-// app.use("/loginc", CitizenLogin);
+app.use("/citizen", CitizenLogin);
 // app.use("/loginv", VehicleLogin);
 // app.use("/logina", AdminLogin);
 app.use("/office", OfficeLogin);
@@ -191,6 +191,25 @@ cron.schedule("*/2 * * * *", async () => {
     }
   } catch (err) {
     console.error("❌ Error in Auto-Offline Job:", err);
+  }
+});
+
+// GET /public-offices
+// Isme koi adminAuth nahi lagayenge taaki registration page par load ho sake
+app.get("/public-list", async (req, res) => {
+  try {
+    // Humein sirf _id aur cityName chahiye
+    const offices = await Office.find({}, "cityName _id"); 
+
+    res.json({
+      success: true,
+      cities: offices.map(o => ({
+        id: o._id,       // Ye backend par save hoga
+        name: o.cityName // Ye dropdown me dikhega
+      }))
+    });
+  } catch (err) {
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

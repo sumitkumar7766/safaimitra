@@ -44,6 +44,199 @@ const MapClickHandler = ({ onLocationSelect }) => {
   return null;
 };
 
+const StatCard = ({ icon: Icon, title, value, color }) => (
+  <div className="bg-white rounded-xl shadow-lg p-6 border-l-4 hover:shadow-xl transition-shadow" style={{ borderLeftColor: color }}>
+    <div className="flex items-center justify-between">
+      <div>
+        <p className="text-gray-500 text-sm font-medium mb-1">{title}</p>
+        <p className="text-3xl font-bold text-gray-800 mt-2">{value}</p>
+      </div>
+      <div className="p-3 rounded-full" style={{ backgroundColor: `${color}20` }}>
+        <Icon className="w-8 h-8" style={{ color }} />
+      </div>
+    </div>
+  </div>
+);
+
+// 👇 STEP 2: Isse 'export default function...' ke UPAR paste karein
+const DashboardView = React.memo(({
+  stats,
+  userData,
+  dustbins,
+  vehicles,
+  getBinIcon,
+  getVehicleIcon,
+  routePaths,
+  handleManualClean,
+  navigateTo,
+  profile,
+  L // Leaflet instance passed as prop
+}) => {
+  return (
+    <>
+      {/* Stats Grid */}
+      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
+        <StatCard icon={Building2} title="Total Bins" value={stats.total} color="#3b82f6" />
+        <StatCard icon={CheckCircle} title="Clean Bins" value={stats.clean} color="#10b981" />
+        <StatCard icon={AlertCircle} title="Overflow" value={stats.overflow} color="#f59e0b" />
+        <StatCard icon={Truck} title="Active Vehicles" value={stats.activeVehicles} color="#8b5cf6" />
+      </div>
+
+      {/* Map Section */}
+      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+        <div className="flex items-center justify-between mb-4">
+          <div>
+            <h3 className="text-2xl font-bold text-gray-800">🗺️ Live City Map</h3>
+            <p className="text-sm text-gray-600">Real-time tracking of bins and vehicles across {profile.city}</p>
+          </div>
+          <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
+              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
+              <span className="text-xs font-semibold text-green-700">Live</span>
+            </div>
+          </div>
+        </div>
+
+        <div className="h-[500px] rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner">
+          {typeof window !== 'undefined' && L && (
+            <MapContainer
+              center={[
+                userData?.latitude ? Number(userData.latitude) : 23.2599,
+                userData?.longitude ? Number(userData.longitude) : 77.4126,
+              ]}
+              zoom={13}
+              style={{ height: '100%', width: '100%' }}
+              scrollWheelZoom={true}
+            >
+              <TileLayer
+                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
+                attribution='&copy; OpenStreetMap contributors'
+              />
+
+              {/* Dustbin Markers */}
+              {dustbins.map((bin) => {
+                const binIcon = getBinIcon(bin.status);
+                if (!binIcon) return null;
+
+                return (
+                  <Marker
+                    key={`bin-${bin._id || bin.id}`}
+                    position={[bin.latitude, bin.longitude]}
+                    icon={binIcon}
+                  >
+                    <Popup>
+                      <div className="text-center p-2 min-w-[200px]">
+                        <p className="font-bold mb-2 text-gray-800 text-base">{bin.name}</p>
+                        {bin.imageUrl && (
+                          <div className="mb-2 w-full h-32 rounded-lg overflow-hidden border">
+                            <img src={bin.imageUrl} alt="Bin State" className="w-full h-full object-cover" />
+                          </div>
+                        )}
+                        <p className="text-xs text-gray-600">Route:  {bin.routeId?.name || "N/A"}</p>
+                        <div className="flex justify-center my-2">
+                          <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
+                            bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' : bin.status === 'missed' ?
+                              'bg-red-100 text-red-800'
+                              : bin.status === 'skiped' ? 'bg-blue-100 text-blue-800'
+                                : bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800'
+                                  : bin.status === 'ideal' ? 'bg-black text-white'
+                                    : 'bg-gray-100 text-gray-800'
+                            }`}>
+                            {bin.status.toUpperCase()}
+                          </span>
+                        </div>
+                        {bin.status !== 'clean' && (
+                          <button
+                            onClick={() => handleManualClean(bin._id)}
+                            className="w-full mt-2 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600"
+                          >
+                            Mark Clean ✅
+                          </button>
+                        )}
+                      </div>
+                    </Popup>
+                    {/* Route Lines */}
+                    {routePaths.map((route, idx) => (
+                      <Polyline
+                        key={`dashboard-route-${idx}`}
+                        positions={route.positions}
+                        pathOptions={{ color: '#3b82f6', weight: 2, opacity: 0.6, dashArray: '5, 10' }}
+                      >
+                        <Popup>Route: {route.name}</Popup>
+                      </Polyline>
+                    ))}
+                  </Marker>
+                );
+              })}
+
+              {/* Vehicle Markers */}
+              {vehicles
+                .filter((v) => v.isOnline === true && v.latitude != null && v.longitude != null)
+                .map((vehicle) => {
+                  const vIcon = getVehicleIcon(vehicle.isOnline);
+                  if (!vIcon) return null;
+
+                  return (
+                    <Marker
+                      key={vehicle._id}
+                      position={[vehicle.latitude, vehicle.longitude]}
+                      icon={vIcon}
+                    >
+                      <Popup>
+                        <div className="text-center p-2 min-w-[180px]">
+                          <p className="font-bold text-gray-800 text-base mb-2">🚛 {vehicle.vehicleNumber}</p>
+                          <p className="text-sm text-gray-600 mb-2">Type: {vehicle.type || "-"}</p>
+                          <div className="flex justify-center mb-2">
+                            <span className="px-3 py-1 rounded-full text-xs font-semibold bg-green-100 text-green-800">Online</span>
+                          </div>
+                          <div className="mt-2 pt-2 border-t border-gray-200">
+                            <p className="text-xs text-gray-500">Current Location:</p>
+                            <p className="text-xs font-mono text-gray-700">
+                              {vehicle.latitude?.toFixed(4)}, {vehicle.longitude?.toFixed(4)}
+                            </p>
+                          </div>
+                        </div>
+                      </Popup>
+                    </Marker>
+                  );
+                })}
+            </MapContainer>
+          )}
+        </div>
+        {/* Legend */}
+        <div className="mt-4 flex flex-wrap items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#10b981' }}></div><span className="text-sm font-medium text-gray-700">Clean</span></div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div><span className="text-sm font-medium text-gray-700">Overflow</span></div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ef4444' }}></div><span className="text-sm font-medium text-gray-700">Skipped</span></div>
+          <div className="flex items-center gap-2"><div className="w-4 h-4 rounded-full bg-purple-500"></div><span className="text-sm font-medium text-gray-700">Active Vehicles</span></div>
+        </div>
+      </div>
+
+      {/* Quick Actions */}
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
+        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigateTo('complaints')}>
+          <div className="flex items-center justify-between mb-4"><MessageSquare className="w-10 h-10" /><span className="text-3xl font-bold">{stats.pendingComplaints}</span></div>
+          <h4 className="text-lg font-semibold">Pending Complaints</h4>
+        </div>
+        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigateTo('dustbins')}>
+          <div className="flex items-center justify-between mb-4"><Building2 className="w-10 h-10" /><span className="text-3xl font-bold">{stats.total}</span></div>
+          <h4 className="text-lg font-semibold">Total Dustbins</h4>
+        </div>
+        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow" onClick={() => navigateTo('vehicles')}>
+          <div className="flex items-center justify-between mb-4"><Truck className="w-10 h-10" /><span className="text-3xl font-bold">{stats.activeVehicles}</span></div>
+          <h4 className="text-lg font-semibold">Active Vehicles</h4>
+        </div>
+      </div>
+    </>
+  );
+}, (prevProps, nextProps) => {
+  // Optimization to stop map refresh
+  return JSON.stringify(prevProps.vehicles) === JSON.stringify(nextProps.vehicles) &&
+    JSON.stringify(prevProps.dustbins) === JSON.stringify(nextProps.dustbins) &&
+    JSON.stringify(prevProps.stats) === JSON.stringify(nextProps.stats) &&
+    prevProps.L === nextProps.L;
+});
+
 export default function OfficeDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -1255,238 +1448,6 @@ export default function OfficeDashboard() {
     return Object.values(paths);
   }, [dustbins]);
 
-  // View: Dashboard
-  const DashboardView = () => (
-    <>
-      {/* Stats Grid */}
-      <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6 mb-6">
-        <StatCard icon={Building2} title="Total Bins" value={stats.total} color="#3b82f6" />
-        <StatCard icon={CheckCircle} title="Clean Bins" value={stats.clean} color="#10b981" />
-        <StatCard icon={AlertCircle} title="Overflow" value={stats.overflow} color="#f59e0b" />
-        <StatCard icon={Truck} title="Active Vehicles" value={stats.activeVehicles} color="#8b5cf6" />
-      </div>
-
-      {/* Map Section */}
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between mb-4">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800">🗺️ Live City Map</h3>
-            <p className="text-sm text-gray-600">Real-time tracking of bins and vehicles across {profile.city}</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="flex items-center gap-2 px-3 py-1 bg-green-100 rounded-full">
-              <div className="w-2 h-2 bg-green-500 rounded-full animate-pulse"></div>
-              <span className="text-xs font-semibold text-green-700">Live</span>
-            </div>
-          </div>
-        </div>
-
-        <div className="h-[500px] rounded-xl overflow-hidden border-2 border-gray-200 shadow-inner">
-          {typeof window !== 'undefined' && L && (
-            <MapContainer
-              center={[
-                userData?.latitude ? Number(userData.latitude) : 0,
-                userData?.longitude ? Number(userData.longitude) : 0,
-              ]}
-              zoom={13}
-              style={{ height: '100%', width: '100%' }}
-              scrollWheelZoom={true}
-            >
-              <TileLayer
-                url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                attribution='&copy; <a href="https://www.openstreetmap.org/copyright">OpenStreetMap</a> contributors'
-              />
-
-              {/* Dustbin Markers */}
-              {dustbins.map((bin) => (
-                <Marker
-                  key={`bin-${bin._id || bin.id}`}
-                  position={[bin.latitude, bin.longitude]}
-                  icon={getBinIcon(bin.status)}
-                >
-                  <Popup>
-                    <div className="text-center p-2 min-w-[200px]"> {/* Width badha di */}
-                      <p className="font-bold mb-2 text-gray-800 text-base">{bin.name}</p>
-
-                      {/* 👇 IMAGE IN POPUP */}
-                      {bin.imageUrl && (
-                        <div className="mb-2 w-full h-32 rounded-lg overflow-hidden border">
-                          <img src={bin.imageUrl} alt="Bin State" className="w-full h-full object-cover" />
-                        </div>
-                      )}
-
-                      <p className="text-xs text-gray-600">Route:  {bin.routeId.name}</p>
-
-                      <div className="flex justify-center my-2">
-                        <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
-                          bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' : bin.status === 'missed' ?
-                            'bg-red-100 text-red-800'
-                            : bin.status === 'skiped' ? 'bg-blue-100 text-blue-800'
-                              : bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800'
-                                : bin.status === 'ideal' ? 'bg-black text-white'
-                                  : 'bg-gray-100 text-gray-800'
-                          }`}>
-                          {bin.status.toUpperCase()}
-                        </span>
-                      </div>
-
-                      {/* 👇 MANUAL CLEAN BUTTON IN POPUP */}
-                      {bin.status !== 'clean' && (
-                        <button
-                          onClick={() => handleManualClean(bin._id)}
-                          className="w-full mt-2 py-1 bg-green-500 text-white text-xs font-bold rounded hover:bg-green-600"
-                        >
-                          Mark Clean ✅
-                        </button>
-                      )}
-
-                    </div>
-                  </Popup>
-                  {/* 👇 ROUTE LINES (Thin Blue Dashed Lines) */}
-                  {routePaths.map((route, idx) => (
-                    <Polyline
-                      key={`dashboard-route-${idx}`}
-                      positions={route.positions}
-                      pathOptions={{
-                        color: '#3b82f6', // Blue Color
-                        weight: 2,        // Thin Line
-                        opacity: 0.6,
-                        dashArray: '5, 10' // Dashed Style
-                      }}
-                    >
-                      <Popup>Route: {route.name}</Popup>
-                    </Polyline>
-                  ))}
-                </Marker>
-              ))}
-
-              {/* Vehicle Markers */}
-              {vehicles
-                .filter(
-                  (v) =>
-                    v.isOnline === true &&        // 👈 sirf online vehicles
-                    v.latitude != null &&
-                    v.longitude != null
-                )
-                .map((vehicle) => (
-                  <Marker
-                    key={`vehicle-${vehicle._id}`}
-                    position={[vehicle.latitude, vehicle.longitude]}
-                    icon={getVehicleIcon(vehicle.isOnline)}
-                  >
-                    <Popup>
-                      <div className="text-center p-2 min-w-[180px]">
-                        <p className="font-bold text-gray-800 text-base mb-2">
-                          🚛 {vehicle.vehicleNumber}
-                        </p>
-
-                        <p className="text-sm text-gray-600 mb-2">
-                          Type: {vehicle.type || "-"}
-                        </p>
-
-                        <div className="flex justify-center mb-2">
-                          <span
-                            className={`px-3 py-1 rounded-full text-xs font-semibold ${vehicle.isOnline === true
-                              ? "bg-green-100 text-green-800"
-                              : "bg-gray-100 text-gray-800"
-                              }`}
-                          >
-                            {vehicle.isOnline === true ? "Online" : "Offline"}
-                          </span>
-                        </div>
-
-                        <div className="mt-2 pt-2 border-t border-gray-200">
-                          <p className="text-xs text-gray-500">Current Location:</p>
-                          <p className="text-xs font-mono text-gray-700">
-                            {vehicle.latitude?.toFixed(4)}, {vehicle.longitude?.toFixed(4)}
-                          </p>
-                        </div>
-                      </div>
-                    </Popup>
-                  </Marker>
-                ))}
-            </MapContainer>
-          )}
-        </div>
-
-        {/* Map Legend */}
-        <div className="mt-4 flex flex-wrap items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
-          {/* Clean Bins */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#10b981' }}></div>
-            <span className="text-sm font-medium text-gray-700">Clean</span>
-          </div>
-
-          {/* Overflow */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#f59e0b' }}></div>
-            <span className="text-sm font-medium text-gray-700">Overflow</span>
-          </div>
-
-          {/* Skipped */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#ef4444' }}></div>
-            <span className="text-sm font-medium text-gray-700">Skipped</span>
-          </div>
-
-          {/* Suspecies */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#cc760e' }}></div>
-            <span className="text-sm font-medium text-gray-700">Suspect Case</span>
-          </div>
-
-          {/* Ideal */}
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full" style={{ backgroundColor: '#000000' }}></div>
-            <span className="text-sm font-medium text-gray-700">Ideal</span>
-          </div>
-
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-purple-500"></div>
-            <span className="text-sm font-medium text-gray-700">Active Vehicles</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-4 h-4 rounded-full bg-gray-500"></div>
-            <span className="text-sm font-medium text-gray-700">Offline Vehicles</span>
-          </div>
-        </div>
-      </div>
-
-      {/* Quick Actions */}
-      <div className="grid grid-cols-1 md:grid-cols-3 gap-6 mb-6">
-        <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => navigateTo('complaints')}>
-          <div className="flex items-center justify-between mb-4">
-            <MessageSquare className="w-10 h-10" />
-            <span className="text-3xl font-bold">{stats.pendingComplaints}</span>
-          </div>
-          <h4 className="text-lg font-semibold">Pending Complaints</h4>
-          <p className="text-sm opacity-90">Click to view and manage</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => navigateTo('dustbins')}>
-          <div className="flex items-center justify-between mb-4">
-            <Building2 className="w-10 h-10" />
-            <span className="text-3xl font-bold">{stats.total}</span>
-          </div>
-          <h4 className="text-lg font-semibold">Total Dustbins</h4>
-          <p className="text-sm opacity-90">Manage bin locations</p>
-        </div>
-
-        <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-xl shadow-lg p-6 text-white cursor-pointer hover:shadow-xl transition-shadow"
-          onClick={() => navigateTo('vehicles')}>
-          <div className="flex items-center justify-between mb-4">
-            <Truck className="w-10 h-10" />
-            <span className="text-3xl font-bold">{stats.activeVehicles}</span>
-          </div>
-          <h4 className="text-lg font-semibold">Active Vehicles</h4>
-          <p className="text-sm opacity-90">Track fleet in real-time</p>
-        </div>
-      </div>
-    </>
-  );
-
   // View: Complaints
   const ComplaintsView = () => (
     <>
@@ -2380,7 +2341,21 @@ export default function OfficeDashboard() {
 
         {/* Main Content Area */}
         <main className="flex-1 overflow-y-auto p-6">
-          {currentView === 'dashboard' && <DashboardView />}
+          {currentView === 'dashboard' && (
+            <DashboardView
+              stats={stats}
+              userData={userData}
+              dustbins={dustbins}
+              vehicles={vehicles}
+              getBinIcon={getBinIcon}
+              getVehicleIcon={getVehicleIcon}
+              routePaths={routePaths}
+              handleManualClean={handleManualClean}
+              navigateTo={navigateTo}
+              profile={profile}
+              L={L}
+            />
+          )}
           {currentView === 'complaints' && <ComplaintsView />}
           {currentView === 'reviews' && <ReviewsView />}
           {currentView === 'routes' && <RouteView />}
@@ -3407,6 +3382,13 @@ export default function OfficeDashboard() {
       <style jsx global>{`
         @import url('https://unpkg.com/leaflet@1.7.1/dist/leaflet.css');
         
+        /* 👇 YE WALA CODE ADD KAREIN (CRASH FIX) 👇 */
+        .leaflet-fade-anim .leaflet-tile,
+        .leaflet-zoom-anim .leaflet-zoom-animated {
+          will-change: auto !important;
+        }
+        /* 👆 YAHAN TAK 👆 */
+
         .custom-marker {
           background: transparent !important;
           border: none !important;

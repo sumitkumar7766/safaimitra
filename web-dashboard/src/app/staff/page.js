@@ -235,18 +235,27 @@ export default function VehiclePage() {
     } catch (err) { console.error("ORS Error:", err); }
   };
 
-  // --- 6. Data Fetching ---
+  // --- 6. Data Fetching (Auto Update) ---
   useEffect(() => {
+    // Function to fetch dashboard data (Dustbins, Route, Status)
     const fetchDashboard = async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const res = await axios.get("http://localhost:5001/staff/dashboard", { headers: { Authorization: `Bearer ${token}` } });
+
+        // Backend se data lo
+        const res = await axios.get("http://localhost:5001/staff/dashboard", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
         if (res.data) {
           const { staff, vehicle, route, dustbins } = res.data;
+
+          // Data update karo
           setStaff(staff);
           setVehicle(vehicle);
           setRoute(route);
+
           if (dustbins && Array.isArray(dustbins)) {
             const stops = dustbins.map((d, index) => ({
               id: d._id,
@@ -256,25 +265,54 @@ export default function VehiclePage() {
               status: d.status,
               completedAt: d.lastCleanedAt,
             }));
-            setRouteStops(stops);
 
+            // 👇 Yahan check lagayenge taki map baar-baar flicker na kare
+            // Agar data same hai to state update mat karo
+            setRouteStops((prevStops) => {
+              if (JSON.stringify(prevStops) === JSON.stringify(stops)) {
+                return prevStops; // Koi change nahi
+              }
+              return stops; // Naya data update karo
+            });
+
+            // Count update karo
             const doneCount = stops.filter(s => ['clean', 'suspecies', 'skiped'].includes(s.status)).length;
             setTodayCompleted(doneCount);
 
-            const firstPendingIndex = stops.findIndex(s => !['clean', 'suspecies', 'skiped'].includes(s.status));
-            if (firstPendingIndex !== -1) {
-              setCurrentStop(firstPendingIndex + 1);
-            } else if (stops.length > 0) {
-              setCurrentStop(stops.length);
-              alert("🎉 All dustbins for today are already cleaned!");
-            }
+            // Sirf pehli baar load hone par current stop set karo,
+            // taaki driver agar beech mein kisi stop par click kiya ho to wo reset na ho jaye
+            // (Hum 'currentStop' state ko tabhi chedenge agar ye pehla load hai i.e. 1)
+            /* Note: Agar aap chahte hain ki naya dustbin add hote hi driver ko wahan bheje,
+               to niche wali logic use karein. Par usually driver manual control chahta hai.
+            */
+            setRouteStops((prev) => {
+              if (prev.length === 0) {
+                const firstPendingIndex = stops.findIndex(s => !['clean', 'suspecies', 'skiped'].includes(s.status));
+                if (firstPendingIndex !== -1) {
+                  setCurrentStop(firstPendingIndex + 1);
+                } else if (stops.length > 0) {
+                  setCurrentStop(stops.length);
+                }
+              }
+              return stops;
+            });
           }
         }
       } catch (err) { console.error("Dashboard Error:", err); }
     };
+
+    // 1. Turant call karo (Pehli baar ke liye)
     fetchDashboard();
 
-    // Fetch Staff Profile
+    // 2. Har 5 second (5000ms) mein repeat karo
+    const intervalId = setInterval(fetchDashboard, 5000);
+
+    // 3. Jab page band ho to interval band karo (Cleanup)
+    return () => clearInterval(intervalId);
+  }, []);
+
+  // Staff Profile alag se fetch karo (Ye baar baar update karne ki zarurat nahi)
+  useEffect(() => {
     const fetchStaffProfile = async () => {
       try {
         const token = localStorage.getItem("token");

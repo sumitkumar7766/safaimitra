@@ -1,19 +1,17 @@
 "use client";
 
 import React, { useState } from 'react';
-import { User, Truck, Building2, ArrowRight, Lock, X, ChevronLeft } from 'lucide-react';
+import { User, Truck, Building2, ArrowRight } from 'lucide-react';
 import { useRouter } from "next/navigation";
-import axios from "axios";
-
+import CitizenLogin from './components/Citizenlogin.js';
+import VehicleStaffLogin from './components/Vehiclestafflogin.js';
+import OfficeStaffLogin from './components/Officestafflogin.js';
+import AdministratorLogin from './components/Administratorlogin.js';
 
 export default function SafaiMitra() {
   const [isLoginOpen, setIsLoginOpen] = useState(false);
   const [selectedPortal, setSelectedPortal] = useState(null);
   const router = useRouter();
-  const [username, setUsername] = useState("");
-  const [password, setPassword] = useState("");
-  const [loading, setLoading] = useState(false);
-
 
   const portals = [
     {
@@ -59,165 +57,34 @@ export default function SafaiMitra() {
     setIsLoginOpen(true);
   };
 
-  //Login centrol
-  const handleLoginSubmit = async (e) => {
-    e.preventDefault();
-
-    if (!selectedPortal) return;
-
-    let endpoint = "";
-    let redirectBase = "";
-
-    switch (selectedPortal.title) {
-      case "Citizen":
-        endpoint = "http://localhost:5001/loginc";
-        redirectBase = "/citizen";
-        break;
-      case "Vehicle Staff":
-        endpoint = "http://localhost:5001/staff/login";
-        redirectBase = "/staff";
-        break;
-      case "Office Staff":
-        endpoint = "http://localhost:5001/office/login";
-        redirectBase = "/office";
-        break;
-      case "Administrator":
-        endpoint = "http://localhost:5001/admin/login";
-        redirectBase = "/admin";
-        break;
-      default:
-        return;
-    }
-
-    try {
-      const res = await axios.post(endpoint, {
-        username,
-        password,
-      });
-
-      if (res.data && res.data.user && res.data.token) {
-        // 1. Set the cookie (Middleware looks for this)
-        document.cookie = `token=${res.data.token}; path=/; max-age=86400; SameSite=Lax`;
-        document.cookie = `role=${selectedPortal.title}; path=/; max-age=86400; SameSite=Lax`;
-
-        localStorage.setItem("token", res.data.token);
-        localStorage.setItem("user", JSON.stringify(res.data.user));
-        localStorage.setItem("role", selectedPortal.title);
-
-        const userId = res.data.user.id;
-        localStorage.setItem("userId", userId);
-
-        router.push(`${redirectBase}?id=${userId}`);
-      } else {
-        alert("Invalid credentials or missing data from server.");
-      }
-    } catch (error) {
-      console.error("Login failed:", error);
-      alert("Login failed. Please check your credentials.");
-    }
+  const handleBackToPortals = () => {
+    setIsLoginOpen(false);
+    setSelectedPortal(null);
   };
 
-
-  // --- FULL PAGE LOGIN VIEW ---
+  // Render appropriate login component based on selected portal
   if (isLoginOpen && selectedPortal) {
-    return (
-      <div className="min-h-screen bg-white flex flex-col md:flex-row animate-in fade-in duration-500">
-        {/* Left Side: Visual Branding (Hidden on small mobile) */}
-        <div className={`hidden md:flex md:w-1/2 ${selectedPortal.color} p-12 flex-col justify-between`}>
-          <div>
-            <div className="flex items-center space-x-2 mb-12">
-              <div className="w-10 h-10 bg-gray-900 rounded-lg flex items-center justify-center">
-                <div className="w-5 h-5 bg-white rounded-sm" />
-              </div>
-              <span className="text-2xl font-bold text-gray-900">SafaiMitra</span>
-            </div>
-            <h2 className={`text-5xl font-extrabold ${selectedPortal.iconColor} leading-tight mb-6`}>
-              Welcome back to the <br /> {selectedPortal.title} Portal.
-            </h2>
-            <p className="text-gray-700 text-lg max-w-md">
-              Helping you manage waste more efficiently for a cleaner, greener city environment.
-            </p>
-          </div>
-          <div className="text-sm text-gray-500 font-medium">
-            © 2026 SafaiMitra Initiative. All rights reserved.
-          </div>
-        </div>
+    const loginProps = {
+      portal: selectedPortal,
+      onBack: handleBackToPortals,
+      router: router
+    };
 
-        {/* Right Side: Responsive Login Form */}
-        <div className="flex-1 flex flex-col justify-center items-center p-6 sm:p-12 relative">
-          <button
-            onClick={() => setIsLoginOpen(false)}
-            className="absolute top-8 left-8 flex items-center text-gray-500 hover:text-gray-900 transition-colors"
-          >
-            <ChevronLeft className="w-5 h-5 mr-1" /> Back to Portals
-          </button>
-
-          <div className="w-full max-w-md">
-            <div className="md:hidden flex items-center space-x-2 mb-8 justify-center">
-              <div className="w-8 h-8 bg-emerald-500 rounded-lg flex items-center justify-center">
-                <div className="w-4 h-4 bg-white rounded-sm" />
-              </div>
-              <span className="text-xl font-bold">Safai<span className="text-emerald-500">Mitra</span></span>
-            </div>
-
-            <div className="text-center md:text-left mb-10">
-              <h3 className="text-3xl font-bold text-gray-900 mb-2">Login</h3>
-              <p className="text-gray-500">Please enter your authorized credentials.</p>
-            </div>
-
-            <form onSubmit={handleLoginSubmit} className="space-y-6">
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Portal ID / Username</label>
-                <input
-                  type="text"
-                  placeholder="Please enter the username"
-                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-black"
-                  required
-                  value={username}
-                  onChange={(e) => setUsername(e.target.value)}
-                />
-              </div>
-              <div>
-                <label className="block text-sm font-semibold text-gray-700 mb-2">Password</label>
-                <input
-                  type="password"
-                  placeholder="Please enter the correct password"
-                  className="w-full p-4 bg-gray-50 border border-gray-200 rounded-xl outline-none focus:ring-2 focus:ring-emerald-500 focus:bg-white transition-all text-black"
-                  required
-                  value={password}
-                  onChange={(e) => setPassword(e.target.value)}
-                />
-              </div>
-
-              <div className="flex items-center justify-between text-sm">
-                <label className="flex items-center space-x-2 cursor-pointer">
-                  <input type="checkbox" className="rounded border-gray-300 text-emerald-600 focus:ring-emerald-500" />
-                  <span className="text-gray-600">Remember me</span>
-                </label>
-                <a href="#" className={`${selectedPortal.iconColor} font-semibold hover:underline`}>Forgot Password?</a>
-              </div>
-
-              <button
-                type="submit"
-                disabled={loading}
-                className={`w-full ${selectedPortal.buttonColor} text-white py-4 rounded-xl font-bold text-lg shadow-lg transition-transform active:scale-95`}
-              >
-                {loading ? "Signing In..." : "Sign In"}
-              </button>
-
-            </form>
-
-            <div className="mt-12 text-center text-sm text-gray-500">
-              Unauthorized access is strictly prohibited. <br />
-              Need help? <a href="#" className="font-bold text-gray-900 underline">Contact System Admin</a>
-            </div>
-          </div>
-        </div>
-      </div>
-    );
+    switch (selectedPortal.title) {
+      case 'Citizen':
+        return <CitizenLogin {...loginProps} />;
+      case 'Vehicle Staff':
+        return <VehicleStaffLogin {...loginProps} />;
+      case 'Office Staff':
+        return <OfficeStaffLogin {...loginProps} />;
+      case 'Administrator':
+        return <AdministratorLogin {...loginProps} />;
+      default:
+        return null;
+    }
   }
 
-  // --- MAIN PORTAL SELECTION VIEW ---
+  // MAIN PORTAL SELECTION VIEW
   return (
     <div className="min-h-screen bg-gray-50">
       <header className="bg-white shadow-sm sticky top-0 z-10">
