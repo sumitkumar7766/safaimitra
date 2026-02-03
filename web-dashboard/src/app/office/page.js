@@ -58,6 +58,20 @@ const StatCard = ({ icon: Icon, title, value, color }) => (
   </div>
 );
 
+// Function to format MongoDB Date to Human Readable String
+const formatDateTime = (dateStr) => {
+  if (!dateStr) return "N/A";
+  const date = new Date(dateStr);
+  return date.toLocaleString('en-IN', {
+    day: '2-digit',
+    month: 'short',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: true
+  });
+};
+
 // 👇 STEP 2: Isse 'export default function...' ke UPAR paste karein
 const DashboardView = React.memo(({
   stats,
@@ -270,6 +284,7 @@ export default function OfficeDashboard() {
   const [showEditStaffModal, setShowEditStaffModal] = useState(false);
   const [editStaffId, setEditStaffId] = useState(null);
   const [filterRoute, setFilterRoute] = useState("");
+  const [loading, setLoading] = useState(true);
 
   const handleEditStaffSubmit = async (e) => {
     e.preventDefault();
@@ -608,10 +623,16 @@ export default function OfficeDashboard() {
   };
 
   useEffect(() => {
-    if (userData?._id) {
+    if (!userData?._id) return;
+
+    fetchRoutes();
+
+    const intervalId = setInterval(() => {
       fetchRoutes();
-    }
-  }, [userData]);
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, [userData?._id]);
 
   const [showEditRouteModal, setShowEditRouteModal] = useState(false);
   const [editRouteId, setEditRouteId] = useState(null);
@@ -627,59 +648,49 @@ export default function OfficeDashboard() {
   };
 
 
-  const [complaints, setComplaints] = useState([
-    {
-      id: 1,
-      type: "overflow",
-      location: "Sector 4, Main Market",
-      coordinates: [23.2599, 77.4126],
-      time: "2 hours ago",
-      priority: "high",
-      status: "pending",
-      reportedBy: "Citizen - Ramesh Verma",
-      vehicle: "Not Assigned",
-      description: "Dustbin is overflowing, garbage spilling on road",
-      phone: "9876543210"
-    },
-    {
-      id: 2,
-      type: "clean",
-      location: "Zone-A, Ward-12",
-      coordinates: [23.2645, 77.4186],
-      time: "30 mins ago",
-      priority: "low",
-      status: "completed",
-      reportedBy: "Vehicle MH-09-AB-1234",
-      vehicle: "MH-09-AB-1234",
-      description: "Bin cleaned successfully",
-    },
-    {
-      id: 3,
-      type: "missed",
-      location: "Kolar Road, Block-3",
-      coordinates: [23.2520, 77.4050],
-      time: "4 hours ago",
-      priority: "high",
-      status: "flagged",
-      reportedBy: "Citizen - Priya Sharma",
-      vehicle: "Not Assigned",
-      description: "Collection missed for 2 days",
-      phone: "9876543211"
-    },
-    {
-      id: 4,
-      type: "overflow",
-      location: "MP Nagar, Zone-1",
-      coordinates: [23.2315, 77.4245],
-      time: "1 hour ago",
-      priority: "critical",
-      status: "urgent",
-      reportedBy: "Citizen - Ankit Gupta",
-      vehicle: "Not Assigned",
-      description: "Emergency - Bin overflowing near school",
-      phone: "9876543214"
-    },
-  ]);
+  const [complaints, setComplaints] = useState([]);
+  const fetchComplaints = async () => {
+    try {
+      // 1. Get Office ID & Token from LocalStorage
+      const officeId = localStorage.getItem("userId");
+      const token = localStorage.getItem("token"); // If you need auth
+
+      if (!officeId) {
+        console.warn("❌ Office ID missing in localStorage");
+        setLoading(false);
+        return;
+      }
+
+      // 2. Call the Backend API
+      const res = await axios.get(`http://localhost:5001/complaint/all/${officeId}`, {
+        headers: {
+          Authorization: `Bearer ${token}`, // Optional: Add if your route is protected
+        },
+      });
+
+      // 3. Update State
+      if (res.data.success) {
+        setComplaints(res.data.complaints);
+        console.log("✅ Complaints fetched:", res.data.complaints);
+      }
+      console.log("✅ Complaints fetch response:", res.data);
+    } catch (error) {
+      console.error("❌ Error fetching complaints:", error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  // 4. Trigger on Component Load
+  useEffect(() => {
+    fetchComplaints();
+
+    const intervalId = setInterval(() => {
+      fetchComplaints();
+    }, 5000);
+
+    return () => clearInterval(intervalId);
+  }, []); 
 
   const [reviews, setReviews] = useState([
     {
@@ -1280,14 +1291,47 @@ export default function OfficeDashboard() {
     setShowAssignVehicleModal(true);
   };
 
-  const assignVehicleToComplaint = (vehicleNumber) => {
-    setComplaints(complaints.map(c =>
-      c.id === selectedComplaint.id
-        ? { ...c, vehicle: vehicleNumber, status: "assigned" }
-        : c
-    ));
-    setShowAssignVehicleModal(false);
-    alert(`Vehicle ${vehicleNumber} assigned successfully!`);
+  const assignVehicleToComplaint = async (vehicleId) => {
+    // Agar selectedReport set nahi hai to wapas jao
+    if (!selectedReport || !selectedReport._id) return;
+
+    // Logic: Agar backend se grouped data aaya hai to 'complaintIds' array hoga
+    // Agar purana/single data hai to hum manually array bana lenge
+    const idsToSend = selectedReport.complaintIds
+      ? selectedReport.complaintIds
+      : [selectedReport._id];
+
+    try {
+      const token = localStorage.getItem("token");
+
+      // Backend API call
+      const res = await axios.post("http://localhost:5001/complaint/assign-vehicle", {
+        complaintIds: idsToSend, // 🔥 AB HUM ARRAY BHEJ RAHE HAIN
+        vehicleId: vehicleId
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        // UI Update: Table me us row ko update karo
+        setComplaints(prev => prev.map(c =>
+          // Check karo agar ye complaint update hui list ka hissa hai
+          idsToSend.includes(c._id) || c._id === selectedReport._id
+            ? { ...c, vehicle: res.data.vehicleNumber, status: "assigned" }
+            : c
+        ));
+
+        setShowAssignVehicleModal(false);
+        setModalVisible(false);
+        alert(`✅ Vehicle assigned to ${idsToSend.length} reports!`);
+
+        // Data refresh karo taaki sab sync ho jaye
+        fetchComplaints();
+      }
+    } catch (error) {
+      console.error("Assignment Error:", error);
+      alert("❌ Failed to assign vehicle.");
+    }
   };
 
   const getPriorityColor = (priority) => {
@@ -1449,98 +1493,178 @@ export default function OfficeDashboard() {
   }, [dustbins]);
 
   // View: Complaints
-  const ComplaintsView = () => (
-    <>
-      <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
-        <div className="flex items-center justify-between">
-          <div>
-            <h3 className="text-2xl font-bold text-gray-800">📋 Complaint Tracker</h3>
-            <p className="text-sm text-gray-600 mt-1">{complaints.length} total complaints • {stats.pendingComplaints} pending</p>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="px-4 py-2 bg-red-100 text-red-700 rounded-lg font-semibold">
-              {stats.pendingComplaints} Urgent
+  // View: Complaints (Updated for Grouping)
+  // View: Complaints (With Active/History Tabs)
+  const ComplaintsView = () => {
+    // 👇 NEW STATE: Filter ke liye
+    const [viewMode, setViewMode] = useState("active"); // 'active' or 'resolved'
+
+    // Filter Logic
+    const filteredList = complaints.filter(c => {
+      if (viewMode === "active") {
+        // Active wo hain jo resolved/closed nahi hain
+        return c.status !== "resolved" && c.status !== "closed";
+      } else {
+        // History wo hain jo resolved hain
+        return c.status === "resolved" || c.status === "closed";
+      }
+    });
+
+    return (
+      <>
+        <div className="bg-white rounded-xl shadow-lg p-6 mb-6">
+          <div className="flex items-center justify-between">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">📋 Complaint Tracker</h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Manage citizen reports and assignments
+              </p>
+            </div>
+
+            {/* 👇 NEW: Toggle Buttons (Active vs History) */}
+            <div className="flex bg-gray-100 p-1 rounded-lg">
+              <button
+                onClick={() => setViewMode("active")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "active"
+                  ? "bg-white text-blue-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                🔥 Active ({complaints.filter(c => c.status !== 'resolved').length})
+              </button>
+              <button
+                onClick={() => setViewMode("resolved")}
+                className={`px-4 py-2 rounded-lg text-sm font-bold transition-all ${viewMode === "resolved"
+                  ? "bg-white text-green-600 shadow-sm"
+                  : "text-gray-500 hover:text-gray-700"
+                  }`}
+              >
+                ✅ History ({complaints.filter(c => c.status === 'resolved').length})
+              </button>
             </div>
           </div>
         </div>
-      </div>
 
-      <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-        <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
-              <tr>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Priority</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Vehicle</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Time</th>
-                <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
-              </tr>
-            </thead>
-            <tbody className="bg-white divide-y divide-gray-200">
-              {complaints.map((complaint) => (
-                <tr key={complaint.id} className="hover:bg-gray-50 transition-colors">
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${complaint.type === 'clean' ? 'bg-green-100 text-green-800' :
-                      complaint.type === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
-                        'bg-red-100 text-red-800'
-                      }`}>
-                      {complaint.type}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <div className="text-sm font-medium text-gray-900">{complaint.location}</div>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span
-                      className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full uppercase"
-                      style={{
-                        backgroundColor: `${getPriorityColor(complaint.priority)}20`,
-                        color: getPriorityColor(complaint.priority)
-                      }}
-                    >
-                      {complaint.priority}
-                    </span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-700 font-medium">{complaint.status}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-700">{complaint.vehicle}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap">
-                    <span className="text-sm text-gray-500">{complaint.time}</span>
-                  </td>
-                  <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
-                    <div className="flex items-center gap-2">
-                      <button
-                        onClick={() => openReportDetails(complaint)}
-                        className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
-                        title="View Details"
-                      >
-                        <Eye className="w-4 h-4" />
-                      </button>
-                      {complaint.vehicle === "Not Assigned" && (
-                        <button
-                          onClick={() => openAssignVehicle(complaint)}
-                          className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
-                          title="Assign Vehicle"
-                        >
-                          <Truck className="w-4 h-4" />
-                        </button>
-                      )}
-                    </div>
-                  </td>
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gradient-to-r from-gray-50 to-gray-100 border-b-2 border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Reports</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Location</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Priority</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Vehicle</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Latest</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">Actions</th>
                 </tr>
-              ))}
-            </tbody>
-          </table>
+              </thead>
+              <tbody className="bg-white divide-y divide-gray-200">
+                {filteredList.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-10 text-center text-gray-500">
+                      No {viewMode} complaints found.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredList.map((complaint) => (
+                    <tr key={complaint._id} className="hover:bg-gray-50 transition-colors">
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="bg-indigo-100 text-indigo-700 px-3 py-1 rounded-full text-xs font-black shadow-sm border border-indigo-200">
+                          {complaint.complaintCount} Reports
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full 
+                          ${(complaint.complaintType || complaint.type) === 'clean' ? 'bg-green-100 text-green-800' :
+                            (complaint.complaintType || complaint.type) === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
+                              'bg-red-100 text-red-800'
+                          }`}>
+                          {complaint.complaintType || complaint.type || "General"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="text-sm font-bold text-gray-900">
+                          {complaint.dustbinDetails?.name || "Unknown Point"}
+                        </div>
+                        <div className="text-xs text-gray-500">{complaint.area || "Unknown Area"}</div>
+                        {/* Route Name Display */}
+                        <div className="text-xs text-blue-600 font-semibold mt-1">
+                          {complaint.dustbinDetails?.routeName
+                            ? `🛣️ ${complaint.dustbinDetails.routeName}`
+                            : ""}
+                        </div>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span
+                          className="px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full uppercase"
+                          style={{
+                            backgroundColor: `${getPriorityColor(complaint.priority || complaint.latestPriority)}20`,
+                            color: getPriorityColor(complaint.priority || complaint.latestPriority)
+                          }}
+                        >
+                          {complaint.priority || complaint.latestPriority || "Medium"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className={`px-2 py-1 rounded-full text-xs font-bold uppercase tracking-wider shadow-sm ${complaint.status === 'resolved' ? 'bg-green-100 text-green-700 border border-green-200' :
+                          complaint.status === 'assigned' ? 'bg-yellow-100 text-yellow-700 border border-yellow-200' :
+                            'bg-red-100 text-red-700 border border-red-200'
+                          }`}>
+                          {complaint.status}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-700 font-mono">
+                          {complaint.vehicle || "Not Assigned"}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap">
+                        <span className="text-sm text-gray-500">
+                          {formatDateTime(complaint.createdAt || complaint.reportedAt)}
+                        </span>
+                      </td>
+
+                      <td className="px-6 py-4 whitespace-nowrap text-sm font-medium">
+                        <div className="flex items-center gap-2">
+                          <button
+                            onClick={() => openReportDetails(complaint)}
+                            className="p-2 text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title="View Details"
+                          >
+                            <Eye className="w-4 h-4" />
+                          </button>
+
+                          {/* Assign Button sirf tab dikhaye jab Active ho */}
+                          {viewMode === "active" && (!complaint.vehicle || complaint.vehicle === "Not Assigned") && (
+                            <button
+                              onClick={() => openAssignVehicle(complaint)}
+                              className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                              title="Assign Vehicle to Group"
+                            >
+                              <Truck className="w-4 h-4" />
+                            </button>
+                          )}
+                        </div>
+                      </td>
+                    </tr>
+                  ))
+                )}
+              </tbody>
+            </table>
+          </div>
         </div>
-      </div>
-    </>
-  );
+      </>
+    );
+  };
 
   // View: Reviews
   const ReviewsView = () => (
@@ -3167,84 +3291,185 @@ export default function OfficeDashboard() {
       )}
 
       {/* Report Detail Modal */}
+      {/* Report Detail Modal - Updated with Image & Assign Option */}
+      {/* Report Detail Modal */}
       {modalVisible && selectedReport && (
         <div
-          className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4"
+          className="fixed inset-0 bg-black/80 backdrop-blur-md z-50 flex items-center justify-center p-4 md:p-10"
           onClick={() => setModalVisible(false)}
         >
           <div
-            className="bg-white rounded-2xl p-6 w-full max-w-2xl max-h-[80vh] overflow-y-auto shadow-2xl"
+            className="bg-white rounded-[2rem] w-full max-w-6xl h-full max-h-[85vh] overflow-hidden shadow-2xl flex flex-col md:flex-row animate-in fade-in zoom-in duration-300"
             onClick={(e) => e.stopPropagation()}
           >
-            <div className="flex justify-between items-center mb-6">
-              <h2 className="text-2xl font-bold text-gray-800">📋 Complaint Details</h2>
-              <button
-                onClick={() => setModalVisible(false)}
-                className="w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors"
-              >
-                <X className="w-5 h-5" />
-              </button>
-            </div>
 
-            <div className="space-y-4">
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Location:</span>
-                <span className="font-bold text-gray-800">{selectedReport.location}</span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Type:</span>
-                <span className="font-bold text-gray-800 capitalize">{selectedReport.type}</span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Priority:</span>
-                <span
-                  className="font-bold uppercase"
-                  style={{ color: getPriorityColor(selectedReport.priority) }}
-                >
-                  {selectedReport.priority}
-                </span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Reported By:</span>
-                <span className="font-bold text-gray-800">{selectedReport.reportedBy}</span>
-              </div>
-              {selectedReport.phone && (
-                <div className="flex justify-between py-3 border-b">
-                  <span className="font-semibold text-gray-600">Phone:</span>
-                  <span className="font-bold text-gray-800">{selectedReport.phone}</span>
+            {/* Left Side: Image Section */}
+            <div className="w-full md:w-[55%] bg-gray-900 relative group h-64 md:h-auto">
+              {selectedReport.image || selectedReport.ComimageUrl ? (
+                <img
+                  src={selectedReport.image || selectedReport.ComimageUrl}
+                  alt="Complaint Proof"
+                  className="w-full h-full object-contain md:object-cover transition-transform duration-500 group-hover:scale-105"
+                />
+              ) : (
+                <div className="w-full h-full flex flex-col items-center justify-center text-gray-500">
+                  <span className="text-6xl mb-4">📷</span>
+                  <p className="text-lg font-semibold">No Image Provided</p>
                 </div>
               )}
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Vehicle:</span>
-                <span className="font-bold text-gray-800">{selectedReport.vehicle}</span>
-              </div>
-              <div className="flex justify-between py-3 border-b">
-                <span className="font-semibold text-gray-600">Time:</span>
-                <span className="font-bold text-gray-800">{selectedReport.time}</span>
-              </div>
-              <div className="py-3">
-                <span className="font-semibold text-gray-600">Description:</span>
-                <p className="text-gray-800 mt-2 bg-gray-50 p-3 rounded-lg">{selectedReport.description}</p>
+
+              {/* Status Badge Overlay */}
+              <div className="absolute top-6 left-6 flex gap-2">
+                <span className={`px-5 py-2 text-xs font-black rounded-full uppercase shadow-2xl backdrop-blur-xl border border-white/20 bg-white/90 ${selectedReport.status === 'resolved' ? 'text-green-700' : 'text-gray-800'
+                  }`}>
+                  {selectedReport.status}
+                </span>
+                <span
+                  className="px-5 py-2 text-xs font-black rounded-full uppercase shadow-2xl border border-white/20"
+                  style={{
+                    backgroundColor: getPriorityColor(selectedReport.priority || selectedReport.latestPriority),
+                    color: '#fff'
+                  }}
+                >
+                  {(selectedReport.priority || selectedReport.latestPriority) || 'Medium'} Priority
+                </span>
               </div>
             </div>
 
-            <div className="flex gap-3 mt-6">
-              {selectedReport.phone && (
-                <button className="flex-1 py-3 bg-blue-600 hover:bg-blue-700 rounded-lg font-bold text-white transition-colors">
-                  📞 Call Citizen
-                </button>
-              )}
-              {selectedReport.vehicle === "Not Assigned" && (
+            {/* Right Side: Details & Actions */}
+            <div className="w-full md:w-[45%] p-8 md:p-10 flex flex-col bg-white overflow-y-auto">
+
+              {/* Header */}
+              <div className="flex justify-between items-start mb-6">
+                <div>
+                  <h2 className="text-3xl font-black text-gray-900 tracking-tight">Complaint Info</h2>
+
+                  {/* Location & Count Badge */}
+                  <div className="mt-2 flex flex-wrap items-center gap-2">
+                    <span className="text-blue-600 font-bold bg-blue-50 px-3 py-1 rounded-lg border border-blue-100 flex items-center gap-2">
+                      🗑️ {selectedReport.dustbinDetails?.name || selectedReport.dustbinId?.name || "Unknown Bin"}
+                    </span>
+
+                    {/* Show +Count if grouped */}
+                    {selectedReport.complaintCount > 1 && (
+                      <span className="bg-indigo-600 text-white px-2 py-1 rounded-lg text-xs font-bold shadow-sm">
+                        +{selectedReport.complaintCount - 1} Others Reported
+                      </span>
+                    )}
+                  </div>
+                </div>
+
                 <button
-                  onClick={() => {
-                    setModalVisible(false);
-                    openAssignVehicle(selectedReport);
-                  }}
-                  className="flex-1 py-3 bg-green-600 hover:bg-green-700 rounded-lg font-bold text-white transition-colors"
+                  onClick={() => setModalVisible(false)}
+                  className="p-2 bg-gray-100 rounded-full hover:bg-red-50 hover:text-red-600 transition-all active:scale-90"
                 >
-                  🚛 Assign Vehicle
+                  <X className="w-6 h-6" />
                 </button>
-              )}
+              </div>
+
+              {/* Details Content */}
+              <div className="space-y-6 flex-1">
+
+                <div className="grid grid-cols-2 gap-4">
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">About</p>
+                    <p className="text-gray-800 font-bold text-lg capitalize">{selectedReport.latestDescription || selectedReport.type || "General"}</p>
+                  </div>
+                  <div className="p-4 bg-gray-50 rounded-2xl border border-gray-100">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-1">Reported At</p>
+                    <p className="text-gray-800 font-bold text-lg">
+                      {formatDateTime(selectedReport.reportedAt || selectedReport.createdAt || selectedReport.time)}
+                    </p>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-gradient-to-br from-blue-50 to-indigo-50 rounded-2xl border border-blue-100">
+                  <p className="text-[10px] text-blue-400 font-bold uppercase tracking-widest mb-2">Route Details</p>
+                  <div className="flex items-center gap-3 text-indigo-900">
+                    <div className="w-10 h-10 bg-white rounded-xl flex items-center justify-center shadow-sm">
+                      <MapPinIcon className="w-5 h-5 text-blue-600" />
+                    </div>
+                    <div>
+                      <p className="font-black text-lg leading-tight">
+                        {/* Safe Check for Route Name */}
+                        {selectedReport.dustbinDetails?.routeName?.name || selectedReport.dustbinId?.routeId?.name || "No Route Assigned"}
+                      </p>
+                      <p className="text-xs text-indigo-600 mt-1">{selectedReport.area || "Area not specified"}</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div className="p-5 bg-amber-50 rounded-2xl border border-amber-100 relative">
+                  <p className="text-[10px] text-amber-500 font-bold uppercase tracking-widest mb-2">Latest Note</p>
+                  <p className="text-amber-900 font-medium leading-relaxed italic text-sm">
+                    "{selectedReport.description || selectedReport.latestDescription || "No comments provided."}"
+                  </p>
+                </div>
+
+                {/* Current Vehicle Status */}
+                <div className="pt-2">
+                  <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">Dispatch Status</p>
+                  {selectedReport.vehicle && selectedReport.vehicle !== "Not Assigned" ? (
+                    <div className="flex items-center gap-4 p-4 bg-green-50 rounded-2xl text-green-700 font-black border-2 border-green-100">
+                      <div className="w-12 h-12 bg-green-500 text-white rounded-xl flex items-center justify-center shadow-lg shadow-green-200">
+                        <Truck className="w-6 h-6" />
+                      </div>
+                      <div>
+                        <p className="text-lg leading-none">{selectedReport.vehicle}</p>
+                        <p className="text-xs font-bold opacity-70 mt-1">Vehicle On Duty</p>
+                      </div>
+                    </div>
+                  ) : (
+                    <div className="flex items-center gap-3 p-4 bg-red-50 rounded-2xl text-red-600 border border-red-100">
+                      <AlertCircle className="w-5 h-5 animate-pulse" />
+                      <p className="font-bold">Awaiting Vehicle Assignment</p>
+                    </div>
+                  )}
+                </div>
+              </div>
+
+              {/* Action Area */}
+              <div className="mt-6 pt-6 border-t-2 border-dashed border-gray-100">
+                {(!selectedReport.vehicle || selectedReport.vehicle === "Not Assigned") && selectedReport.status !== 'resolved' ? (
+                  <div className="space-y-4">
+                    <label className="text-sm font-black text-gray-800 ml-1">Quick Dispatch</label>
+                    <div className="flex flex-col sm:flex-row gap-3">
+                      <select
+                        className="flex-1 bg-white border-2 border-gray-200 text-gray-900 text-sm font-bold rounded-2xl focus:ring-4 focus:ring-blue-100 focus:border-blue-500 block w-full p-3 transition-all outline-none"
+                        id="quickAssignSelect"
+                      >
+                        <option value="">Select Available Vehicle</option>
+                        {vehicles.filter(v => v.status === "Active" || v.status === "idle").map(v => (
+                          <option key={v._id} value={v._id}>
+                            🚚 {v.vehicleNumber} ({v.type || "Truck"})
+                          </option>
+                        ))}
+                      </select>
+                      <button
+                        onClick={() => {
+                          const select = document.getElementById('quickAssignSelect');
+                          if (select.value) {
+                            assignVehicleToComplaint(select.value); // Yeh function grouped logic handle karega
+                          } else {
+                            alert("Please select a vehicle first");
+                          }
+                        }}
+                        className="px-6 py-3 bg-blue-600 hover:bg-blue-700 text-white font-black rounded-2xl transition-all shadow-xl shadow-blue-200 flex items-center justify-center gap-2 active:scale-95"
+                      >
+                        Assign
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  <button
+                    onClick={() => setModalVisible(false)}
+                    className="w-full py-4 bg-gray-900 hover:bg-black text-white font-black rounded-2xl transition-all shadow-xl active:scale-95"
+                  >
+                    Close Details
+                  </button>
+                )}
+              </div>
+
             </div>
           </div>
         </div>

@@ -64,6 +64,35 @@ export default function CitizenPage() {
   const [myComplaints, setMyComplaints] = useState([]);
   const [selectedBin, setSelectedBin] = useState(null);
   const fileInputRef = useRef(null);
+  // Add these inside existing useState definitions
+  const [verifying, setVerifying] = useState(false); // To show loading spinner
+  const [aiResult, setAiResult] = useState(null);    // To store AI result (Clean/Overflow)
+  const [fileToUpload, setFileToUpload] = useState(null); // To store actual file for API
+  const [isSubmitting, setIsSubmitting] = useState(false); // For final submit loading
+  const [areaStats, setAreaStats] = useState({ cleanedToday: 0, activeVehicles: 0, pendingBins: 0 });
+  const [activeVehiclesnear, setActiveVehicles] = useState([]);
+
+  const fetchNearbyVehicles = async (lat, lng) => {
+    try {
+      const res = await axios.get(`http://localhost:5001/citizen/active-vehicles-nearby?lat=${lat}&lng=${lng}`);
+      if (res.data.success) {
+        setActiveVehicles(res.data.vehicles);
+      }
+    } catch (err) {
+      console.error(err);
+    }
+  };
+
+  const fetchAreaStats = async (lat, lng) => {
+    try {
+      const res = await axios.get(`http://localhost:5001/citizen/area-stats?lat=${lat}&lng=${lng}`);
+      if (res.data.success) {
+        setAreaStats(res.data.stats);
+      }
+    } catch (err) {
+      console.error("Stats fetch error", err);
+    }
+  };
 
   const [dustbins, setDustbins] = useState([]);
   const [L, setL] = useState(null);
@@ -110,6 +139,7 @@ export default function CitizenPage() {
         localStorage.removeItem("user");
         localStorage.removeItem("role");
         localStorage.removeItem("userId");
+        localStorage.removeItem("officeId");
 
         // 4. Cookies manually clear karna
         document.cookie = "token=; Max-Age=0; path=/;";
@@ -217,6 +247,8 @@ export default function CitizenPage() {
 
           // Reverse geocode to get address
           reverseGeocode(latitude, longitude);
+          fetchAreaStats(latitude, longitude);
+          fetchNearbyVehicles(latitude, longitude);
         },
         (error) => {
           console.error('Error getting location:', error);
@@ -432,20 +464,66 @@ export default function CitizenPage() {
     ? dustbins
     : dustbins.filter(bin => bin.status === filterStatus);
 
-  const handleImageUpload = (e) => {
+  const handleImageUpload = async (e) => {
     const file = e.target.files[0];
     if (file) {
+      // 1. Show Preview Immediately
+      setFileToUpload(file);
       const reader = new FileReader();
       reader.onloadend = () => {
         setImage(reader.result);
-        setStatus("ready");
       };
       reader.readAsDataURL(file);
+
+      // 2. Start AI Verification
+      setVerifying(true);
+      setAiResult(null); // Reset previous result
+      setStatus("verifying"); // Update UI status
+
+      try {
+        const token = localStorage.getItem("token");
+        const formData = new FormData();
+        formData.append("image", file);
+
+        // If a bin is selected, send its ID for better context (optional)
+        if (selectedBin) {
+          formData.append("dustbinId", selectedBin._id);
+        }
+
+        // 3. Call the AI Prediction API (Same as Vehicle Page)
+        const res = await axios.post("http://localhost:5001/api/predict", formData, {
+          headers: {
+            "Content-Type": "multipart/form-data",
+            Authorization: `Bearer ${token}`,
+          },
+        });
+
+        const { status: apiStatus, confidence } = res.data;
+
+        // 4. Update UI based on AI Logic
+        setAiResult({ status: apiStatus, confidence });
+
+        if (apiStatus === "empty" || apiStatus === "clean") {
+          // If AI says clean, warn the citizen (Why report a clean bin?)
+          alert(`⚠️ AI Analysis: This bin looks CLEAN (${confidence}%).`);
+          setStatus("ready"); // Still allow them to submit if they insist
+        } else {
+          // If AI detects garbage/overflow
+          setStatus("ready");
+        }
+
+      } catch (err) {
+        console.error("AI Verification Failed:", err);
+        alert("⚠️ AI could not verify the image. You can still submit manually.");
+        setStatus("ready");
+      } finally {
+        setVerifying(false);
+      }
     }
   };
 
-  const handleSubmit = () => {
-    if (!image) {
+  const handleSubmit = async () => {
+    if (!image || !fileToUpload) {
       alert("📸 Please take a photo of the issue first!");
       return;
     }
@@ -455,27 +533,55 @@ export default function CitizenPage() {
       return;
     }
 
-    // Add new complaint
-    const newComplaint = {
-      id: myComplaints.length + 1,
-      location: selectedBin.address,
-      binName: selectedBin.name,
-      binCode: selectedBin.binCode,
-      status: "pending",
-      submittedAt: "Just now",
-      expectedTime: "Within 2 hours",
-      vehicle: "Assigning...",
-      image: image
-    };
+    setIsSubmitting(true);
 
-    setMyComplaints([newComplaint, ...myComplaints]);
-    setStatus("submitted");
-    setShowNotification(true);
-    setTimeout(() => setShowNotification(false), 3000);
+    // Prepare data for backend
+    const formData = new FormData();
+    formData.append("officeId", localStorage.getItem("officeId")); // Assuming generic office
+    formData.append("citizenId", localStorage.getItem("userId"));
+    formData.append("dustbinId", selectedBin._id);
+    formData.append("complaintType", "Waste Dumping"); // Or dynamic based on AI
+    formData.append("description", `Reported via App. AI Status: ${aiResult?.status || "Manual"}`);
+    formData.append("latitude", selectedBin.latitude);
+    formData.append("longitude", selectedBin.longitude);
+    formData.append("area", selectedBin.area);
+    formData.append("priority", aiResult?.status === "overflow" ? "high" : "medium");
+    formData.append("image", fileToUpload); // Send actual file
+
+    // Add vehicle details if valid (Optional, based on your schema)
+    formData.append("status", "pending");
+
+    try {
+      const token = localStorage.getItem("token");
+      await axios.post("http://localhost:5001/citizen/complaint/create", formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+      });
+
+      // Success UI
+      setShowNotification(true);
+      setStatus("submitted");
+      setImage(null);
+      setFileToUpload(null);
+      setAiResult(null);
+      setSelectedBin(null);
+
+      setTimeout(() => setShowNotification(false), 3000);
+
+    } catch (error) {
+      console.error("Submission error", error);
+      alert("❌ Failed to submit complaint. Please try again.");
+    } finally {
+      setIsSubmitting(false);
+    }
   };
 
   const handleRetake = () => {
     setImage(null);
+    setFileToUpload(null); // Add this
+    setAiResult(null);     // Add this
     setStatus("waiting");
     if (fileInputRef.current) {
       fileInputRef.current.value = "";
@@ -510,6 +616,32 @@ export default function CitizenPage() {
     // }
   };
 
+  // Add inside Component
+  const fetchMyComplaints = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const userId = localStorage.getItem("userId");
+      if (!userId) return;
+
+      const res = await axios.get(`http://localhost:5001/citizen/complaint/history/${userId}`, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      if (res.data.success) {
+        setMyComplaints(res.data.complaints);
+        console.log("My Complaints:", res.data.complaints);
+      }
+    } catch (err) {
+      console.error("Error loading history", err);
+    }
+  };
+
+  // Add to useEffect
+  useEffect(() => {
+    // ... existing calls
+    fetchMyComplaints(); // <--- Call this here
+  }, []);
+
   const getStatusColor = (status) => {
     switch (status) {
       case "resolved": return "green";
@@ -520,10 +652,10 @@ export default function CitizenPage() {
   };
 
   return (
-    <div className="min-h-screen bg-gray-100">
+    <div className="relative min-h-screen bg-gray-100">
       {/* Success Notification */}
       {showNotification && (
-        <div className="fixed top-4 right-4 z-50 bg-green-500 text-white px-6 py-4 rounded-xl shadow-2xl animate-slide-in-right flex items-center gap-3">
+        <div className="fixed top-4 right-4 bg-green-500 text-white px-6 py-4 rounded-xl shadow-2xl animate-slide-in-right flex items-center gap-3 z-[9999]">
           <span className="text-2xl">✅</span>
           <div>
             <p className="font-bold">Success!</p>
@@ -534,7 +666,7 @@ export default function CitizenPage() {
 
       {/* Location Permission Modal */}
       {locationPermission === "prompt" && selectedTab === "track" && (
-        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-50 flex items-center justify-center p-4">
+        <div className="fixed inset-0 bg-black/50 backdrop-blur-sm z-[9998] flex items-center justify-center p-4">
           <div className="bg-white rounded-3xl p-8 max-w-md w-full shadow-2xl transform animate-scale-in">
             <div className="text-center mb-6">
               <div className="w-20 h-20 bg-blue-100 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -590,7 +722,7 @@ export default function CitizenPage() {
       )}
 
       {/* Header */}
-      <header className="bg-blue-800 text-white shadow-lg">
+      <header className="bg-blue-800 text-white shadow-lg relative z-50">
         <div className="container mx-auto px-5 py-4">
           <div className="flex items-center justify-between">
             <div className="flex items-center gap-4">
@@ -655,11 +787,11 @@ export default function CitizenPage() {
       </header>
 
       {/* Main Content */}
-      <main className="container mx-auto px-5 py-6 pb-32">
+      <main className="container mx-auto px-5 py-6 pb-32 relative z-10">
         {selectedTab === "report" ? (
           <>
             {/* Step 1: Location Status Card */}
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6">
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 relative z-20">
               <div className="bg-blue-600 p-5">
                 <div className="flex items-center justify-between">
                   <div className="flex items-center gap-3">
@@ -710,7 +842,7 @@ export default function CitizenPage() {
             </div>
 
             {/* Step 2: Interactive Map - Select Dustbin */}
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6">
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 relative z-20">
               <div className="bg-purple-600 p-5">
                 <div className="flex items-center gap-3">
                   <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
@@ -726,13 +858,14 @@ export default function CitizenPage() {
               <div className="p-6">
 
                 {/* Map */}
-                <div className="h-96 rounded-2xl overflow-hidden border-2 border-gray-200 mb-4">
+                <div className="h-96 rounded-2xl overflow-hidden border-2 border-gray-200 mb-4 relative z-0">
                   {isMapReady && typeof window !== 'undefined' && (
                     <MapContainer
                       center={dustbins.length > 0 ? dustbins[0].coordinates : [23.2599, 77.4126]}
                       zoom={14}
                       style={{ height: '100%', width: '100%' }}
                       scrollWheelZoom={true}
+                      className="map-container-custom"
                     >
                       <TileLayer
                         url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
@@ -817,7 +950,7 @@ export default function CitizenPage() {
                 </div>
 
                 {/* Map Legend */}
-                <div className="flex justify-center gap-4 flex-wrap text-xs">
+                <div className="flex justify-center gap-4 flex-wrap text-xs relative z-10">
                   {[
                     { icon: "📍", label: "Your Location", color: "text-blue-600" },
                     { icon: "✅", label: "Clean Bin", color: "text-green-600" },
@@ -832,7 +965,7 @@ export default function CitizenPage() {
                 </div>
 
                 {!selectedBin && (
-                  <p className="text-center text-sm text-purple-600 font-semibold mt-4">
+                  <p className="text-center text-sm text-purple-600 font-semibold mt-4 relative z-10">
                     👆 Click on any dustbin marker to select it for your complaint
                   </p>
                 )}
@@ -840,8 +973,9 @@ export default function CitizenPage() {
             </div>
 
             {/* Step 3: Photo Card */}
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 transform transition-all hover:shadow-2xl">
-              <div className="bg-amber-500 p-5 flex items-center gap-3">
+            {/* Step 3: Photo Card */}
+            <div className={`bg-white rounded-3xl shadow-xl overflow-hidden mb-6 transform transition-all duration-300 ${!selectedBin ? 'opacity-50 grayscale cursor-not-allowed' : 'hover:shadow-2xl'}`}>
+              <div className={`p-5 flex items-center gap-3 ${!selectedBin ? 'bg-gray-400' : 'bg-amber-500'}`}>
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
                   <span className="text-lg font-bold text-gray-800">3</span>
                 </div>
@@ -851,24 +985,49 @@ export default function CitizenPage() {
                 </div>
               </div>
 
-              <div className="p-6">
+              <div className="p-6 relative">
+
+                {/* Overlay for Disabled State */}
+                {!selectedBin && (
+                  <div className="absolute inset-0 z-10 bg-white/60 backdrop-blur-[1px] flex flex-col items-center justify-center text-center p-4">
+                    <div className="bg-white p-4 rounded-2xl shadow-lg border-2 border-red-100 animate-bounce">
+                      <span className="text-3xl block mb-2">👆</span>
+                      <p className="font-bold text-red-500">First Select a Dustbin</p>
+                      <p className="text-xs text-gray-500">Tap a marker on the map above</p>
+                    </div>
+                  </div>
+                )}
+
                 <div
-                  onClick={() => fileInputRef.current?.click()}
-                  className={`w-full h-60 rounded-2xl border-3 border-dashed ${image ? 'border-blue-300' : 'border-blue-300 bg-blue-50'
-                    } overflow-hidden cursor-pointer transition-all hover:border-blue-500 hover:shadow-lg group`}
+                  onClick={() => {
+                    if (selectedBin) fileInputRef.current?.click();
+                    else alert("🚫 Please select a dustbin from the map first!");
+                  }}
+                  className={`w-full h-60 rounded-2xl border-3 border-dashed overflow-hidden transition-all group
+                    ${!selectedBin
+                      ? 'border-gray-300 bg-gray-50'
+                      : image
+                        ? 'border-blue-300'
+                        : 'border-blue-300 bg-blue-50 cursor-pointer hover:border-blue-500 hover:shadow-lg'
+                    }`}
                 >
                   {image ? (
                     <img src={image} alt="Uploaded" className="w-full h-full object-cover" />
                   ) : (
                     <div className="flex flex-col items-center justify-center h-full p-5 group-hover:scale-105 transition-transform">
-                      <div className="w-20 h-20 bg-blue-800 rounded-full flex items-center justify-center mb-4 shadow-lg group-hover:shadow-xl transition-all">
+                      <div className={`w-20 h-20 rounded-full flex items-center justify-center mb-4 shadow-lg transition-all ${!selectedBin ? 'bg-gray-300' : 'bg-blue-800 group-hover:shadow-xl'}`}>
                         <span className="text-4xl">📸</span>
                       </div>
-                      <h3 className="text-lg font-bold text-gray-800 mb-2">Tap to Upload Photo</h3>
-                      <p className="text-sm text-gray-600 text-center">Take a photo of the overflowing bin or dirty area</p>
+                      <h3 className={`text-lg font-bold mb-2 ${!selectedBin ? 'text-gray-400' : 'text-gray-800'}`}>
+                        {selectedBin ? "Tap to Upload Photo" : "Upload Disabled"}
+                      </h3>
+                      <p className="text-sm text-gray-500 text-center">
+                        {selectedBin ? "Take a photo of the overflowing bin or dirty area" : "Select a location to enable camera"}
+                      </p>
                     </div>
                   )}
                 </div>
+
                 <input
                   ref={fileInputRef}
                   type="file"
@@ -876,6 +1035,7 @@ export default function CitizenPage() {
                   capture="environment"
                   onChange={handleImageUpload}
                   className="hidden"
+                  disabled={!selectedBin} // Disable input itself
                 />
 
                 {image && (
@@ -890,34 +1050,56 @@ export default function CitizenPage() {
             </div>
 
             {/* Step 4: Review & Submit Card */}
-            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6">
+            <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 relative z-20">
               <div className="bg-green-500 p-5 flex items-center gap-3">
                 <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
                   <span className="text-lg font-bold text-gray-800">4</span>
                 </div>
                 <div>
                   <h2 className="text-lg font-bold text-white">Review & Submit</h2>
-                  <p className="text-sm text-white/90">Check details before submitting</p>
+                  <p className="text-sm text-white/90">AI Verification Status</p>
                 </div>
               </div>
 
               <div className="p-6">
+                {/* Loading State */}
+                {verifying && (
+                  <div className="flex flex-col items-center justify-center p-4">
+                    <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                    <p className="text-sm font-bold text-blue-600">🤖 AI is analyzing photo...</p>
+                  </div>
+                )}
+
+                {/* AI Result Display */}
+                {!verifying && aiResult && (
+                  <div className={`mb-4 p-3 rounded-xl border-l-4 ${aiResult.status === 'clean' || aiResult.status === 'empty' ? 'bg-green-50 border-green-500' : 'bg-red-50 border-red-500'
+                    }`}>
+                    <p className="text-xs font-bold uppercase text-gray-500">AI Detection Result</p>
+                    <p className={`text-lg font-bold ${aiResult.status === 'clean' || aiResult.status === 'empty' ? 'text-green-700' : 'text-red-700'
+                      }`}>
+                      {aiResult.status === 'clean' || aiResult.status === 'empty' ? "✅ Bin Looks Clean" : "⚠️ Garbage / Overflow"}
+                    </p>
+                    <p className="text-xs text-gray-500">Confidence: {aiResult.confidence}%</p>
+                  </div>
+                )}
+
+                {/* Status Bar */}
                 <div className={`flex items-center gap-4 p-4 rounded-2xl transition-all ${status === "submitted" ? "bg-green-100" :
-                  status === "ready" ? "bg-amber-100" : "bg-gray-100"
+                  status === "ready" ? "bg-blue-100" : "bg-gray-100"
                   }`}>
                   <div className={`w-12 h-12 rounded-xl flex items-center justify-center shadow-md flex-shrink-0 ${status === "submitted" ? "bg-green-500" :
-                    status === "ready" ? "bg-amber-500" : "bg-gray-400"
+                    status === "ready" ? "bg-blue-500" : "bg-gray-400"
                     }`}>
                     <span className="text-2xl">
-                      {status === "submitted" ? "✅" : status === "ready" ? "⚡" : "⏳"}
+                      {status === "submitted" ? "✅" : status === "ready" ? "👍" : "⏳"}
                     </span>
                   </div>
                   <div className="flex-1">
-                    <p className="text-xs font-semibold text-gray-600 mb-1">Status</p>
+                    <p className="text-xs font-semibold text-gray-600 mb-1">Current Status</p>
                     <p className={`text-base font-bold ${status === "submitted" ? "text-green-600" :
-                      status === "ready" ? "text-amber-600" : "text-gray-600"
+                      status === "ready" ? "text-blue-600" : "text-gray-600"
                       }`}>
-                      {status === "submitted" ? "Successfully Submitted!" :
+                      {status === "submitted" ? "Complaint Registered" :
                         status === "ready" ? "Ready to Submit" : "Waiting for Photo"}
                     </p>
                   </div>
@@ -926,7 +1108,7 @@ export default function CitizenPage() {
             </div>
 
             {/* Tips Card */}
-            <div className="bg-blue-50 rounded-3xl p-6 border-2 border-blue-200 mb-6">
+            <div className="bg-blue-50 rounded-3xl p-6 border-2 border-blue-200 mb-6 relative z-20">
               <h3 className="text-lg font-bold text-blue-800 mb-4">💡 Quick Tips</h3>
               <ul className="space-y-3">
                 {[
@@ -945,222 +1127,112 @@ export default function CitizenPage() {
           </>
         ) : (
           <>
-            {/* My Complaints Section */}
-            {myComplaints.length > 0 && (
-              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6">
-                <h2 className="text-xl font-bold text-gray-800 mb-4">📋 My Complaints</h2>
+            {/* 📜 Complaint History Section (Only keep this one) */}
+            <div className="bg-white rounded-3xl p-6 shadow-xl mb-6 relative z-20">
+              <div className="flex justify-between items-center mb-4">
+                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2">
+                  <span>📜</span> My complaints History
+                </h2>
+                <span className="text-xs font-bold text-blue-600 bg-blue-50 px-3 py-1 rounded-full">
+                  {myComplaints.length} Records
+                </span>
+              </div>
 
-                <div className="space-y-3">
-                  {myComplaints.map((complaint) => {
-                    const color = getStatusColor(complaint.status);
-                    return (
-                      <div key={complaint.id} className={`bg-${color}-50 border-2 border-${color}-200 rounded-2xl p-4`}>
-                        <div className="flex items-start gap-4">
-                          <div className={`w-12 h-12 bg-${color}-500 rounded-xl flex items-center justify-center flex-shrink-0`}>
-                            <span className="text-xl text-white">
-                              {complaint.status === "resolved" ? "✅" :
-                                complaint.status === "in-progress" ? "🔄" : "⏳"}
+              {/* Scrollable List */}
+              <div className="space-y-4 max-h-[500px] overflow-y-auto pr-2 custom-scrollbar">
+
+                {myComplaints.length === 0 ? (
+                  <div className="text-center py-10 flex flex-col items-center opacity-60">
+                    <div className="text-6xl mb-2">📭</div>
+                    <p className="text-gray-500 font-medium">No complaints registered yet.</p>
+                    <p className="text-xs text-gray-400">Your reports will appear here.</p>
+                  </div>
+                ) : (
+                  myComplaints.map((complaint, index) => (
+                    <div
+                      // 🛠️ FIX: Safe Key Logic
+                      key={complaint._id || complaint.id || index}
+                      className="group flex gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50 hover:bg-white hover:shadow-md transition-all duration-300"
+                    >
+                      {/* Left: Image or Icon */}
+                      <div className="w-20 h-20 flex-shrink-0 rounded-xl overflow-hidden bg-gray-200 border border-gray-200 relative">
+                        {complaint.ComimageUrl ? (
+                          <img
+                            src={complaint.ComimageUrl}
+                            alt="Proof"
+                            className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-500"
+                          />
+                        ) : (
+                          <div className="w-full h-full flex items-center justify-center text-2xl">🗑️</div>
+                        )}
+
+                        {/* Status Overlay on Image */}
+                        <div className="absolute bottom-0 left-0 right-0 bg-black/60 backdrop-blur-[2px] py-1 flex justify-center">
+                          <span className={`text-[10px] font-bold uppercase ${complaint.status === 'resolved' ? 'text-green-400' :
+                            complaint.status === 'pending' ? 'text-yellow-400' : 'text-blue-400'
+                            }`}>
+                            {complaint.status}
+                          </span>
+                        </div>
+                      </div>
+
+                      {/* Right: Content */}
+                      <div className="flex-1 flex flex-col justify-between">
+
+                        {/* Header: Location & Time */}
+                        <div>
+                          <div className="flex justify-between items-start">
+                            <h4 className="font-bold text-gray-800 text-sm line-clamp-1">
+                              {/* Safe Check for Dustbin Object */}
+                              {typeof complaint.dustbinId === 'object' ? complaint.dustbinId.name : "Location Unavailable"}
+                            </h4>
+                            <span className="text-[10px] text-gray-500 font-mono whitespace-nowrap bg-white px-2 py-0.5 rounded border border-gray-200">
+                              {new Date(complaint.createdAt || Date.now()).toLocaleDateString('en-IN', { day: '2-digit', month: 'short' })}
+                            </span>
+                          </div>
+                          <p className="text-xs text-gray-500 mt-1 line-clamp-1">
+                            {typeof complaint.dustbinId === 'object' ? complaint.dustbinId.area : complaint.area || "Area not available"}
+                          </p>
+                        </div>
+
+                        {/* Footer: Details & Vehicle */}
+                        <div className="mt-3 flex items-center justify-between">
+                          <div className="flex items-center gap-2">
+                            <span className={`px-2 py-1 rounded text-[10px] font-bold border ${complaint.status === 'resolved' ? 'bg-green-50 border-green-200 text-green-700' :
+                              complaint.status === 'assigned' ? 'bg-blue-50 border-blue-200 text-blue-700' :
+                                'bg-amber-50 border-amber-200 text-amber-700'
+                              }`}>
+                              {complaint.status === 'resolved' ? '✅ Cleaned' :
+                                complaint.status === 'assigned' ? '🚛 On Way' : '⏳ Pending'}
                             </span>
                           </div>
 
-                          <div className="flex-1 min-w-0">
-                            <div className="flex items-center justify-between mb-2">
-                              <p className="font-bold text-gray-800">{complaint.location}</p>
-                              <span className={`px-3 py-1 bg-${color}-100 border border-${color}-300 rounded-lg text-xs font-bold text-${color}-700 uppercase`}>
-                                {complaint.status.replace('-', ' ')}
-                              </span>
+                          {/* Vehicle Info (If Assigned) */}
+                          {complaint.vehicle && complaint.vehicle !== "Not Assigned" && (
+                            <div className="flex items-center gap-1 text-[10px] font-semibold text-gray-600 bg-gray-200 px-2 py-1 rounded-lg">
+                              <span>🚛</span>
+                              <span>{complaint.vehicle}</span>
                             </div>
-
-                            <div className="space-y-1 text-sm">
-                              <p className="text-gray-600">
-                                <span className="font-semibold">Submitted:</span> {complaint.submittedAt}
-                              </p>
-                              {complaint.status === "resolved" && (
-                                <>
-                                  <p className="text-green-600">
-                                    <span className="font-semibold">Resolved:</span> {complaint.resolvedAt}
-                                  </p>
-                                  <p className="text-gray-600">
-                                    <span className="font-semibold">Vehicle:</span> {complaint.vehicle}
-                                  </p>
-                                </>
-                              )}
-                              {complaint.status === "in-progress" && (
-                                <>
-                                  <p className="text-blue-600">
-                                    <span className="font-semibold">Expected:</span> {complaint.expectedTime}
-                                  </p>
-                                  <p className="text-gray-600">
-                                    <span className="font-semibold">Assigned to:</span> {complaint.vehicle}
-                                  </p>
-                                </>
-                              )}
-                              {complaint.status === "pending" && (
-                                <p className="text-amber-600">
-                                  <span className="font-semibold">Expected:</span> {complaint.expectedTime}
-                                </p>
-                              )}
-                            </div>
-                          </div>
+                          )}
                         </div>
                       </div>
-                    );
-                  })}
-                </div>
-              </div>
-            )}
-
-            {/* Filter Buttons */}
-            <div className="bg-white rounded-2xl p-4 mb-6 shadow-lg">
-              <p className="text-sm font-semibold text-gray-600 mb-3">Filter Nearby Bins:</p>
-              <div className="flex flex-wrap gap-2">
-                {[
-                  { label: "All", value: "all", icon: "🔍" },
-                  { label: "Clean", value: "clean", icon: "✅" },
-                  { label: "Overflow", value: "overflow", icon: "⚠️" },
-                  { label: "Pending", value: "pending", icon: "⏳" }
-                ].map((filter) => (
-                  <button
-                    key={filter.value}
-                    onClick={() => setFilterStatus(filter.value)}
-                    className={`px-4 py-2 rounded-xl font-semibold text-sm transition-all transform hover:scale-105 ${filterStatus === filter.value
-                      ? "bg-blue-800 text-white shadow-lg"
-                      : "bg-gray-100 text-gray-700 hover:bg-gray-200"
-                      }`}
-                  >
-                    {filter.icon} {filter.label}
-                  </button>
-                ))}
+                    </div>
+                  ))
+                )}
               </div>
             </div>
 
-            {/* Map View */}
-            {locationPermission === "granted" && userLocation ? (
-              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6">
-                <div className="mb-4">
-                  <h2 className="text-xl font-bold text-gray-800 mb-1">🗺️ Live Area Status</h2>
-                  <p className="text-sm text-gray-600">Your location and nearby collection points</p>
-                </div>
 
-                <div className="h-80 rounded-2xl overflow-hidden mb-4 border-2 border-gray-200">
-                  {isMapReady && typeof window !== 'undefined' && (
-                    <MapContainer
-                      center={userLocation}
-                      zoom={15}
-                      style={{ height: '100%', width: '100%' }}
-                      scrollWheelZoom={false}
-                    >
-                      <TileLayer
-                        url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png"
-                        attribution='&copy; OpenStreetMap'
-                      />
-
-                      <MapUpdater center={userLocation} />
-
-                      {/* User location circle */}
-                      <Circle
-                        center={userLocation}
-                        radius={500}
-                        pathOptions={{
-                          color: 'rgba(59, 130, 246, 0.5)',
-                          fillColor: 'rgba(59, 130, 246, 0.1)',
-                          fillOpacity: 0.3
-                        }}
-                      />
-
-                      {/* User location marker */}
-                      <Marker position={userLocation}>
-                        <Popup>
-                          <div className="text-center">
-                            <p className="font-bold">📍 You are here</p>
-                            <p className="text-sm">{address}</p>
-                          </div>
-                        </Popup>
-                      </Marker>
-
-                      {/* 3. SHOW EXISTING DUSTBINS (Read Only) */}
-                      {dustbins.map((existingBin) => (
-                        <Marker
-                          key={`modal-bin-${existingBin._id}`}
-                          position={[existingBin.latitude, existingBin.longitude]}
-                          icon={getBinIcon(existingBin.status)} // Same colored icons
-                        >
-                          <Popup>
-                            <div className="text-center min-w-[150px]">
-                              <p className="font-bold text-gray-800 text-sm mb-1">
-                                {existingBin.name}
-                              </p>
-                              <p className="text-xs text-gray-600 bg-gray-100 rounded px-2 py-1 inline-block">
-                                Route: {existingBin.routeId ? existingBin.routeId.name : "N/A"}
-                              </p>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      ))}
-
-                      {/* Active vehicles */}
-                      {activeVehicles.map((vehicle) => (
-                        <Marker key={vehicle.id} position={vehicle.coordinates}>
-                          <Popup>
-                            <div className="text-center">
-                              <p className="font-bold">🚛 {vehicle.number}</p>
-                              <p className="text-xs">{vehicle.currentStop}</p>
-                              <p className="text-xs font-semibold text-blue-600">{vehicle.eta}</p>
-                            </div>
-                          </Popup>
-                        </Marker>
-                      ))}
-                    </MapContainer>
-                  )}
-                </div>
-
-                {/* Map Legend */}
-                <div className="flex justify-center gap-6 flex-wrap">
-                  {[
-                    { icon: "📍", label: "You" },
-                    { color: "bg-green-500", label: "Clean" },
-                    { color: "bg-amber-500", label: "Overflow" },
-                    { icon: "🚛", label: "Vehicle" }
-                  ].map((item, index) => (
-                    <div key={index} className="flex items-center gap-2">
-                      {item.icon ? (
-                        <span className="text-lg">{item.icon}</span>
-                      ) : (
-                        <div className={`w-3 h-3 ${item.color} rounded-full`}></div>
-                      )}
-                      <span className="text-sm font-semibold text-gray-600">{item.label}</span>
-                    </div>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <div className="bg-amber-50 rounded-3xl p-8 border-2 border-amber-200 mb-6 text-center">
-                <div className="w-16 h-16 bg-amber-100 rounded-full flex items-center justify-center mx-auto mb-4">
-                  <span className="text-3xl">📍</span>
-                </div>
-                <h3 className="text-lg font-bold text-amber-800 mb-2">Location Access Required</h3>
-                <p className="text-sm text-amber-700 mb-4">
-                  Enable location to see the map with nearby bins and active vehicles
-                </p>
-                <button
-                  onClick={requestLocationPermission}
-                  className="px-6 py-3 bg-amber-500 hover:bg-amber-600 text-white font-bold rounded-xl transition-all transform hover:scale-105"
-                >
-                  Enable Location
-                </button>
-              </div>
-            )}
 
             {/* Today's Status Card */}
             {locationPermission === "granted" && (
-              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-6 shadow-xl mb-6 text-white">
+              <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-3xl p-6 shadow-xl mb-6 text-white relative z-20">
                 <h2 className="text-xl font-bold mb-5">📊 Today's Status in Your Area</h2>
-
                 <div className="grid grid-cols-3 gap-4">
                   {[
-                    { icon: "✅", number: "3", label: "Cleaned Today" },
-                    { icon: "🚛", number: "2", label: "Vehicles Active" },
-                    { icon: "⚠️", number: "1", label: "Pending" }
+                    { icon: "✅", number: areaStats.cleanedToday, label: "Cleaned Today" },
+                    { icon: "🚛", number: areaStats.activeVehicles, label: "Vehicles Active" },
+                    { icon: "⚠️", number: areaStats.pendingBins, label: "Pending" }
                   ].map((stat, index) => (
                     <div key={index} className="bg-white/20 backdrop-blur-sm rounded-2xl p-4 text-center transform transition-all hover:scale-105 hover:bg-white/30">
                       <div className="text-3xl mb-2">{stat.icon}</div>
@@ -1174,11 +1246,11 @@ export default function CitizenPage() {
 
             {/* Active Vehicles with Routes */}
             {locationPermission === "granted" && activeVehicles.length > 0 && (
-              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6">
+              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6 relative z-20">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">🚛 Active Vehicles & Routes</h2>
 
                 <div className="space-y-4">
-                  {activeVehicles.map((vehicle) => (
+                  {activeVehiclesnear.map((vehicle) => (
                     <div key={vehicle.id} className="bg-blue-50 rounded-2xl p-5 border-2 border-blue-200">
                       <div className="flex items-start gap-4 mb-4">
                         <div className="w-14 h-14 bg-blue-500 rounded-xl flex items-center justify-center flex-shrink-0 shadow-md">
@@ -1231,12 +1303,12 @@ export default function CitizenPage() {
 
             {/* Nearby Bins List */}
             {locationPermission === "granted" && filteredBins.length > 0 && (
-              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6">
+              <div className="bg-white rounded-3xl p-6 shadow-xl mb-6 relative z-20">
                 <h2 className="text-xl font-bold text-gray-800 mb-4">📍 Nearby Collection Points</h2>
 
                 <div className="space-y-3">
                   {filteredBins.map((bin) => (
-                    <div key={bin.id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl transition-all hover:bg-gray-100 hover:shadow-md">
+                    <div key={bin._id} className="flex items-center gap-4 p-4 bg-gray-50 rounded-2xl transition-all hover:bg-gray-100 hover:shadow-md">
                       <div className={`w-11 h-11 rounded-xl flex items-center justify-center flex-shrink-0 ${bin.status === "clean" ? "bg-green-100" :
                         bin.status === "overflow" ? "bg-amber-100" : "bg-gray-200"
                         }`}>
@@ -1272,7 +1344,7 @@ export default function CitizenPage() {
             )}
 
             {/* Transparency Card */}
-            <div className="bg-green-50 rounded-3xl p-6 border-2 border-green-200 text-center">
+            <div className="bg-green-50 rounded-3xl p-6 border-2 border-green-200 text-center relative z-20">
               <div className="text-5xl mb-3">👁️</div>
               <h3 className="text-xl font-bold text-green-700 mb-2">Full Transparency</h3>
               <p className="text-sm text-green-800 leading-relaxed">
@@ -1285,26 +1357,68 @@ export default function CitizenPage() {
 
       {/* Bottom Submit Button - Only show in Report tab */}
       {selectedTab === "report" && (
-        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-5 shadow-2xl">
+        <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-5 shadow-2xl z-[100]">
           <div className="container mx-auto max-w-2xl">
             <button
               onClick={handleSubmit}
-              disabled={!image || !selectedBin || status === "submitted"}
-              className={`w-full py-4 rounded-xl font-bold text-base transition-all transform ${image && selectedBin && status !== "submitted"
-                ? "bg-green-500 hover:bg-green-600 text-white shadow-lg hover:scale-105 active:scale-95"
-                : "bg-gray-200 text-gray-400 cursor-not-allowed"
+              disabled={!image || !selectedBin || status === "submitted" || verifying}
+              className={`w-full py-4 rounded-xl font-bold text-base transition-all transform flex items-center justify-center gap-2
+                ${verifying
+                  ? "bg-blue-600 text-white cursor-wait opacity-90"
+                  : image && selectedBin && status !== "submitted"
+                    ? "bg-green-500 hover:bg-green-600 text-white shadow-lg hover:scale-105 active:scale-95"
+                    : "bg-gray-200 text-gray-400 cursor-not-allowed"
                 }`}
             >
-              {status === "submitted" ? "✅ Submitted Successfully" :
-                !selectedBin ? "🗑️ Select Dustbin from Map" :
-                  !image ? "📸 Take Photo to Continue" :
-                    "Submit Your Complaint"}
+              {verifying ? (
+                <>
+                  <div className="w-5 h-5 border-2 border-white border-t-transparent rounded-full animate-spin"></div>
+                  <span>AI Analyzing Image...</span>
+                </>
+              ) : status === "submitted" ? (
+                "✅ Submitted Successfully"
+              ) : !selectedBin ? (
+                "🗑️ Select Dustbin from Map"
+              ) : !image ? (
+                "📸 Take Photo to Continue"
+              ) : (
+                "Submit Your Complaint"
+              )}
             </button>
-            {(!image || !selectedBin) && status !== "submitted" && (
+
+            {(!image || !selectedBin) && status !== "submitted" && !verifying && (
               <p className="text-center text-sm text-gray-500 mt-3">
                 {!selectedBin ? "🗑️ Please select a dustbin from the map first" : "📸 Please take a photo to continue"}
               </p>
             )}
+          </div>
+        </div>
+      )}
+
+      {/* Professional Loading Overlay */}
+      {(verifying || isSubmitting) && (
+        <div className="fixed inset-0 bg-black/70 backdrop-blur-sm z-[10000] flex items-center justify-center p-4">
+          <div className="bg-white p-8 rounded-3xl shadow-2xl flex flex-col items-center max-w-xs w-full">
+            <div className="relative w-20 h-20 mb-6">
+              <div className="absolute inset-0 border-4 border-blue-100 rounded-full"></div>
+              <div className="absolute inset-0 border-4 border-blue-600 border-t-transparent rounded-full animate-spin"></div>
+              <div className="absolute inset-0 flex items-center justify-center">
+                <span className="text-2xl">{verifying ? "🤖" : "☁️"}</span>
+              </div>
+            </div>
+
+            <h3 className="text-xl font-bold text-gray-800 mb-2">
+              {verifying ? "AI Analysis" : "Sending Report"}
+            </h3>
+            <p className="text-sm text-gray-500 text-center leading-relaxed">
+              {verifying
+                ? "Checking if the photo is valid garbage..."
+                : "Uploading your complaint to the server."}
+            </p>
+
+            <div className="mt-6 w-full bg-gray-100 h-1.5 rounded-full overflow-hidden">
+              <div className="bg-blue-600 h-full w-1/2 animate-progress-indefinite rounded-full"></div>
+            </div>
           </div>
         </div>
       )}
@@ -1338,6 +1452,28 @@ export default function CitizenPage() {
         }
         .leaflet-container {
           font-family: inherit;
+          z-index: 1 !important;
+        }
+        .map-container-custom {
+          position: relative;
+          z-index: 1 !important;
+        }
+        .leaflet-pane {
+          z-index: 1 !important;
+        }
+        .leaflet-top,
+        .leaflet-bottom {
+          z-index: 2 !important;
+        }
+        .leaflet-popup {
+          z-index: 3 !important;
+        }
+        @keyframes progress-indefinite {
+          0% { transform: translateX(-100%); }
+          100% { transform: translateX(200%); }
+        }
+        .animate-progress-indefinite {
+          animation: progress-indefinite 1.5s infinite linear;
         }
       `}</style>
     </div>

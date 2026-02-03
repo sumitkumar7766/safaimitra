@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 module.exports = function staffAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    console.log("STAFF AUTH HEADER:", authHeader);
+    // console.log("STAFF AUTH HEADER:", authHeader);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({
@@ -15,7 +15,7 @@ module.exports = function staffAuth(req, res, next) {
     const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
-    console.log("DECODED STAFF TOKEN:", decoded);
+    // console.log("DECODED STAFF TOKEN:", decoded);
 
     // Staff roles allowed: driver, helper, supervisor
     if (!["driver", "helper", "supervisor"].includes(decoded.role)) {
