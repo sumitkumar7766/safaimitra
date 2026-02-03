@@ -4,6 +4,7 @@ import React, { useState, useEffect, useRef } from "react";
 import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import axios from "axios";
+import { io } from "socket.io-client";
 
 // Import Leaflet CSS
 import 'leaflet/dist/leaflet.css';
@@ -53,6 +54,8 @@ export default function VehiclePage() {
   const [fileToUpload, setFileToUpload] = useState(null);
   const [submissionStatus, setSubmissionStatus] = useState("clean");
   const [isSubmitting, setIsSubmitting] = useState(false);
+  const [newJobAlert, setNewJobAlert] = useState(null);
+  const [socket, setSocket] = useState(null);
 
   const ORS_API_KEY = process.env.NEXT_PUBLIC_ORS_API_KEY;
 
@@ -60,12 +63,13 @@ export default function VehiclePage() {
 
   // Derived values
   const totalStops = routeStops.length;
+  const targetStop = routeStops.slice(currentStop - 1).find(stop =>
+    !['clean', 'skiped', 'suspecies', 'resolved'].includes(stop.status)
+  );
   // Get Current Stop Data Safely
   const currentStopData = routeStops[currentStop - 1];
   const nextStop = routeStops.length > 0 ? routeStops[currentStop - 1] : null;
 
-  // 👇 LOGIC FIX: Check if current bin is effectively "Done" (Clean or Suspicious)
-  // Skipped/Missed/Overflow are NOT considered "Locked", so you can fix them.
   const isCurrentBinLocked = currentStopData?.status === 'clean' || currentStopData?.status === 'suspecies';
 
   // Route is "technically" complete if count matches, BUT we allow fixing skips
@@ -117,6 +121,92 @@ export default function VehiclePage() {
       iconAnchor: [18, 36],
       popupAnchor: [0, -36]
     });
+  };
+
+  // --- SOCKET IO CONNECTION & EVENT LISTENER ---
+  // --- SOCKET IO LISTENER (Map & Popup Update) ---
+  useEffect(() => {
+    let newSocket = null;
+    const token = localStorage.getItem("token");
+
+    const initializeSocket = async () => {
+      try {
+        const res = await axios.get("http://localhost:5001/staff/userdata", {
+          headers: { Authorization: `Bearer ${token}` }
+        });
+
+        if (res.data.success) {
+          const userId = res.data.user._id;
+
+          newSocket = io("http://localhost:5001", {
+            transports: ["websocket", "polling"],
+            reconnectionAttempts: 5,
+          });
+          setSocket(newSocket);
+
+          newSocket.on("connect", () => {
+            newSocket.emit("join_room", `driver_${userId}`);
+          });
+
+          // 🔥 MERGE LOGIC HERE
+          newSocket.on("new_job_alert", (data) => {
+            try {
+              const audio = new Audio("https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3");
+              audio.play().catch(e => { });
+            } catch (e) { }
+
+            setNewJobAlert(data);
+
+            setRouteStops((prevStops) => {
+              const incomingId = data.newStop.id;
+
+              // Check karo agar ye dustbin pehle se list mein hai (Daily Route)
+              const existingIndex = prevStops.findIndex(stop => stop.id === incomingId);
+
+              if (existingIndex !== -1) {
+                // Agar hai, to purane wale ko update kar do (Upgrade to Complaint)
+                const updatedStops = [...prevStops];
+                updatedStops[existingIndex] = {
+                  ...updatedStops[existingIndex], // Purana data (coordinates, name)
+                  status: "overflow",             // Force status overflow
+                  type: "complaint",              // Mark as complaint
+                  complaintId: data.newStop.complaintId, // Attach Complaint ID
+                  isEmergency: true,              // UI Red karne ke liye
+                  isNew: true                     // Popup/Notification ke liye
+                };
+                return updatedStops;
+              } else {
+                // Agar nahi hai (Ad-hoc location), to naya add karo
+                return [...prevStops, {
+                  ...data.newStop,
+                  isEmergency: true,
+                  type: "complaint"
+                }];
+              }
+            });
+          });
+        }
+      } catch (err) {
+        console.error("Socket Init Failed:", err);
+      }
+    };
+
+    initializeSocket();
+    return () => { if (newSocket) newSocket.disconnect(); };
+  }, []);
+
+  const handleAcceptJob = () => {
+    setNewJobAlert(null);
+
+    if (newJobAlert?.newStop?.coordinates) {
+      const [lat, lng] = newJobAlert.newStop.coordinates;
+
+      if (driverLocation) {
+        fetchShortestRoute(driverLocation, [lat, lng]);
+      }
+
+      alert("✅ Task Accepted! Route updated to new location.");
+    }
   };
 
   // --- 1. Setup Leaflet ---
@@ -217,9 +307,15 @@ export default function VehiclePage() {
 
   let distance = 0;
   let bearing = 0;
-  if (driverLocation && nextStop && nextStop.coordinates) {
-    distance = getDistance(driverLocation[0], driverLocation[1], nextStop.coordinates[0], nextStop.coordinates[1]);
-    bearing = getBearing(driverLocation[0], driverLocation[1], nextStop.coordinates[0], nextStop.coordinates[1]);
+  if (driverLocation && targetStop && targetStop.coordinates) {
+    distance = getDistance(
+      driverLocation[0], driverLocation[1],
+      targetStop.coordinates[0], targetStop.coordinates[1]
+    );
+    bearing = getBearing(
+      driverLocation[0], driverLocation[1],
+      targetStop.coordinates[0], targetStop.coordinates[1]
+    );
   }
 
   // --- 5. Fetch Route ---
@@ -237,78 +333,70 @@ export default function VehiclePage() {
 
   // --- 6. Data Fetching (Auto Update) ---
   useEffect(() => {
-    // Function to fetch dashboard data (Dustbins, Route, Status)
     const fetchDashboard = async () => {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-
-        // Backend se data lo
         const res = await axios.get("http://localhost:5001/staff/dashboard", {
           headers: { Authorization: `Bearer ${token}` }
         });
 
-        if (res.data) {
-          const { staff, vehicle, route, dustbins } = res.data;
+        if (res.data && res.data.dustbins) {
+          const backendStops = res.data.dustbins.map((d, index) => ({
+            id: d._id,
+            displayId: index + 1,
+            name: d.name,
+            coordinates: [d.latitude, d.longitude],
+            status: d.status,
+            completedAt: d.lastCleanedAt,
+            complaintId: d.complaintId,
+            isEmergency: d.isEmergency || (d.complaintId ? true : false) // Ensure flag
+          }));
 
-          // Data update karo
-          setStaff(staff);
-          setVehicle(vehicle);
-          setRoute(route);
+          setRouteStops((prevStops) => {
+            // Map banayenge ID ke basis par taaki duplicates hat jayein
+            const stopMap = new Map();
 
-          if (dustbins && Array.isArray(dustbins)) {
-            const stops = dustbins.map((d, index) => ({
-              id: d._id,
-              displayId: index + 1,
-              name: d.name,
-              coordinates: [d.latitude, d.longitude],
-              status: d.status,
-              completedAt: d.lastCleanedAt,
-            }));
+            // 1. Pehle Backend data dalo (Daily Route + Complaints form DB)
+            backendStops.forEach(stop => stopMap.set(stop.id, stop));
 
-            // 👇 Yahan check lagayenge taki map baar-baar flicker na kare
-            // Agar data same hai to state update mat karo
-            setRouteStops((prevStops) => {
-              if (JSON.stringify(prevStops) === JSON.stringify(stops)) {
-                return prevStops; // Koi change nahi
-              }
-              return stops; // Naya data update karo
-            });
-
-            // Count update karo
-            const doneCount = stops.filter(s => ['clean', 'suspecies', 'skiped'].includes(s.status)).length;
-            setTodayCompleted(doneCount);
-
-            // Sirf pehli baar load hone par current stop set karo,
-            // taaki driver agar beech mein kisi stop par click kiya ho to wo reset na ho jaye
-            // (Hum 'currentStop' state ko tabhi chedenge agar ye pehla load hai i.e. 1)
-            /* Note: Agar aap chahte hain ki naya dustbin add hote hi driver ko wahan bheje,
-               to niche wali logic use karein. Par usually driver manual control chahta hai.
-            */
-            setRouteStops((prev) => {
-              if (prev.length === 0) {
-                const firstPendingIndex = stops.findIndex(s => !['clean', 'suspecies', 'skiped'].includes(s.status));
-                if (firstPendingIndex !== -1) {
-                  setCurrentStop(firstPendingIndex + 1);
-                } else if (stops.length > 0) {
-                  setCurrentStop(stops.length);
+            // 2. Agar koi Local Socket data hai jo abhi tak DB me reflect nahi hua, use merge karo
+            prevStops.forEach(localStop => {
+              if (localStop.isNew) {
+                if (stopMap.has(localStop.id)) {
+                  // Agar ID match hui, to Socket wala data (Complaint info) prefer karo
+                  const existing = stopMap.get(localStop.id);
+                  stopMap.set(localStop.id, {
+                    ...existing,
+                    ...localStop,
+                    isEmergency: true
+                  });
+                } else {
+                  stopMap.set(localStop.id, localStop);
                 }
               }
-              return stops;
             });
-          }
+
+            const mergedList = Array.from(stopMap.values());
+
+            // Re-render rokne ke liye comparison
+            if (JSON.stringify(prevStops.map(s => s.id + s.status)) === JSON.stringify(mergedList.map(s => s.id + s.status))) {
+              return prevStops;
+            }
+            return mergedList;
+          });
+
+          // Count sirf unka jo Daily route ka hissa hain aur complete hain
+          // (Logic: Complaint solve hone par bhi count badhna chahiye)
+          const doneCount = backendStops.filter(s => ['clean', 'suspecies', 'skiped'].includes(s.status)).length;
+          setTodayCompleted(doneCount);
         }
-      } catch (err) { console.error("Dashboard Error:", err); }
+      } catch (err) { console.error(err); }
     };
 
-    // 1. Turant call karo (Pehli baar ke liye)
     fetchDashboard();
-
-    // 2. Har 5 second (5000ms) mein repeat karo
-    const intervalId = setInterval(fetchDashboard, 5000);
-
-    // 3. Jab page band ho to interval band karo (Cleanup)
-    return () => clearInterval(intervalId);
+    const interval = setInterval(fetchDashboard, 5000);
+    return () => clearInterval(interval);
   }, []);
 
   // Staff Profile alag se fetch karo (Ye baar baar update karne ki zarurat nahi)
@@ -325,25 +413,51 @@ export default function VehiclePage() {
   }, []);
 
   // --- 7. Update Route ---
+  // --- 7. Update Route (Auto-Find Next Pending Stop) ---
   useEffect(() => {
-    if (driverLocation && routeStops.length > 0 && currentStop <= routeStops.length) {
-      const next = routeStops[currentStop - 1];
-      if (next?.coordinates) fetchShortestRoute(driverLocation, next.coordinates);
+    // Agar driver location hai aur koi target (pending) stop bacha hai
+    if (driverLocation && targetStop && targetStop.coordinates) {
+      fetchShortestRoute(driverLocation, targetStop.coordinates);
+    } else {
+      // Agar sab kuch clean hai ya koi target nahi mila
+      setRouteLine([]);
     }
-  }, [currentStop, driverLocation, routeStops]);
+    // 👇 Dependency array me 'targetStop' add kiya
+  }, [currentStop, driverLocation, routeStops, targetStop]);
 
   // --- 8. Update Location Name ---
+  // 🔥 AUTO-DETECT NEXT PENDING STOP ON LOAD 🔥
   useEffect(() => {
-    if (routeStops[currentStop - 1]) {
-      const name = routeStops[currentStop - 1].name;
-      setCurrentLocation(name.includes(" - ") ? name.split(" - ")[1] : name);
+    if (routeStops.length > 0) {
+      // 1. Dhoondho ki pehla 'Unclean' (Pending/Overflow/New) bin kaun sa hai
+      const firstPendingIndex = routeStops.findIndex(stop =>
+        !['clean', 'skiped', 'suspecies', 'resolved'].includes(stop.status)
+      );
+
+      // 2. Agar koi pending kaam mila, to Current Stop ko wahan set kar do
+      if (firstPendingIndex !== -1) {
+        // (index + 1) isliye kyunki aapka currentStop 1-based hai
+        setCurrentStop(firstPendingIndex + 1);
+      }
     }
-  }, [currentStop, routeStops]);
+  }, [routeStops]); // Jab bhi list load hogi, ye chalega
 
   // --- Handlers ---
   const handleAfterImage = async (e) => {
     const file = e.target.files[0];
     if (!file) return;
+
+    // 1. Current Stop Data ko safely nikalo
+    const activeStopData = routeStops[currentStop - 1];
+
+    // Safety Check: Agar stop data nahi mila to aage mat badho
+    if (!activeStopData) {
+      alert("❌ Error: Could not identify the current dustbin. Please re-select the stop.");
+      return;
+    }
+
+    console.log("📸 Image Selected for Bin:", activeStopData.name, "ID:", activeStopData.id);
+
     setFileToUpload(file);
     const reader = new FileReader();
     reader.onloadend = () => setAfterImage(reader.result);
@@ -357,9 +471,17 @@ export default function VehiclePage() {
       const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("image", file);
-      if (routeStops[currentStop - 1]) formData.append("dustbinId", routeStops[currentStop - 1].id);
 
-      const res = await axios.post("http://localhost:5001/api/predict", formData, { headers: { Authorization: `Bearer ${token}` } });
+      // ✅ Explicitly ID attach karein aur log karein
+      formData.append("dustbinId", activeStopData.id);
+
+      console.log("🚀 Sending to AI API...");
+
+      const res = await axios.post("http://localhost:5001/api/predict", formData, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+
+      console.log("🤖 AI Response:", res.data);
       const { status, confidence } = res.data;
 
       if (status !== "empty") {
@@ -367,6 +489,7 @@ export default function VehiclePage() {
           setIsCleanVerified(true);
           setSubmissionStatus("suspecies");
         } else {
+          // Reset if cancelled
           setAfterImage(null);
           setFileToUpload(null);
           if (afterFileRef.current) afterFileRef.current.value = "";
@@ -378,13 +501,16 @@ export default function VehiclePage() {
         alert(`✅ Clean verified (${confidence}%)`);
       }
     } catch (err) {
-      console.error(err);
-      if (confirm("⚠️ AI Verification failed. Submit manually as Suspicious?")) {
+      console.error("❌ AI Verification Failed:", err);
+      // Agar API fail ho jaye, tab bhi driver ko manual submit karne do
+      if (confirm("⚠️ AI Server not responding. Verify manually as Clean/Suspicious?")) {
         setIsCleanVerified(true);
-        setSubmissionStatus("suspecies");
+        // Default to clean if manual override
+        setSubmissionStatus("clean");
       } else {
         setAfterImage(null);
         setFileToUpload(null);
+        if (afterFileRef.current) afterFileRef.current.value = "";
       }
     } finally {
       setVerifying(false);
@@ -392,70 +518,59 @@ export default function VehiclePage() {
   };
 
   const handleMarkComplete = async () => {
-    if (!afterImage || !isCleanVerified) return alert("❌ Bin not verified!");
-    if (!fileToUpload) return alert("❌ Image file lost.");
-    if (!confirm(`Mark Stop ${currentStop} complete?`)) return;
-
+    console.log("🚀 Current Stop Data (Full Object):", currentStopData);
+    console.log("🆔 Complaint ID Check:", currentStopData?.complaintId);
+    if (!afterImage) return alert("❌ Photo required!");
     setIsSubmitting(true);
     try {
       const token = localStorage.getItem("token");
       const formData = new FormData();
       formData.append("image", fileToUpload);
       formData.append("dustbinId", currentStopData.id);
-      formData.append("status", submissionStatus);
 
-      // Location bhejna zaroori hai backend check ke liye
+      // Agar Complaint ID hai to attach karo
+      if (currentStopData.complaintId) {
+        formData.append("complaintId", currentStopData.complaintId);
+      }
+
+      formData.append("status", submissionStatus);
       formData.append("latitude", driverLocation[0]);
       formData.append("longitude", driverLocation[1]);
 
       const res = await axios.post("http://localhost:5001/dustbin/mark-clean", formData, {
-        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "multipart/form-data" },
+        headers: { "Authorization": `Bearer ${token}`, "Content-Type": "multipart/form-data" }
       });
 
       if (res.data.success) {
-        const updatedStops = routeStops.map((stop) => {
-          if (stop.id === currentStopData.id) {
-            return { ...stop, status: submissionStatus, completedAt: new Date().toISOString() };
-          }
-          return stop;
-        });
-        setRouteStops(updatedStops);
+        // 🔥 UPDATE LIST:
+        // Chahe Complaint ho ya Daily route, hum usse remove nahi karenge, bas status "Clean" karenge.
+        // Taki driver ko dikhe ki "Haan ye kaam ho gaya".
+
+        setRouteStops(prev => prev.map(s =>
+          s.id === currentStopData.id
+            ? {
+              ...s,
+              status: submissionStatus,
+              completedAt: new Date().toISOString(),
+              isEmergency: false, // Emergency hat gayi
+              isNew: false
+            }
+            : s
+        ));
+
         setRouteLine([]);
 
-        const newDoneCount = updatedStops.filter(s => ['clean', 'suspecies', 'skiped'].includes(s.status)).length;
-        setTodayCompleted(newDoneCount);
+        // Count badhao
+        setTodayCompleted(prev => prev + 1);
 
-        if (currentStop < totalStops) {
-          setCurrentStop((prev) => prev + 1);
-        }
+        // Next stop par move karo
+        if (currentStop < totalStops) setCurrentStop(prev => prev + 1);
 
-        setAfterImage(null);
-        setFileToUpload(null);
-        setIsCleanVerified(false);
-        setSubmissionStatus("clean");
-        if (afterFileRef.current) afterFileRef.current.value = "";
+        alert(`🎉 Task Completed! (Complaint Resolved + Daily Counted)`);
 
-        if (newDoneCount === totalStops && currentStop === totalStops) {
-          setTimeout(() => alert("🎉 Route Completed!"), 500);
-        } else {
-          alert(`🎉 Saved! Status: ${submissionStatus.toUpperCase()}`);
-        }
+        setAfterImage(null); setFileToUpload(null); setIsCleanVerified(false);
       }
-    } catch (err) {
-      console.error("Upload failed", err);
-
-      // 👇👇 YAHAN CHANGE KIYA HAI 👇👇
-      // Agar Backend ne koi specific message bheja hai (jaise distance error), to wo dikhao
-      if (err.response && err.response.data && err.response.data.message) {
-        alert(`❌ ${err.response.data.message}`);
-      } else {
-        // Agar koi aur error hai (server down etc.)
-        alert("❌ Failed to save progress. Please try again.");
-      }
-
-    } finally {
-      setIsSubmitting(false);
-    }
+    } catch (e) { alert("❌ Failed to save."); } finally { setIsSubmitting(false); }
   };
 
   const skipStop = async () => {
@@ -671,12 +786,22 @@ export default function VehiclePage() {
                 </MapContainer>
               )}
             </div>
-            {driverLocation && nextStop && !showCompletionUI && (
+            {driverLocation && targetStop && !showCompletionUI && (
               <div className="bg-white rounded-xl p-3 shadow mt-3 text-center border border-gray-200">
                 <div className="flex justify-between items-center px-4">
-                  <div className="text-left"><p className="text-xs text-gray-500 uppercase font-bold">Next Stop</p><p className="text-sm font-bold text-gray-800">{nextStop.name}</p></div>
+                  <div className="text-left">
+                    <p className="text-xs text-gray-500 uppercase font-bold">Going To</p>
+                    {/* Yahan Target Stop ka naam aayega */}
+                    <p className="text-sm font-bold text-gray-800">{targetStop.name}</p>
+                  </div>
+
+                  {/* Rotating Arrow */}
                   <div className="text-4xl text-blue-600" style={{ transform: `rotate(${bearing}deg)` }}>➤</div>
-                  <div className="text-right"><p className="text-xs text-gray-500 uppercase font-bold">Distance</p><p className="text-lg font-bold text-blue-600">{(distance / 1000).toFixed(2)} km</p></div>
+
+                  <div className="text-right">
+                    <p className="text-xs text-gray-500 uppercase font-bold">Distance</p>
+                    <p className="text-lg font-bold text-blue-600">{(distance / 1000).toFixed(2)} km</p>
+                  </div>
                 </div>
               </div>
             )}
@@ -738,8 +863,23 @@ export default function VehiclePage() {
         <div className="bg-white rounded-2xl overflow-hidden shadow-lg">
           <div className={`p-5 text-white ${showCompletionUI ? "bg-gray-500" : "bg-gradient-to-r from-blue-600 to-indigo-600"}`}>
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center"><span className={`text-xl font-bold ${showCompletionUI ? "text-gray-600" : "text-blue-600"}`}>{showCompletionUI ? "✓" : currentStop}</span></div>
-              <div><h2 className="text-lg font-bold">{showCompletionUI ? "All Tasks Done" : "Current Stop"}</h2><p className="text-sm opacity-90">{showCompletionUI ? "Great job!" : currentLocation}</p></div>
+              <div className="w-12 h-12 bg-white rounded-xl flex items-center justify-center">
+                <span className={`text-xl font-bold ${showCompletionUI ? "text-green-600" : "text-blue-600"}`}>
+                  {showCompletionUI ? "✓" : currentStop}
+                </span>
+              </div>
+              <div>
+                <h2 className="text-white uppercase font-bold">
+                  {showCompletionUI ? "Status" : "Next Stop"}
+                </h2>
+
+                {/* 🛠️ FIX: Safe Navigation (?.) and Logic Handle */}
+                <p className="text- font-bold text-gray-100">
+                  {showCompletionUI
+                    ? "All Tasks Done"
+                    : (targetStop?.name || "Select a Stop")}
+                </p>
+              </div>
             </div>
           </div>
 
@@ -748,25 +888,25 @@ export default function VehiclePage() {
               <label className="block text-base font-bold text-gray-800 mb-3">{showCompletionUI ? "🎉 Duty Over" : "📸 Upload Proof (After Cleaning)"}</label>
               <div onClick={() => {
                 // 👇 IMPORTANT FIX: Allow click if bin is NOT Clean/Suspicious (even if route is "done")
-                if (showCompletionUI) { alert("🎉 This bin is already clean!"); return; }
+                // if (showCompletionUI) { alert("🎉 This bin is already clean!"); return; }
 
-                // Check the location of the driver before allowing photo capture in radius of 100 meters
-                // 👇👇 NEW LOGIC: 100m Radius Check 👇👇
-                if (driverLocation && currentStopData && currentStopData.coordinates) {
-                  const dist = getDistance(
-                    driverLocation[0], driverLocation[1],
-                    currentStopData.coordinates[0], currentStopData.coordinates[1]
-                  );
+                // // Check the location of the driver before allowing photo capture in radius of 100 meters
+                // // 👇👇 NEW LOGIC: 100m Radius Check 👇👇
+                // if (driverLocation && currentStopData && currentStopData.coordinates) {
+                //   const dist = getDistance(
+                //     driverLocation[0], driverLocation[1],
+                //     currentStopData.coordinates[0], currentStopData.coordinates[1]
+                //   );
 
-                  // Agar doori 100m se zyada hai
-                  if (dist > 100) {
-                    alert(`⚠️ You are too far from the dustbin!\n\nCurrent Distance: ${Math.round(dist)} meters\nAllowed Radius: 100 meters\n\nPlease move closer to upload proof.`);
-                    return; // ⛔ Yahi rok do, camera mat kholo
-                  }
-                } else {
-                  alert("📍 Fetching your location... Please wait.");
-                  return;
-                }
+                //   // Agar doori 100m se zyada hai
+                //   if (dist > 100) {
+                //     alert(`⚠️ You are too far from the dustbin!\n\nCurrent Distance: ${Math.round(dist)} meters\nAllowed Radius: 100 meters\n\nPlease move closer to upload proof.`);
+                //     return; // ⛔ Yahi rok do, camera mat kholo
+                //   }
+                // } else {
+                //   alert("📍 Fetching your location... Please wait.");
+                //   return;
+                // }
                 // end of the distance check
 
                 afterFileRef.current?.click();
@@ -802,6 +942,38 @@ export default function VehiclePage() {
         <button onClick={skipStop} disabled={showCompletionUI} className={`flex-1 py-4 border-2 font-bold rounded-xl transition-colors ${showCompletionUI ? "bg-gray-100 border-gray-200 text-gray-400 cursor-not-allowed" : "bg-red-50 border-red-300 text-red-600 hover:bg-red-100"}`}><div className="flex flex-col items-center"><span className="text-xl mb-1">⚠️</span><span className="text-sm">Skip</span></div></button>
         <button onClick={handleMarkComplete} disabled={!afterImage || !isCleanVerified || verifying || isSubmitting || showCompletionUI} className={`flex-1 py-4 font-bold rounded-xl transition-colors ${showCompletionUI ? "bg-gray-200 text-gray-400 cursor-not-allowed" : afterImage && isCleanVerified ? submissionStatus === "suspecies" ? "bg-gradient-to-r from-yellow-500 to-orange-600 text-white" : "bg-gradient-to-r from-green-500 to-emerald-600 text-white" : "bg-gray-200 text-gray-400 cursor-not-allowed"}`}><div className="flex flex-col items-center"><span className="text-xl mb-1">{submissionStatus === "suspecies" ? "⚠️" : "✅"}</span><span className="text-sm">{verifying ? "Verifying..." : isSubmitting ? "Uploading..." : "Complete"}</span></div></button>
       </div>
+
+      {newJobAlert && (
+        <div className="fixed inset-0 z-[999] flex items-center justify-center p-4 bg-black/80 backdrop-blur-sm animate-in fade-in zoom-in">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-sm shadow-2xl border-4 border-red-500 relative overflow-hidden">
+
+            {/* Blinking Background Effect */}
+            <div className="absolute top-0 left-0 w-full h-2 bg-red-500 animate-pulse"></div>
+
+            <div className="text-center">
+              <div className="w-20 h-20 bg-red-100 rounded-full flex items-center justify-center mx-auto mb-4 animate-bounce">
+                <span className="text-4xl">🚨</span>
+              </div>
+
+              <h2 className="text-2xl font-black text-gray-900 mb-2">{newJobAlert.title}</h2>
+              <p className="text-gray-600 mb-4">{newJobAlert.message}</p>
+
+              {newJobAlert.imageUrl && (
+                <div className="mb-4 rounded-xl overflow-hidden border-2 border-gray-200 h-40">
+                  <img src={newJobAlert.imageUrl} alt="Complaint" className="w-full h-full object-cover" />
+                </div>
+              )}
+
+              <button
+                onClick={handleAcceptJob}
+                className="w-full py-4 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-lg shadow-lg transform transition-transform active:scale-95"
+              >
+                ACCEPT TASK 🚛
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
 
       {(isSubmitting || verifying) && (
         <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/70 backdrop-blur-sm">

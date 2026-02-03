@@ -1,6 +1,5 @@
 const mongoose = require("mongoose");
 
-// Vehicle Schema
 const VehicleSchema = new mongoose.Schema({
   officeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -14,9 +13,7 @@ const VehicleSchema = new mongoose.Schema({
     unique: true
   },
 
-  type: {
-    type: String
-  },
+  type: { type: String },
 
   routeId: {
     type: mongoose.Schema.Types.ObjectId,
@@ -32,39 +29,27 @@ const VehicleSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ["Active", "Inactive"],
+    enum: ["Active", "Inactive", "OnDuty", "Maintenance"], // 'OnDuty' status helpful rahega
     default: "Inactive"
   },
 
-  latitude: {
-    type: Number,
-    default: null
-  },
-
-  longitude: {
-    type: Number,
-    default: null
-  },
-
+  // Location Data
+  latitude: { type: Number, default: null },
+  longitude: { type: Number, default: null },
   location: {
-    type: {
-      type: String,
-      enum: ["Point"],
-      default: "Point",
-    },
-    coordinates: {
-      type: [Number], // [lng, lat]
-      required: true,
-    },
+    type: { type: String, enum: ["Point"], default: "Point" },
+    coordinates: { type: [Number], default: [0, 0] },
   },
-  isOnline: {
-    type: Boolean,
-    default: false,
-  },
-  lastSeen: {
-    type: Date,
+
+  isOnline: { type: Boolean, default: false },
+  lastSeen: { type: Date, default: null },
+  
+  // ✅ UPDATE: complaintBin ki jagah complaintId rakhein jo direct Complaint se link ho
+  currentComplaintId: {
+    type: mongoose.Schema.Types.ObjectId,
+    ref: "Complaint",
     default: null,
-  },
+  }
 
 }, { timestamps: true });
 

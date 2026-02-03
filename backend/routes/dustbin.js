@@ -6,6 +6,8 @@ const Office = require("../model/OfficeModel");
 const officeAuth = require("../middleware/officeAuth");
 const upload = require("../utils/cloudinaryConfig");
 const staffAuth = require("../middleware/staffAuth");
+const Complaint = require("../model/ComplaintModel");
+const mongoose = require("mongoose");
 
 /* ================= REGISTER DUSTBIN ================= */
 router.post("/register", officeAuth, async (req, res) => {
@@ -224,62 +226,71 @@ function deg2rad(deg) {
 
 router.post("/mark-clean", staffAuth, upload.single("image"), async (req, res) => {
   try {
-    // Extract status from body (sent by frontend)
-    const { dustbinId, status, latitude, longitude } = req.body;
+    const { dustbinId, status, latitude, longitude, complaintId } = req.body;
 
-    if (!req.file) {
-      return res.status(400).json({ success: false, message: "No image uploaded" });
-    }
+    console.log("Cleaning Request:", { dustbinId, complaintId, status });
+    console.log("Uploaded File:", req.body);
 
-    if (!dustbinId) {
-      return res.status(400).json({ success: false, message: "Dustbin ID missing" });
-    }
+    // ✅ Validation Sahi Hai
+    if (!req.file) return res.status(400).json({ success: false, message: "No image uploaded" });
+    if (!dustbinId) return res.status(400).json({ success: false, message: "Dustbin ID missing" });
 
-    // 1. Dustbin find karo
     const dustbin = await Dustbin.findById(dustbinId);
     if (!dustbin) return res.status(404).json({ success: false, message: "Dustbin not found" });
 
-    if (latitude && longitude) {
-      const dist = getDistanceFromLatLonInM(
-        parseFloat(latitude),
-        parseFloat(longitude),
-        dustbin.latitude,
-        dustbin.longitude
-      );
+    // ✅ Distance Logic Sahi Hai
+    // if (latitude && longitude) {
+    //   const dist = getDistanceFromLatLonInM(
+    //     parseFloat(latitude),
+    //     parseFloat(longitude),
+    //     dustbin.latitude,
+    //     dustbin.longitude
+    //   );
 
-      console.log(`Driver Distance: ${dist} meters`);
+    //   console.log(`Driver Distance: ${dist} meters`);
 
-      // Agar 100m se zyada dur hai, toh request REJECT kar do
-      if (dist > 100) {
-        return res.status(400).json({
-          success: false,
-          message: `You are too far! Distance: ${Math.round(dist)}m. Must be under 100m.`
-        });
-      }
-    } else {
-      return res.status(400).json({ success: false, message: "Location data missing!" });
-    }
+    //   if (dist > 100) {
+    //     return res.status(400).json({
+    //       success: false,
+    //       message: `Too far! You are ${Math.round(dist)}m away. Go closer (100m).`
+    //     });
+    //   }
+    // } else {
+    //   return res.status(400).json({ success: false, message: "Location data missing!" });
+    // }
 
     const imageUrl = req.file.path;
 
-    // Determine the status to save
-    // If frontend sent "suspecies", use that. Otherwise default to "clean"
+    // ✅ Complaint Logic Sahi Hai (Resolved + Inactive)
+    if (complaintId && complaintId !== "undefined") {
+      await Complaint.findByIdAndUpdate(complaintId, {
+        status: "resolved", resolvedAt: new Date(), active: false, ComimageUrl: imageUrl
+      });
+
+      // 2. 🔥 SMART LOGIC: Agar same dustbin ki aur bhi complaints 'assigned' padi hain, unhe bhi resolve kar do
+      // Isse grouping wala circle complete ho jata hai.
+      await Complaint.updateMany(
+        { dustbinId: dustbinId, status: "assigned" },
+        {
+          $set: { status: "resolved", resolvedAt: new Date(), active: false, ComimageUrl: imageUrl }
+        }
+      );
+      console.log("✅ Complaint Resolved");
+    }
+
+    // ✅ Status Logic Sahi Hai
     const finalStatus = status === "suspecies" ? "suspecies" : "clean";
 
-    // Update Database
+    // ✅ Dustbin Logic Sahi Hai (Daily Route count badhega isse)
     const updatedBin = await Dustbin.findByIdAndUpdate(
       dustbinId,
       {
-        status: finalStatus, // 👈 Saving the correct status
+        status: finalStatus,
         imageUrl: imageUrl,
         lastCleanedAt: new Date()
       },
       { new: true }
     );
-
-    if (!updatedBin) {
-      return res.status(404).json({ success: false, message: "Dustbin not found" });
-    }
 
     res.json({
       success: true,

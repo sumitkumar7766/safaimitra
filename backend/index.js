@@ -1,7 +1,6 @@
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
-const app = express();
 const passport = require("passport");
 const LocalStrategy = require("passport-local");
 const session = require("express-session");
@@ -9,7 +8,10 @@ const dotenv = require("dotenv");
 dotenv.config();
 const bodyParser = require("body-parser");
 const cron = require("node-cron");
+const http = require("http");
+const { Server } = require("socket.io");
 const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
+const app = express();
 
 // Models
 const Citizen = require("./model/CitizenModel.js");
@@ -18,6 +20,7 @@ const Admin = require("./model/AdminModel.js");
 const Office = require("./model/OfficeModel.js");
 const Staff = require("./model/StaffModel.js");
 const Dustbin = require("./model/DustbinModel.js");
+const Complaint = require("./model/ComplaintModel.js");
 
 // Routes
 const CitizenRegister = require("./routes/citizen.js");
@@ -33,13 +36,14 @@ const RouteRegister = require("./routes/route.js");
 const dustbinRoutes = require("./routes/dustbin.js");
 const StaffLogin = require("./routes/loginStaff.js")
 const predictRoutes = require("./routes/predict.routes");
+const ComplaintRoutes = require("./routes/complaint");
 
 // 👇 2. ADD THIS DEBUG BLOCK (Delete later)
-console.log("--- DEBUGGING ENV VARS ---");
-console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ MISSING");
-console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ Loaded" : "❌ MISSING");
-console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✅ Loaded" : "❌ MISSING");
-console.log("--------------------------");
+// console.log("--- DEBUGGING ENV VARS ---");
+// console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ MISSING");
+// console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ Loaded" : "❌ MISSING");
+// console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✅ Loaded" : "❌ MISSING");
+// console.log("--------------------------");
 
 // DB Connection
 mongoose
@@ -56,12 +60,39 @@ const store = MongoStore.create({
 });
 
 // Middlewares
-app.use(cors({
-  origin: "http://localhost:3000", // Apne frontend ka URL yahan likhein
-  credentials: true // Agar cookies/headers bhej rahe hain to ye zaroori hai
-}));
+app.use(cors({}));
 app.use(express.json());
 app.use(bodyParser.json());
+
+const server = http.createServer(app);
+
+// 2. 🔥 SOCKET.IO SETUP WITH CORS (Ye Important Hai) 🔥
+const io = new Server(server, {
+  cors: {
+    origin: "http://localhost:3000", // Yahan * mat lagana, exact URL likho
+    methods: ["GET", "POST"],
+    credentials: true
+  },
+  transports: ['polling', 'websocket'] // Dono allow karo
+});
+
+app.set("io", io); 
+
+// ... Baaki code (DB connection, Routes) ...
+
+// Socket Connection Log
+io.on("connection", (socket) => {
+  console.log(`✅ User Connected: ${socket.id}`);
+
+  socket.on("join_room", (room) => {
+    socket.join(room);
+    console.log(`👤 Joined Room: ${room}`);
+  });
+
+  socket.on("disconnect", () => {
+    console.log("❌ User Disconnected");
+  });
+});
 
 // Sessions
 app.use(
@@ -128,6 +159,7 @@ app.use("/staff", StaffLogin);
 app.use("/route", RouteRegister);
 app.use("/dustbin", dustbinRoutes);
 app.use("/api", predictRoutes);
+app.use("/complaint", ComplaintRoutes);
 
 // Root
 app.get("/", (_req, res) => {
@@ -139,7 +171,7 @@ app.get("/", (_req, res) => {
 /* ============================================================ */
 
 // '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("32 23 * * *", async () => {
+cron.schedule("0 4 * * *", async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
 
   try {
@@ -167,22 +199,22 @@ cron.schedule("32 23 * * *", async () => {
 
 cron.schedule("*/2 * * * *", async () => {
   // console.log("🕵️ Checking for inactive vehicles...");
-  
+
   // 5 Minute se purana time
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
 
   try {
     // Aise VEHICLES dhoondo jo 'Online' hain par 5 min se inactive hain
     const result = await Vehicle.updateMany(
-      { 
-        isOnline: true, 
+      {
+        isOnline: true,
         lastSeen: { $lt: fiveMinutesAgo } // lastSeen < 5 min pehle
       },
-      { 
-        $set: { 
+      {
+        $set: {
           isOnline: false,
           status: "Inactive" // Status bhi inactive kar do
-        } 
+        }
       }
     );
 
@@ -199,7 +231,7 @@ cron.schedule("*/2 * * * *", async () => {
 app.get("/public-list", async (req, res) => {
   try {
     // Humein sirf _id aur cityName chahiye
-    const offices = await Office.find({}, "cityName _id"); 
+    const offices = await Office.find({}, "cityName _id");
 
     res.json({
       success: true,
@@ -214,6 +246,7 @@ app.get("/public-list", async (req, res) => {
 });
 
 // Start server
-app.listen(5001, "0.0.0.0", () => {
-  console.log("Server running on 0.0.0.0:5001");
+// Humein uss 'server' ko start karna hai jisme humne 'io' attach kiya tha (Line 68)
+server.listen(5001, "0.0.0.0", () => {
+  console.log("🚀 Server running on 0.0.0.0:5001 (Socket.io Enabled)");
 });

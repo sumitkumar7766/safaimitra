@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 module.exports = function officeAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    console.log("OFFICE AUTH HEADER:", authHeader);
+    // console.log("OFFICE AUTH HEADER:", authHeader);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ 
@@ -15,7 +15,7 @@ module.exports = function officeAuth(req, res, next) {
     const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
-    console.log("DECODED OFFICE TOKEN:", decoded);
+    // console.log("DECODED OFFICE TOKEN:", decoded);
 
     if (decoded.role !== "office") {
       return res.status(403).json({ 

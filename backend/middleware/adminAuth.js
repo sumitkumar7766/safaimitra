@@ -3,7 +3,7 @@ const jwt = require("jsonwebtoken");
 module.exports = function adminAuth(req, res, next) {
   try {
     const authHeader = req.headers.authorization;
-    console.log("AUTH HEADER:", authHeader);
+    // console.log("AUTH HEADER:", authHeader);
 
     if (!authHeader || !authHeader.startsWith("Bearer ")) {
       return res.status(401).json({ message: "No token provided" });
@@ -12,7 +12,7 @@ module.exports = function adminAuth(req, res, next) {
     const token = authHeader.split(" ")[1];
 
     const decoded = jwt.verify(token, process.env.JWT_SECRET);
-    console.log("DECODED TOKEN:", decoded);
+    // console.log("DECODED TOKEN:", decoded);
 
     if (decoded.role !== "admin") {
       return res.status(403).json({ message: "Only admin allowed" });
