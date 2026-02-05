@@ -6,7 +6,6 @@ const Vehicle = require("../model/VehicleModel");
 const Office = require("../model/OfficeModel");
 const Route = require("../model/RouteModel");
 const Dustbin = require("../model/DustbinModel");
-// 👇 1. IMPORT COMPLAINT MODEL
 const Complaint = require("../model/ComplaintModel");
 const officeAuth = require("../middleware/officeAuth");
 const staffAuth = require("../middleware/staffAuth");
@@ -54,12 +53,24 @@ router.post("/register", officeAuth, async (req, res) => {
       { $push: { staffId: registeredStaff._id } }
     );
 
+    let vehicleInfo = null;
     if (assignedVehicleId) {
-      await Vehicle.findByIdAndUpdate(
+      vehicleInfo = await Vehicle.findByIdAndUpdate(
         assignedVehicleId,
-        { $set: { driverId: registeredStaff._id } }
+        { $set: { driverId: registeredStaff._id } },
+        { new: true } // Return updated vehicle
       );
     }
+
+    // Populate for frontend list
+    const populatedStaff = await Staff.findById(registeredStaff._id).populate("assignedVehicleId", "vehicleNumber type status");
+
+    // 🔥 SOCKET EMIT: Add to Staff List
+    const io = req.app.get("io");
+    io.emit("staff_list_update", { 
+      type: "ADD", 
+      data: populatedStaff 
+    });
 
     return res.json({
       success: true,
@@ -102,6 +113,14 @@ router.delete("/delete/:staffId", officeAuth, async (req, res) => {
     }
 
     await Staff.findByIdAndDelete(staffId);
+
+    // 🔥 SOCKET EMIT: Remove from Staff List
+    const io = req.app.get("io");
+    io.emit("staff_list_update", { 
+      type: "DELETE", 
+      id: staffId 
+    });
+
     return res.json({ success: true, message: "Staff deleted" });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
@@ -125,7 +144,6 @@ router.put("/update/:staffId", officeAuth, async (req, res) => {
 
     const oldVehicleId = staff.assignedVehicleId?.toString() || null;
     const newVehicleId = role === "driver" && assignedVehicleId ? assignedVehicleId : null;
-    let reassignedFrom = null;
 
     if (newVehicleId) {
       const otherStaff = await Staff.findOne({
@@ -149,12 +167,22 @@ router.put("/update/:staffId", officeAuth, async (req, res) => {
       await Vehicle.findByIdAndUpdate(newVehicleId, { driverId: staff._id });
     }
 
-    return res.json({ success: true, message: "Updated", staff });
+    const updatedStaff = await Staff.findById(staffId).populate("assignedVehicleId", "vehicleNumber type status");
+
+    // 🔥 SOCKET EMIT: Update Staff List
+    const io = req.app.get("io");
+    io.emit("staff_list_update", { 
+      type: "UPDATE", 
+      data: updatedStaff 
+    });
+
+    return res.json({ success: true, message: "Updated", staff: updatedStaff });
   } catch (err) {
     return res.status(500).json({ success: false, message: err.message });
   }
 });
 
+/* ================= REMOVE VEHICLE ================= */
 router.put("/remove-vehicle/:staffId", officeAuth, async (req, res) => {
   const { staffId } = req.params;
   const officeId = req.user.id;
@@ -167,24 +195,30 @@ router.put("/remove-vehicle/:staffId", officeAuth, async (req, res) => {
     }
     staff.assignedVehicleId = null;
     await staff.save();
+
+    const updatedStaff = await Staff.findById(staffId).populate("assignedVehicleId");
+
+    // 🔥 SOCKET EMIT: Update Staff List (Vehicle Removed)
+    const io = req.app.get("io");
+    io.emit("staff_list_update", { 
+      type: "UPDATE", 
+      data: updatedStaff 
+    });
+
     res.json({ success: true, message: "Vehicle removed" });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-/* ============================================================ */
-/* 👇 2. UPDATED DASHBOARD ROUTE (Fetch Routes + Complaints) 👇 */
-/* ============================================================ */
+/* ================= DASHBOARD (No Socket needed) ================= */
 router.get("/dashboard", staffAuth, async (req, res) => {
   const staffId = req.user.id;
 
   try {
-    // 1. Staff nikalo
     const staff = await Staff.findById(staffId);
     if (!staff) return res.status(404).json({ success: false, message: "Staff not found" });
 
-    // 2. Assigned Vehicle check
     if (!staff.assignedVehicleId) {
       return res.json({ success: true, message: "No vehicle assigned", staff, vehicle: null, route: null, dustbins: [] });
     }
@@ -192,7 +226,6 @@ router.get("/dashboard", staffAuth, async (req, res) => {
     const vehicle = await Vehicle.findById(staff.assignedVehicleId);
     if (!vehicle) return res.json({ success: true, staff, vehicle: null, route: null, dustbins: [] });
 
-    // 3. Regular Route ke Dustbins Fetch karo
     let route = null;
     let regularDustbins = [];
 
@@ -203,16 +236,12 @@ router.get("/dashboard", staffAuth, async (req, res) => {
       }
     }
 
-    // 4. 🔥 Emergency Complaints Fetch karo 🔥
-    // Jo is vehicle ko assign hui hain aur abhi tak complete nahi hui hain
     const assignedComplaints = await Complaint.find({
       assignedVehicleId: vehicle._id,
-      status: { $in: ["assigned", "in_progress"] } // Sirf active tasks
-    }).populate("dustbinId"); // Dustbin info agar link hai to
+      status: { $in: ["assigned", "in_progress"] }
+    }).populate("dustbinId");
 
-    // 5. Complaints ko Standard Dustbin Format me convert karo (Adapter Pattern)
     const formattedComplaints = assignedComplaints.map(complaint => {
-      // Agar physical dustbin link hai to uska ID use karo, nahi to complaint ID
       const binId = complaint.dustbinId ? complaint.dustbinId._id : complaint._id;
       const binName = complaint.dustbinId ? `🚨 ${complaint.dustbinId.name}` : `🚨 Alert: ${complaint.area}`;
 
@@ -222,17 +251,14 @@ router.get("/dashboard", staffAuth, async (req, res) => {
         area: complaint.area,
         latitude: complaint.latitude,
         longitude: complaint.longitude,
-        status: "overflow", // Driver ke liye hamesha Red/Overflow dikhega
-        imageUrl: complaint.ComimageUrl || complaint.imageUrl, // Image proof
-
-        // Extra flags for frontend identification
+        status: "overflow",
+        imageUrl: complaint.ComimageUrl || complaint.imageUrl,
         isEmergency: true,
-        complaintId: complaint._id, // Ye ID 'mark-clean' karte waqt kaam aayegi
+        complaintId: complaint._id,
         lastCleanedAt: null
       };
     });
 
-    // 6. Dono lists ko Jod do (Regular + Emergency)
     const allStops = [...regularDustbins, ...formattedComplaints];
 
     return res.json({
@@ -240,7 +266,7 @@ router.get("/dashboard", staffAuth, async (req, res) => {
       staff,
       vehicle,
       route,
-      dustbins: allStops, // Mixed Data bhej rahe hain
+      dustbins: allStops,
     });
 
   } catch (err) {
@@ -249,55 +275,90 @@ router.get("/dashboard", staffAuth, async (req, res) => {
   }
 });
 
-/* ================= LOCATION & STATUS UPDATES ================= */
+/* ================= LIVE LOCATION UPDATES (CRITICAL) ================= */
 router.post("/update-vehicle-location", staffAuth, async (req, res) => {
   const staffId = req.user.id;
   const { latitude, longitude } = req.body;
-  const staff = await Staff.findById(staffId);
-  if (!staff || !staff.assignedVehicleId) return res.status(404).json({ success: false });
+  
+  try {
+    const staff = await Staff.findById(staffId);
+    if (!staff || !staff.assignedVehicleId) return res.status(404).json({ success: false });
 
-  await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
-    latitude, longitude, isOnline: true, lastSeen: new Date(),
-    location: { type: "Point", coordinates: [longitude, latitude] },
-    status: "Active",
-  });
-  res.json({ success: true });
+    // Update DB
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      staff.assignedVehicleId, 
+      {
+        latitude, 
+        longitude, 
+        isOnline: true, 
+        lastSeen: new Date(),
+        location: { type: "Point", coordinates: [longitude, latitude] },
+        status: "Active",
+      },
+      { new: true } // Return updated doc
+    );
+
+    // 🔥 SOCKET EMIT: Live Map Tracking
+    // Map listens to 'vehicle_location_update' to move the truck icon
+    const io = req.app.get("io");
+    io.emit("vehicle_location_update", updatedVehicle);
+
+    res.json({ success: true });
+  } catch(err) {
+    console.error("Loc Update Err:", err);
+    res.status(500).json({ success: false });
+  }
 });
 
+/* ================= PING / OFFLINE ================= */
 router.post("/set-offline", staffAuth, async (req, res) => {
-  const staff = await Staff.findById(req.user.id);
-  if (!staff || !staff.assignedVehicleId) return res.json({ success: true });
+  try {
+    const staff = await Staff.findById(req.user.id);
+    if (!staff || !staff.assignedVehicleId) return res.json({ success: true });
 
-  await Vehicle.findByIdAndUpdate(staff.assignedVehicleId, {
-    isOnline: false, lastSeen: new Date(), status: "Inactive",
-  });
-  res.json({ success: true });
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      staff.assignedVehicleId, 
+      {
+        isOnline: false, 
+        lastSeen: new Date(), 
+        status: "Inactive",
+      },
+      { new: true }
+    );
+
+    // 🔥 SOCKET EMIT: Turn Marker Grey
+    const io = req.app.get("io");
+    io.emit("vehicle_location_update", updatedVehicle);
+
+    res.json({ success: true });
+  } catch(err) {
+    res.status(500).json({ success: false });
+  }
 });
 
 router.post("/ping-vehicle", staffAuth, async (req, res) => {
   try {
     const driverId = req.user.id;
-    console.log(`Ping received from driver ${driverId} at ${new Date().toISOString()}`);
-    // 1. Pehle Driver (Staff) ko find karo
     const driver = await Staff.findById(driverId);
 
-    // Agar driver nahi mila ya usko gadi assign nahi hai to 404
     if (!driver || !driver.assignedVehicleId) {
-      return res.status(404).json({ success: false, message: "No vehicle assigned to this driver" });
+      return res.status(404).json({ success: false, message: "No vehicle assigned" });
     }
 
-    // 2. Ab Vehicle ko uski ID se find karo
-    const vehicle = await Vehicle.findById(driver.assignedVehicleId);
+    const vehicle = await Vehicle.findByIdAndUpdate(
+        driver.assignedVehicleId,
+        {
+            isOnline: true,
+            lastSeen: new Date()
+        },
+        { new: true }
+    );
 
-    if (!vehicle) {
-      return res.status(404).json({ success: false, message: "Vehicle not found in database" });
-    }
+    if (!vehicle) return res.status(404).json({ success: false });
 
-    // 3. Status Update karo
-    vehicle.isOnline = true;
-    vehicle.lastSeen = new Date();
-
-    await vehicle.save();
+    // 🔥 SOCKET EMIT: Keep Marker Active (Heartbeat)
+    const io = req.app.get("io");
+    io.emit("vehicle_location_update", vehicle);
 
     res.json({ success: true });
   } catch (err) {
@@ -306,17 +367,6 @@ router.post("/ping-vehicle", staffAuth, async (req, res) => {
   }
 });
 
-router.post("/set-vehicle-offline", staffAuth, async (req, res) => {
-  try {
-    const driverId = req.user._id;
-    await Vehicle.findOneAndUpdate(
-      { driverId: driverId },
-      { isOnline: false, lastSeen: new Date(), status: "Inactive" }
-    );
-    res.json({ success: true });
-  } catch (err) {
-    res.status(500).json({ success: false });
-  }
-});
+// Redundant route removed/merged (set-vehicle-offline was duplicate of set-offline)
 
 module.exports = router;

@@ -21,6 +21,8 @@ router.post("/register", officeAuth, async (req, res) => {
       officeId,
       vehicleNumber,
       type,
+      status: "Active",
+      isOnline: false // Default
     });
 
     // Office ke andar vehicleId push karo
@@ -28,6 +30,13 @@ router.post("/register", officeAuth, async (req, res) => {
       officeId,
       { $push: { vehicles: vehicle._id } }
     );
+
+    // 🔥 SOCKET EMIT: Add to Vehicle List 🔥
+    const io = req.app.get("io");
+    io.emit("vehicle_list_update", { 
+      type: "ADD", 
+      data: vehicle 
+    });
 
     return res.json({
       success: true,
@@ -61,7 +70,7 @@ router.get("/list/:officeId", officeAuth, async (req, res) => {
   }
 });
 
-/* ================= UPDATE VEHICLE LIVE LOCATION ================= */
+/* ================= UPDATE VEHICLE LIVE LOCATION (The most important part) ================= */
 router.post("/location/update", async (req, res) => {
   const { vehicleId, latitude, longitude } = req.body;
 
@@ -73,12 +82,29 @@ router.post("/location/update", async (req, res) => {
   }
 
   try {
-    await Vehicle.findByIdAndUpdate(vehicleId, {
-      latitude,
-      longitude,
-      status: "Active",
-      updatedAt: new Date(),
-    });
+    // Update DB and Return New Document ({new: true})
+    const updatedVehicle = await Vehicle.findByIdAndUpdate(
+      vehicleId, 
+      {
+        latitude,
+        longitude,
+        status: "Active",
+        isOnline: true,
+        lastSeen: new Date(),
+        location: {
+            type: "Point",
+            coordinates: [longitude, latitude] // GeoJSON format [lng, lat]
+        },
+        updatedAt: new Date(),
+      },
+      { new: true }
+    );
+
+    if(updatedVehicle) {
+        // 🔥 SOCKET EMIT: Move Map Marker Instantly 🔥
+        const io = req.app.get("io");
+        io.emit("vehicle_location_update", updatedVehicle);
+    }
 
     return res.json({
       success: true,
@@ -92,7 +118,7 @@ router.post("/location/update", async (req, res) => {
   }
 });
 
-/* ================= UPDATE VEHICLE ================= */
+/* ================= UPDATE VEHICLE DETAILS ================= */
 router.put("/update/:vehicleId", officeAuth, async (req, res) => {
   const { vehicleId } = req.params;
   const officeId = req.user.id;
@@ -100,7 +126,6 @@ router.put("/update/:vehicleId", officeAuth, async (req, res) => {
   const { vehicleNumber, type, status } = req.body;
 
   try {
-    // 1. Vehicle find karo (office ownership verify)
     const vehicle = await Vehicle.findOne({ _id: vehicleId, officeId });
     if (!vehicle) {
       return res.status(404).json({
@@ -109,7 +134,6 @@ router.put("/update/:vehicleId", officeAuth, async (req, res) => {
       });
     }
 
-    // 2. Agar vehicle number change ho raha hai to duplicate check
     if (vehicleNumber && vehicleNumber !== vehicle.vehicleNumber) {
       const exists = await Vehicle.findOne({ vehicleNumber });
       if (exists) {
@@ -120,12 +144,18 @@ router.put("/update/:vehicleId", officeAuth, async (req, res) => {
       }
     }
 
-    // 3. Update fields
     if (vehicleNumber) vehicle.vehicleNumber = vehicleNumber;
     if (type !== undefined) vehicle.type = type;
-    if (status) vehicle.status = status; // "Active" | "Inactive"
+    if (status) vehicle.status = status;
 
     await vehicle.save();
+
+    // 🔥 SOCKET EMIT: Update List Details 🔥
+    const io = req.app.get("io");
+    io.emit("vehicle_list_update", { 
+      type: "UPDATE", 
+      data: vehicle 
+    });
 
     return res.json({
       success: true,
@@ -148,7 +178,6 @@ router.delete("/delete/:vehicleId", officeAuth, async (req, res) => {
   const officeId = req.user.id;
 
   try {
-    // 1. Vehicle find karo (verify office ownership)
     const vehicle = await Vehicle.findOne({ _id: vehicleId, officeId });
     if (!vehicle) {
       return res.status(404).json({
@@ -157,20 +186,24 @@ router.delete("/delete/:vehicleId", officeAuth, async (req, res) => {
       });
     }
 
-    // 2. Office se vehicleId remove karo (agar Office schema me array hai)
     await Office.findByIdAndUpdate(
       officeId,
       { $pull: { vehicles: vehicle._id } }
     );
 
-    // 3. Agar kisi staff se linked hai to us staff ko unlink karo
     await Staff.updateMany(
       { assignedVehicleId: vehicle._id },
       { $set: { assignedVehicleId: null } }
     );
 
-    // 4. Vehicle delete karo
     await Vehicle.findByIdAndDelete(vehicleId);
+
+    // 🔥 SOCKET EMIT: Remove from List & Map 🔥
+    const io = req.app.get("io");
+    io.emit("vehicle_list_update", { 
+      type: "DELETE", 
+      id: vehicleId 
+    });
 
     return res.json({
       success: true,

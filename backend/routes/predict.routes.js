@@ -4,6 +4,7 @@ const multer = require("multer");
 const fs = require("fs");
 const axios = require("axios");
 const FormData = require("form-data");
+const Dustbin = require("../model/DustbinModel"); // ✅ Import Dustbin Model
 
 const upload = multer({ dest: "uploads/" });
 
@@ -16,7 +17,9 @@ router.post("/predict", upload.single("image"), async (req, res) => {
     }
 
     imagePath = req.file.path;
+    const dustbinId = req.body.dustbinId; // Expect ID from the camera/app
 
+    // 1. Get Prediction from Roboflow
     const form = new FormData();
     form.append("file", fs.createReadStream(imagePath));
 
@@ -32,26 +35,53 @@ router.post("/predict", upload.single("image"), async (req, res) => {
     );
 
     const predictions = response.data?.predictions;
-
-    if (!predictions || predictions.length === 0) {
-      return res.json({ status: "unknown", confidence: 0 });
-    }
-
-    const prediction = predictions[0];
-    const confidence = Number(prediction.confidence || 0);
-    const label = prediction.class;
-
-    const threshold = Number(process.env.CONFIDENCE_THRESHOLD || 0.7);
-
+    
+    // Default Status
     let status = "unknown";
-    if (confidence >= threshold) {
-      status = label; // empty / medium / full
+    let confidence = 0;
+
+    if (predictions && predictions.length > 0) {
+      const prediction = predictions[0];
+      confidence = Number(prediction.confidence || 0);
+      const label = prediction.class;
+      const threshold = Number(process.env.CONFIDENCE_THRESHOLD || 0.7);
+
+      if (confidence >= threshold) {
+        status = label; // e.g., "overflow", "clean", "full"
+      }
     }
 
+    // 2. 🔥 IF WE HAVE A DUSTBIN ID, UPDATE SYSTEM 🔥
+    if (dustbinId && status !== "unknown") {
+      
+      // A. Update Database
+      const updatedBin = await Dustbin.findByIdAndUpdate(
+        dustbinId,
+        { 
+            status: status,
+            lastCleanedAt: status === 'clean' ? new Date() : undefined 
+        },
+        { new: true }
+      );
+
+      if (updatedBin) {
+        // B. 🔥 SOCKET EMIT: Alert the Dashboard Instantly
+        const io = req.app.get("io");
+        io.emit("dustbin_data_update", { 
+          type: "UPDATE", 
+          data: updatedBin 
+        });
+
+        console.log(`🤖 AI Update: Dustbin ${updatedBin.name} is now ${status.toUpperCase()}`);
+      }
+    }
+
+    // 3. Return JSON to the Camera/User
     return res.json({
-      dustbinId: req.body.dustbinId || null,
+      dustbinId: dustbinId || null,
       status,
       confidence: (confidence * 100).toFixed(2),
+      message: "Prediction processed and Dashboard updated"
     });
 
   } catch (err) {
