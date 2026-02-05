@@ -276,8 +276,8 @@ router.post("/set-offline", staffAuth, async (req, res) => {
 
 router.post("/ping-vehicle", staffAuth, async (req, res) => {
   try {
-    const driverId = req.user._id;
-
+    const driverId = req.user.id;
+    console.log(`Ping received from driver ${driverId} at ${new Date().toISOString()}`);
     // 1. Pehle Driver (Staff) ko find karo
     const driver = await Staff.findById(driverId);
 

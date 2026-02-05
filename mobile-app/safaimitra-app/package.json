@@ -9,10 +9,12 @@
     "web": "expo start --web"
   },
   "dependencies": {
-    "@react-native-async-storage/async-storage": "^2.2.0",
-    "axios": "^1.13.3",
+    "@react-native-async-storage/async-storage": "2.2.0",
+    "axios": "^1.13.4",
     "babel-preset-expo": "^54.0.9",
+    "clsx": "^2.1.1",
     "expo": "~54.0.32",
+    "expo-constants": "~18.0.13",
     "expo-image-picker": "^17.0.10",
     "expo-linear-gradient": "~15.0.8",
     "expo-status-bar": "~3.0.9",
@@ -25,7 +27,8 @@
     "react-native-maps": "1.20.1",
     "react-native-safe-area-context": "^5.6.2",
     "react-native-svg": "15.12.1",
-    "react-native-web": "^0.21.0"
+    "react-native-web": "^0.21.0",
+    "tailwind-merge": "^3.4.0"
   },
   "private": true,
   "devDependencies": {
