@@ -5,6 +5,7 @@ import axios from "axios";
 import { Users, Building2, UserCog, Activity, Plus, Edit2, Trash2, Power, X, Menu, Settings, LogOut, User, Shield, Key, Mail, Phone, MapPin, Save, UserX } from 'lucide-react';
 
 import dynamic from "next/dynamic";
+import { io } from "socket.io-client";
 
 // Leaflet components – SSR off
 const MapContainer = dynamic(
@@ -96,6 +97,51 @@ export default function OfficeDashboard() {
             [name]: type === 'checkbox' ? checked : value
         });
     };
+
+    // ==========================================
+    // 🔥 REAL-TIME SOCKET LISTENER ADDED HERE 🔥
+    // ==========================================
+    useEffect(() => {
+        // 1. Connect to Backend
+        const socket = io("http://localhost:5001");
+
+        // 2. Listen for Admin Updates (Add/Delete)
+        socket.on("admin_list_update", (payload) => {
+            console.log("Socket Update Received (Admin):", payload);
+
+            if (payload.type === "ADD") {
+                // Add new admin to top of list
+                setAdmins((prev) => [payload.data, ...prev]);
+            }
+            else if (payload.type === "DELETE") {
+                // Remove admin from list
+                setAdmins((prev) => prev.filter((a) => a.id !== payload.id));
+            }
+        });
+
+        // 3. Listen for Office Updates (Add/Update/Delete)
+        // Note: Ensure your Backend 'routes/office.js' emits 'office_list_update'
+        socket.on("office_list_update", (payload) => {
+            console.log("Socket Update Received (Office):", payload);
+
+            if (payload.type === "ADD") {
+                setOffices((prev) => [payload.data, ...prev]);
+            }
+            else if (payload.type === "UPDATE") {
+                setOffices((prev) =>
+                    prev.map((o) => (o.id === payload.data.id ? payload.data : o))
+                );
+            }
+            else if (payload.type === "DELETE") {
+                setOffices((prev) => prev.filter((o) => o.id !== payload.id));
+            }
+        });
+
+        // 4. Cleanup on Unmount
+        return () => {
+            socket.disconnect();
+        };
+    }, []);
 
 
     // Show Office Data

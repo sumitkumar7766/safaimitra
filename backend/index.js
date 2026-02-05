@@ -59,8 +59,23 @@ const store = MongoStore.create({
   touchAfter: 24 * 3600,
 });
 
+const allowedOrigins = [
+  "http://localhost:3000",
+  "http://10.242.244.129:5001"
+];
 // Middlewares
-app.use(cors({}));
+app.use(cors({
+  origin: function (origin, callback) {
+    // allow requests with no origin (like mobile apps or curl requests)
+    if (!origin) return callback(null, true);
+    if (allowedOrigins.indexOf(origin) === -1) {
+      var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
+      return callback(new Error(msg), false);
+    }
+    return callback(null, true);
+  },
+  credentials: true
+}));
 app.use(express.json());
 app.use(bodyParser.json());
 
@@ -69,14 +84,14 @@ const server = http.createServer(app);
 // 2. 🔥 SOCKET.IO SETUP WITH CORS (Ye Important Hai) 🔥
 const io = new Server(server, {
   cors: {
-    origin: "http://localhost:3000", // Yahan * mat lagana, exact URL likho
+    origin: ["http://localhost:3000", "http://10.242.244.129:5001"], // Dono URLs allow kar diye
     methods: ["GET", "POST"],
     credentials: true
   },
-  transports: ['polling', 'websocket'] // Dono allow karo
+  transports: ['polling', 'websocket']
 });
 
-app.set("io", io); 
+app.set("io", io);
 
 // ... Baaki code (DB connection, Routes) ...
 
@@ -171,7 +186,7 @@ app.get("/", (_req, res) => {
 /* ============================================================ */
 
 // '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("0 4 * * *", async () => {
+cron.schedule("1 15 * * *", async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
 
   try {

@@ -2,9 +2,9 @@ const express = require("express");
 const router = express.Router();
 const Admin = require("../model/AdminModel");
 const adminAuth = require("../middleware/adminAuth");
-const { route } = require("./office");
+// const { route } = require("./office"); // Unused import removed for cleaner code
 
-// Admin Registration
+// 1. ADMIN REGISTRATION (Emit 'ADD' event)
 router.post("/register", adminAuth, async (req, res) => {
   try {
     const newAdmin = new Admin({
@@ -13,10 +13,27 @@ router.post("/register", adminAuth, async (req, res) => {
       username: req.body.email,
       role: "admin",
     });
-    console.log(newAdmin);
 
-    // passport-local-mongoose method
+    // Save using passport-local-mongoose
     const admin = await Admin.register(newAdmin, req.body.password);
+
+    // 🔥 SOCKET.IO LOGIC START 🔥
+    const io = req.app.get("io");
+    
+    // Emit event to all clients that a new admin was added
+    io.emit("admin_list_update", { 
+      type: "ADD", 
+      data: {
+        _id: admin._id,
+        id: admin._id.toString(),
+        name: admin.name,
+        email: admin.email,
+        username: admin.username,
+        role: admin.role,
+        createdAt: admin.createdAt
+      } 
+    });
+    // 🔥 SOCKET.IO LOGIC END 🔥
 
     res.status(201).json({
       message: "Admin registered successfully",
@@ -36,6 +53,7 @@ router.post("/register", adminAuth, async (req, res) => {
   }
 });
 
+// 2. GET ALL ADMINS (No Socket needed here, just standard fetch)
 router.get("/", adminAuth, async (req, res) => {
   try {
     const admins = await Admin.find().sort({ createdAt: -1 });
@@ -43,8 +61,8 @@ router.get("/", adminAuth, async (req, res) => {
     res.json({
       success: true,
       admins: admins.map((a) => ({
-        _id: a._id,                 // raw Mongo id
-        id: a._id.toString(),       // friendly id for frontend
+        _id: a._id,
+        id: a._id.toString(),
         name: a.name,
         email: a.email,
         username: a.username,
@@ -60,6 +78,7 @@ router.get("/", adminAuth, async (req, res) => {
   }
 });
 
+// 3. DELETE ADMIN (Emit 'DELETE' event)
 router.delete("/delete/:id", adminAuth, async (req, res) => {
   try {
     const adminId = req.params.id;
@@ -68,6 +87,16 @@ router.delete("/delete/:id", adminAuth, async (req, res) => {
     if (!deletedAdmin) {
       return res.status(404).json({ message: "Admin not found" });
     }
+
+    // 🔥 SOCKET.IO LOGIC START 🔥
+    const io = req.app.get("io");
+    
+    // Emit event so frontend removes this ID from the list immediately
+    io.emit("admin_list_update", { 
+      type: "DELETE", 
+      id: adminId 
+    });
+    // 🔥 SOCKET.IO LOGIC END 🔥
 
     res.json({
       success: true,
@@ -80,6 +109,5 @@ router.delete("/delete/:id", adminAuth, async (req, res) => {
     });
   }
 });
-
 
 module.exports = router;

@@ -6,7 +6,7 @@ import axios from "axios";
 import { ArrowLeft, Save } from "lucide-react";
 import dynamic from "next/dynamic";
 
-// Leaflet dynamic imports
+// 1. Only Import COMPONENTS dynamically
 const MapContainer = dynamic(
   () => import("react-leaflet").then((m) => m.MapContainer),
   { ssr: false }
@@ -19,10 +19,24 @@ const Marker = dynamic(
   () => import("react-leaflet").then((m) => m.Marker),
   { ssr: false }
 );
-const useMapEvents = dynamic(
-  () => import("react-leaflet").then((m) => m.useMapEvents),
-  { ssr: false }
-);
+
+// 2. Define the Map Click Component OUTSIDE the main function
+// We pass 'setFormData' as a prop
+const LocationSelector = ({ setFormData }) => {
+  // We use require here to access the Hook safely on the client side
+  const { useMapEvents } = require("react-leaflet");
+
+  useMapEvents({
+    click(e) {
+      setFormData((prev) => ({
+        ...prev,
+        latitude: e.latlng.lat.toFixed(6),
+        longitude: e.latlng.lng.toFixed(6),
+      }));
+    },
+  });
+  return null;
+};
 
 export default function NewOfficePage() {
   const router = useRouter();
@@ -40,6 +54,7 @@ export default function NewOfficePage() {
     longitude: "",
   });
 
+  // Fix for Leaflet Marker Icons
   useEffect(() => {
     if (typeof window !== "undefined") {
       import("leaflet").then((L) => {
@@ -58,20 +73,6 @@ export default function NewOfficePage() {
 
   const handleInputChange = (e) => {
     setFormData({ ...formData, [e.target.name]: e.target.value });
-  };
-
-  const MapClickHandler = () => {
-    const MapEvents = require("react-leaflet").useMapEvents;
-    MapEvents({
-      click(e) {
-        setFormData((prev) => ({
-          ...prev,
-          latitude: e.latlng.lat.toFixed(6),
-          longitude: e.latlng.lng.toFixed(6),
-        }));
-      },
-    });
-    return null;
   };
 
   const handleCreateOffice = async () => {
@@ -174,7 +175,10 @@ export default function NewOfficePage() {
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
-              <MapClickHandler />
+
+              {/* 3. Use the corrected Component here */}
+              <LocationSelector setFormData={setFormData} />
+
               {formData.latitude && formData.longitude && (
                 <Marker
                   position={[

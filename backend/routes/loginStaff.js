@@ -106,7 +106,17 @@ router.get("/userdata", staffAuth, async (req, res) => {
     const decoded = jwt.verify(token, JWT_SECRET);
 
     // 3. Database se Staff dhundhna (password hata kar)
-    const staff = await Staff.findById(decoded.id).select("-password");
+    const staff = await Staff.findById(decoded.id)
+      .select("-password")
+      .populate({
+        path: "assignedVehicleId", // 1st Level: Staff -> Vehicle
+        select: "vehicleNumber routeId", // Vehicle se jo fields chahiye
+        populate: {
+          path: "routeId", // 2nd Level: Vehicle -> Route
+          model: "Route",  // Route model ka exact naam (case-sensitive)
+          select: "name" // Route se jo fields chahiye
+        }
+      });
 
     if (!staff) {
       return res.status(404).json({

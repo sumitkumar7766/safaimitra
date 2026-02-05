@@ -5,6 +5,7 @@ import dynamic from 'next/dynamic';
 import { useRouter } from 'next/navigation';
 import axios from "axios";
 import { io } from "socket.io-client";
+import { useMap } from 'react-leaflet';
 
 // Import Leaflet CSS
 import 'leaflet/dist/leaflet.css';
@@ -31,6 +32,22 @@ const Popup = dynamic(
   { ssr: false }
 );
 
+// Is component ko file me neeche kahin bhi rakh dein
+function MapRecenter({ lat, lng }) {
+  const map = useMap();
+
+  useEffect(() => {
+    // setView map ko smooth animate karega bina refresh kiye
+    if (lat && lng) {
+      map.setView([lat, lng], map.getZoom(), {
+        animate: true,
+      });
+    }
+  }, [lat, lng, map]);
+
+  return null;
+}
+
 export default function VehiclePage() {
   const router = useRouter();
 
@@ -44,8 +61,6 @@ export default function VehiclePage() {
   const [truckIcon, setTruckIcon] = useState(null);
 
   const [staff, setStaff] = useState(null);
-  const [vehicle, setVehicle] = useState(null);
-  const [route, setRoute] = useState(null);
   const [routeStops, setRouteStops] = useState([]);
   const [routeLine, setRouteLine] = useState([]);
   const [driverLocation, setDriverLocation] = useState(null);
@@ -709,10 +724,10 @@ export default function VehiclePage() {
         <div className="px-4 py-4 flex items-center justify-between">
           <div className="flex items-center gap-3">
             <div className="w-12 h-12 bg-gradient-to-br from-blue-600 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg"><span className="text-2xl">🚛</span></div>
-            <div><h1 className="text-lg font-bold text-gray-800">SafaiMitra Driver</h1><p className="text-xs text-gray-600">{vehicle ? vehicle.vehicleNumber : "No Vehicle"}</p></div>
+            <div><h1 className="text-lg font-bold text-gray-800">SafaiMitra Driver</h1><p className="text-xs text-gray-600">{staff ? staff.assignedVehicleId?.vehicleNumber : "No Vehicle"}</p></div>
           </div>
           <div className="flex items-center gap-4">
-            <div className="text-right"><p className="text-xs text-gray-500">Route</p><p className="text-sm font-semibold text-gray-800">{route ? route.name : "No Route"}</p></div>
+            <div className="text-right"><p className="text-xs text-gray-500">Route</p><p className="text-sm font-semibold text-gray-800">{staff ? staff.assignedVehicleId.routeId?.name : "No Route"}</p></div>
             <button onClick={handleLogout} className="px-4 py-2 bg-red-500 text-white rounded-lg font-semibold hover:bg-red-600 transition-colors">Logout</button>
           </div>
         </div>
@@ -759,6 +774,7 @@ export default function VehiclePage() {
               {isClient && (
                 <MapContainer key={mapCenter.join(",")} center={mapCenter} zoom={17} style={{ height: '100%', width: '100%' }} scrollWheelZoom={true}>
                   <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" attribution='&copy; OpenStreetMap' />
+                  <MapRecenter lat={mapCenter[0]} lng={mapCenter[1]} />
                   {!isRouteCountComplete && routeLine.length > 0 && <Polyline positions={routeLine} pathOptions={{ color: "#2563eb", weight: 5, opacity: 0.85 }} />}
                   {routeStops.map((stop, index) => (
                     <Marker key={stop.id} position={stop.coordinates} icon={getBinIcon(stop.status)}

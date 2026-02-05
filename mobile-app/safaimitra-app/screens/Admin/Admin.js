@@ -33,6 +33,8 @@ import AdminPage from '../../App';
 import NewOffice from "./newoffice"; // Path check kar lena apne hisaab se
 import NewAdmin from "./newadmin"; // Path check kar lena apne hisaab se
 
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
 // Added 'goBack' prop here to handle navigation
 export default function OfficeDashboard({ goBack }) {
   const [screen, setScreen] = useState("home");
@@ -122,7 +124,7 @@ export default function OfficeDashboard({ goBack }) {
     try {
       setLoading(true);
       const token = await AsyncStorage.getItem('token');
-      const res = await axios.get('http://10.13.177.129:5001/office', {
+      const res = await axios.get(`${API_BASE_URL}/office`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -148,7 +150,7 @@ export default function OfficeDashboard({ goBack }) {
   const fetchAdmins = async () => {
     try {
       const token = await AsyncStorage.getItem('token');
-      const res = await axios.get('http://10.13.177.129:5001/admin', {
+      const res = await axios.get(`${API_BASE_URL}/admin`, {
         headers: { Authorization: `Bearer ${token}` }
       });
 
@@ -180,7 +182,7 @@ export default function OfficeDashboard({ goBack }) {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('token');
-              await axios.delete(`http://10.13.177.129:5001/office/${officeId}`, {
+              await axios.delete(`${API_BASE_URL}/office/${officeId}`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
               setOffices(prev => prev.filter(o => o.id !== officeId));
@@ -206,7 +208,7 @@ export default function OfficeDashboard({ goBack }) {
           onPress: async () => {
             try {
               const token = await AsyncStorage.getItem('token');
-              await axios.delete(`http://10.13.177.129:5001/admin/${adminId}`, {
+              await axios.delete(`${API_BASE_URL}/admin/${adminId}`, {
                 headers: { Authorization: `Bearer ${token}` }
               });
               setAdmins(prev => prev.filter(a => a.id !== adminId));

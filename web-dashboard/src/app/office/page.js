@@ -151,7 +151,7 @@ const DashboardView = React.memo(({
                           <span className={`px-3 py-1 rounded-full text-xs font-semibold ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
                             bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' : bin.status === 'missed' ?
                               'bg-red-100 text-red-800'
-                              : bin.status === 'skiped' ? 'bg-blue-100 text-blue-800'
+                              : bin.status === 'skiped' ? 'bg-red-200 text-blue-800'
                                 : bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800'
                                   : bin.status === 'ideal' ? 'bg-black text-white'
                                     : 'bg-gray-100 text-gray-800'
@@ -1013,7 +1013,7 @@ export default function OfficeDashboard() {
         });
 
         setShowAddModal(false);
-        router.push(`/office?id=${userData._id}`);
+        // router.push(`/office?id=${userData._id}`);
       } catch (err) {
         console.error("Staff Register Error:", err);
         alert("Server error while registering staff");
@@ -1920,7 +1920,7 @@ export default function OfficeDashboard() {
                       <span className={`px-3 py-1 inline-flex text-xs leading-5 font-semibold rounded-full ${bin.status === 'clean' ? 'bg-green-100 text-green-800' :
                         bin.status === 'overflow' ? 'bg-yellow-100 text-yellow-800' :
                           bin.status === 'missed' ? 'bg-red-100 text-red-800' :
-                            bin.status === 'skiped' ? 'bg-blue-100 text-blue-800' :
+                            bin.status === 'skiped' ? 'bg-red-200 text-blue-800' :
                               bin.status === 'suspecies' ? 'bg-orange-100 text-orange-800' :
                                 'bg-gray-100 text-gray-800'
                         }`}>
