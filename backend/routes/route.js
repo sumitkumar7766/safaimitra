@@ -9,7 +9,7 @@ const Dustbin = require("../model/DustbinModel");
 /* ================= REGISTER ROUTE ================= */
 router.post("/register", officeAuth, async (req, res) => {
   const { name, description, dustbins, assignedVehicleId } = req.body;
-  const officeId = req.user.id; // token se aayega
+  const officeId = req.user.id;
   console.log("Route Register Attempt:", name, "Office:", officeId);
 
   if (!name) {
@@ -20,17 +20,12 @@ router.post("/register", officeAuth, async (req, res) => {
   }
 
   try {
-    // Agar vehicle assign ho rahi hai to check karo
     if (assignedVehicleId) {
       const vehicle = await Vehicle.findById(assignedVehicleId);
       if (!vehicle) {
-        return res.status(404).json({
-          success: false,
-          message: "Vehicle not found",
-        });
+        return res.status(404).json({ success: false, message: "Vehicle not found" });
       }
 
-      // Check: ye vehicle kisi aur active route me to assigned nahi hai
       const alreadyAssigned = await Route.findOne({
         assignedVehicleId,
         active: true,
@@ -53,22 +48,28 @@ router.post("/register", officeAuth, async (req, res) => {
       active: true,
     });
 
-    // 🏢 Office ke andar bhi dustbin ID save karo
     await Office.findByIdAndUpdate(officeId, {
       $addToSet: { route: route._id },
+    });
+
+    // Populate for frontend display
+    const populatedRoute = await Route.findById(route._id).populate("assignedVehicleId", "vehicleNumber type");
+
+    // 🔥 SOCKET EMIT: New Route Created
+    const io = req.app.get("io");
+    io.emit("route_data_update", { 
+      type: "ADD", 
+      data: populatedRoute 
     });
 
     return res.json({
       success: true,
       message: "Route successfully registered",
-      route,
+      route: populatedRoute,
     });
   } catch (err) {
     console.error("Route Register Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -87,10 +88,7 @@ router.get("/list/:officeId", officeAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("Get Routes Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -100,47 +98,40 @@ router.delete("/delete/:routeId", officeAuth, async (req, res) => {
   const officeId = req.user.id;
 
   try {
-    // 1. Route find karo (office verify ke saath)
     const route = await Route.findOne({ _id: routeId, officeId });
     if (!route) {
-      return res.status(404).json({
-        success: false,
-        message: "Route not found for this office",
-      });
+      return res.status(404).json({ success: false, message: "Route not found" });
     }
 
-    // 2. Agar kisi vehicle ko assigned hai, to us vehicle se route hata do
     if (route.assignedVehicleId) {
       await Vehicle.findByIdAndUpdate(
         route.assignedVehicleId,
-        { $unset: { routeId: "" } } // agar vehicle me routeId field hai
+        { $unset: { routeId: "" } }
       );
     }
 
-    // Sab dustbins se ye route hata do
     await Dustbin.updateMany(
       { routeId: routeId, officeId: officeId },
       { $unset: { routeId: "" } }
     );
 
-    // 🏢 Office ke andar se bhi dustbin hatao (agar office me array hai)
     await Office.findByIdAndUpdate(officeId, {
       $pull: { route: route._id },
     });
 
-    // 3. Route delete karo
     await Route.findByIdAndDelete(routeId);
 
-    return res.json({
-      success: true,
-      message: "Route successfully deleted",
+    // 🔥 SOCKET EMIT: Route Deleted
+    const io = req.app.get("io");
+    io.emit("route_data_update", { 
+      type: "DELETE", 
+      id: routeId 
     });
+
+    return res.json({ success: true, message: "Route successfully deleted" });
   } catch (err) {
     console.error("Delete Route Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
@@ -148,29 +139,19 @@ router.delete("/delete/:routeId", officeAuth, async (req, res) => {
 router.put("/update/:routeId", officeAuth, async (req, res) => {
   const { routeId } = req.params;
   const officeId = req.user.id;
-
   const { name, description, assignedVehicleId } = req.body;
 
   if (!name) {
-    return res.status(400).json({
-      success: false,
-      message: "Route name required hai",
-    });
+    return res.status(400).json({ success: false, message: "Route name required hai" });
   }
 
   try {
-    // 1. Route find karo (office verify ke saath)
     const route = await Route.findOne({ _id: routeId, officeId });
     if (!route) {
-      return res.status(404).json({
-        success: false,
-        message: "Route not found for this office",
-      });
+      return res.status(404).json({ success: false, message: "Route not found" });
     }
 
-    // 2. Agar vehicle assign/change ho rahi hai
     if (assignedVehicleId && assignedVehicleId !== String(route.assignedVehicleId)) {
-      // Check: ye vehicle kisi aur active route me to nahi hai
       const alreadyAssigned = await Route.findOne({
         _id: { $ne: routeId },
         assignedVehicleId,
@@ -184,24 +165,14 @@ router.put("/update/:routeId", officeAuth, async (req, res) => {
         });
       }
 
-      // Purani vehicle se route unlink karo (agar thi)
       if (route.assignedVehicleId) {
-        await Vehicle.findByIdAndUpdate(
-          route.assignedVehicleId,
-          { $unset: { routeId: "" } }
-        );
+        await Vehicle.findByIdAndUpdate(route.assignedVehicleId, { $unset: { routeId: "" } });
       }
 
-      // Nayi vehicle me routeId set karo
-      await Vehicle.findByIdAndUpdate(
-        assignedVehicleId,
-        { routeId: routeId }
-      );
-
+      await Vehicle.findByIdAndUpdate(assignedVehicleId, { routeId: routeId });
       route.assignedVehicleId = assignedVehicleId;
     }
 
-    // 3. Baaki fields update karo
     route.name = name;
     route.description = description || "";
 
@@ -210,6 +181,13 @@ router.put("/update/:routeId", officeAuth, async (req, res) => {
     const updatedRoute = await Route.findById(routeId)
       .populate("assignedVehicleId", "vehicleNumber type");
 
+    // 🔥 SOCKET EMIT: Route Updated
+    const io = req.app.get("io");
+    io.emit("route_data_update", { 
+      type: "UPDATE", 
+      data: updatedRoute 
+    });
+
     return res.json({
       success: true,
       message: "Route updated successfully",
@@ -217,13 +195,11 @@ router.put("/update/:routeId", officeAuth, async (req, res) => {
     });
   } catch (err) {
     console.error("Update Route Error:", err);
-    return res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    return res.status(500).json({ success: false, message: err.message });
   }
 });
 
+/* ================= REMOVE VEHICLE ================= */
 router.put("/remove-vehicle/:routeId", officeAuth, async (req, res) => {
   const { routeId } = req.params;
   const officeId = req.user.id;
@@ -231,32 +207,31 @@ router.put("/remove-vehicle/:routeId", officeAuth, async (req, res) => {
   try {
     const route = await Route.findOne({ _id: routeId, officeId });
     if (!route) {
-      return res.status(404).json({
-        success: false,
-        message: "Route not found",
-      });
+      return res.status(404).json({ success: false, message: "Route not found" });
     }
 
-    // Agar koi vehicle assigned hai to vehicle se bhi route hatao
     if (route.assignedVehicleId) {
       await Vehicle.findByIdAndUpdate(route.assignedVehicleId, {
         $unset: { routeId: "" },
       });
     }
 
-    // Route se vehicle hatao
     route.assignedVehicleId = null;
     await route.save();
 
-    res.json({
-      success: true,
-      message: "Vehicle removed from route",
+    // Re-fetch to send clean object
+    const updatedRoute = await Route.findById(routeId);
+
+    // 🔥 SOCKET EMIT: Vehicle Removed (Update Route)
+    const io = req.app.get("io");
+    io.emit("route_data_update", { 
+      type: "UPDATE", 
+      data: updatedRoute 
     });
+
+    res.json({ success: true, message: "Vehicle removed from route" });
   } catch (err) {
-    res.status(500).json({
-      success: false,
-      message: err.message,
-    });
+    res.status(500).json({ success: false, message: err.message });
   }
 });
 

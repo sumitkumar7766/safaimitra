@@ -7,7 +7,7 @@ const Route = require("../model/RouteModel");
 const Dustbin = require("../model/DustbinModel");
 const adminAuth = require("../middleware/adminAuth");
 
-// Manual Office Registration
+// Manual Office Registration (CREATE)
 router.post("/register", adminAuth, async (req, res) => {
   try {
     const {
@@ -38,7 +38,6 @@ router.post("/register", adminAuth, async (req, res) => {
     const lat = parseFloat(latitude);
     const lng = parseFloat(longitude);
 
-    // Geo validation
     if (
       isNaN(lat) ||
       isNaN(lng) ||
@@ -56,35 +55,47 @@ router.post("/register", adminAuth, async (req, res) => {
       officeName,
       adminName,
       adminEmail,
-      username: adminEmail, // login ke liye
+      username: adminEmail,
       status: status || "Active",
-
       latitude: lat,
       longitude: lng,
       location: {
         type: "Point",
-        coordinates: [lng, lat], // GeoJSON order
+        coordinates: [lng, lat],
       },
     });
 
-    // passport-local-mongoose method
+    // Save to DB
     const office = await Office.register(newOffice, password);
+
+    // Prepare data for frontend/socket
+    const officeData = {
+      _id: office._id,
+      id: office._id.toString(),
+      stateName: office.stateName,
+      cityName: office.cityName,
+      officeName: office.officeName,
+      adminName: office.adminName,
+      adminEmail: office.adminEmail,
+      username: office.username,
+      status: office.status,
+      latitude: office.latitude,
+      longitude: office.longitude,
+      createdAt: office.createdAt
+    };
+
+    // 🔥 SOCKET EMIT: Add Office 🔥
+    const io = req.app.get("io");
+    io.emit("office_list_update", { 
+      type: "ADD", 
+      data: officeData 
+    });
 
     res.status(201).json({
       message: "Office registered successfully",
-      office: {
-        id: office._id,
-        stateName: office.stateName,
-        cityName: office.cityName,
-        officeName: office.officeName,
-        adminName: office.adminName,
-        adminEmail: office.adminEmail,
-        username: office.username,
-        status: office.status,
-        latitude: office.latitude,
-        longitude: office.longitude,
-      },
+      office: officeData,
     });
+
   } catch (err) {
     if (err.name === "UserExistsError") {
       return res.status(409).json({ message: "Office already exists" });
@@ -95,7 +106,7 @@ router.post("/register", adminAuth, async (req, res) => {
   }
 });
 
-// GET all offices
+// GET all offices (READ - No Socket Needed)
 router.get("/", adminAuth, async (req, res) => {
   try {
     const offices = await Office.find().sort({ createdAt: -1 });
@@ -125,7 +136,7 @@ router.get("/", adminAuth, async (req, res) => {
   }
 });
 
-// DELETE office + cascade data
+// DELETE office + cascade data (DELETE)
 router.delete("/delete/:id", adminAuth, async (req, res) => {
   try {
     const officeId = req.params.id;
@@ -135,15 +146,25 @@ router.delete("/delete/:id", adminAuth, async (req, res) => {
       return res.status(404).json({ message: "Office not found" });
     }
 
+    // Cascade Delete
     await Staff.deleteMany({ officeId });
     await Vehicle.deleteMany({ officeId });
     await Route.deleteMany({ officeId });
     await Dustbin.deleteMany({ officeId });
+    
+    // Delete Office
     await Office.findByIdAndDelete(officeId);
+
+    // 🔥 SOCKET EMIT: Delete Office 🔥
+    const io = req.app.get("io");
+    io.emit("office_list_update", { 
+      type: "DELETE", 
+      id: officeId 
+    });
 
     return res.json({
       success: true,
-      message: "Office aur usse related saara data successfully deleted",
+      message: "Office and related data successfully deleted",
     });
   } catch (err) {
     console.error("Delete Office Error:", err);
@@ -151,8 +172,7 @@ router.delete("/delete/:id", adminAuth, async (req, res) => {
   }
 });
 
-// Update office detail
-// UPDATE OFFICE
+// UPDATE OFFICE (UPDATE)
 router.put("/update/:id", adminAuth, async (req, res) => {
   try {
     const officeId = req.params.id;
@@ -187,7 +207,7 @@ router.put("/update/:id", adminAuth, async (req, res) => {
         lng < -180 || lng > 180
       ) {
         return res.status(400).json({
-          message: "Invalid coordinates. Latitude -90 to 90, Longitude -180 to 180",
+          message: "Invalid coordinates",
         });
       }
     }
@@ -210,10 +230,33 @@ router.put("/update/:id", adminAuth, async (req, res) => {
 
     await office.save();
 
+    // Prepare data for frontend
+    const updatedData = {
+        _id: office._id,
+        id: office._id.toString(), // Important for React Keys
+        stateName: office.stateName,
+        cityName: office.cityName,
+        officeName: office.officeName,
+        adminName: office.adminName,
+        adminEmail: office.adminEmail,
+        username: office.username,
+        status: office.status,
+        latitude: office.latitude,
+        longitude: office.longitude,
+        createdAt: office.createdAt
+    };
+
+    // 🔥 SOCKET EMIT: Update Office 🔥
+    const io = req.app.get("io");
+    io.emit("office_list_update", { 
+      type: "UPDATE", 
+      data: updatedData 
+    });
+
     return res.json({
       success: true,
       message: "Office updated successfully",
-      office,
+      office: updatedData,
     });
   } catch (err) {
     console.error("Update Office Error:", err);

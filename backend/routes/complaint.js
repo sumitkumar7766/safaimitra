@@ -11,59 +11,43 @@ const upload = require("../utils/cloudinaryConfig");
 const staffAuth = require("../middleware/staffAuth");
 const mongoose = require("mongoose");
 
-// sumit
-// GET: Fetch ALL complaints for a specific Office 
-// GET: Fetch ALL complaints (With Separated Counts)
+// GET: Fetch ALL complaints (No Socket change needed here, just fetching)
 router.get("/all/:officeId", officeAuth, async (req, res) => {
   try {
     const { officeId } = req.params;
 
     const complaints = await Complaint.aggregate([
-      // Stage 1: Sirf is office ki complaints (Resolved filter nahi hai)
       {
         $match: {
           officeId: new mongoose.Types.ObjectId(officeId)
         }
       },
-      
-      // Stage 2: Sort (Latest Pehle)
       { $sort: { createdAt: -1 } },
-
-      // Stage 3: Grouping & Conditional Counting
       {
         $group: {
           _id: "$dustbinId", 
-          
-          // 🔥 NEW: Total Count (History + Current)
           totalReports: { $sum: 1 }, 
-
-          // 🔥 NEW: Sirf Active Count (Pending/Assigned/Overflow)
           activeReports: { 
             $sum: { 
               $cond: [ 
                 { $in: ["$status", ["pending", "assigned", "overflow", "in_progress"]] }, 
-                1, // Agar status active hai to 1 jodo
-                0  // Agar resolved hai to 0 jodo
+                1, 
+                0 
               ] 
             } 
           },
-
-          // Latest details
           latestDescription: { $first: "$description" },
           latestPriority: { $max: "$priority" }, 
           complaintIds: { $push: "$_id" },
-
           area: { $first: "$area" },
           latitude: { $first: "$latitude" },
           longitude: { $first: "$longitude" },
           ComimageUrl: { $first: "$ComimageUrl" },
-          status: { $first: "$status" }, // Latest status
+          status: { $first: "$status" },
           vehicle: { $first: "$vehicle" },
           createdAt: { $first: "$createdAt" }
         }
       },
-      
-      // Stage 4: Dustbin Details
       {
         $lookup: {
           from: "dustbins",
@@ -73,8 +57,6 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
         }
       },
       { $unwind: { path: "$dustbinDetails", preserveNullAndEmptyArrays: true } },
-
-      // Stage 5: Route Name
       {
         $lookup: {
           from: "routes",
@@ -84,16 +66,12 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
         }
       },
       { $unwind: { path: "$routeInfo", preserveNullAndEmptyArrays: true } },
-
-      // Stage 6: Cleanup
       {
         $addFields: {
           "dustbinDetails.routeName": "$routeInfo.name"
         }
       },
       { $project: { routeInfo: 0 } },
-
-      // Stage 7: Sort by Active Reports (Jispe kaam baki hai wo upar dikhe)
       { $sort: { activeReports: -1, createdAt: -1 } }
     ]);
 
@@ -109,20 +87,22 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
   }
 });
 
+// POST: Assign Vehicle (🔥 SOCKET IO LOGIC ADDED HERE 🔥)
 router.post("/assign-vehicle", async (req, res) => {
   try {
-    // Frontend ab ek ID nahi, balki IDs ka Array bhejega
     const { complaintIds, vehicleId } = req.body;
 
+    // 1. Get Socket Instance
     const io = req.app.get("io");
+    
     const vehicle = await Vehicle.findById(vehicleId);
     if (!vehicle) return res.status(404).json({ success: false, message: "Vehicle not found" });
 
     const driver = await Staff.findOne({ assignedVehicleId: vehicleId, role: "driver" });
 
-    // 🔥 JADOO: Ek saath saari complaints ko update karo
+    // 2. Database Update
     await Complaint.updateMany(
-      { _id: { $in: complaintIds } }, // Jinki IDs is array me hain
+      { _id: { $in: complaintIds } }, 
       {
         $set: {
           vehicle: vehicle.vehicleNumber,
@@ -133,10 +113,20 @@ router.post("/assign-vehicle", async (req, res) => {
       }
     );
 
-    // Driver Notification Logic (Pehli complaint ka data use karo notification ke liye)
+    // 3. Get Details for Notifications
     const firstComplaint = await Complaint.findById(complaintIds[0]).populate("dustbinId");
 
-    if (driver && io) {
+    // 🔥 SOCKET EMIT 1: Update Office Dashboard (Real-time List Refresh)
+    // This tells the frontend "Hey, complaints updated, refresh your list"
+    io.emit("complaint_status_update", {
+        type: "ASSIGNED",
+        complaintIds: complaintIds,
+        vehicleNumber: vehicle.vehicleNumber,
+        status: "assigned"
+    });
+
+    // 🔥 SOCKET EMIT 2: Notify Driver (Specific Room)
+    if (driver) {
       const newStopData = {
         id: firstComplaint.dustbinId ? firstComplaint.dustbinId._id : firstComplaint._id,
         name: firstComplaint.dustbinId ? `🚨 ${firstComplaint.dustbinId.name}` : "🚨 Urgent Cleanup",
@@ -144,17 +134,19 @@ router.post("/assign-vehicle", async (req, res) => {
         status: "overflow",
         type: "complaint",
         isNew: true,
-        // Driver ko sirf ek ID bhejo (resolve karne ke liye), backend sambhal lega
         complaintId: firstComplaint._id,
-        isGrouped: true // Optional flag
+        isGrouped: true
       };
 
+      // Send alert specifically to this driver's room
       io.to(`driver_${driver._id}`).emit("new_job_alert", {
         title: "🚨 Emergency Task!",
         message: `Total ${complaintIds.length} reports at ${firstComplaint.area}`,
         newStop: newStopData,
         imageUrl: firstComplaint.ComimageUrl
       });
+      
+      console.log(`Socket sent to driver_${driver._id}`);
     }
 
     res.json({

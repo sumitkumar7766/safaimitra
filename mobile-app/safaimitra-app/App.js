@@ -18,6 +18,7 @@ import axios from "axios";
 // abhi ke liye main AdminPage ko hi reuse kar raha hu props ke sath.
 import AdminPage from "./screens/Admin/Admin"; 
 import OfficeDashboard from "./screens/Office/Office";
+import StaffDashboard from "./screens/Staff/Staff";
 
 const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
 
@@ -87,7 +88,7 @@ const processStrictLogin = async (username, password, endpoint, expectedRole, on
       } else if (expectedRole === "office") {
         onSuccess("officeDashboard"); // Office ke liye alag screen name
       } else if (expectedRole === "vehicle") {
-        onSuccess("vehicle");
+        onSuccess("staffDashboard");
       } else {
         onSuccess("citizen");
       }
@@ -259,7 +260,7 @@ export default function App() {
   }
 
   if (screen === "citizen") return <Citizen goBack={handleLogout} />;
-  if (screen === "vehicle") return <Vehicle goBack={handleLogout} />;
+  if (screen === "vehicle") return <StaffDashboard goBack={handleLogout} />;
   
   if (screen === "register") return <UserRegister goBack={() => setScreen("citizenLogin")} />;
 
