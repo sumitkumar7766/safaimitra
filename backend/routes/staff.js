@@ -315,6 +315,7 @@ router.post("/set-offline", staffAuth, async (req, res) => {
   try {
     const staff = await Staff.findById(req.user.id);
     if (!staff || !staff.assignedVehicleId) return res.json({ success: true });
+    console.log(`Setting vehicle ${staff.assignedVehicleId} offline for staff ${staff._id}`);
 
     const updatedVehicle = await Vehicle.findByIdAndUpdate(
       staff.assignedVehicleId, 

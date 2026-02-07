@@ -75,7 +75,7 @@ router.post("/predict", upload.single("image"), async (req, res) => {
         console.log(`🤖 AI Update: Dustbin ${updatedBin.name} is now ${status.toUpperCase()}`);
       }
     }
-
+    console.log(`🤖 Prediction: ${status.toUpperCase()} with confidence ${confidence.toFixed(2)}`);
     // 3. Return JSON to the Camera/User
     return res.json({
       dustbinId: dustbinId || null,
