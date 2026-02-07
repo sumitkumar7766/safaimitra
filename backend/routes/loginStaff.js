@@ -5,6 +5,7 @@ const jwt = require("jsonwebtoken");
 const officeAuth = require("../middleware/officeAuth");
 const passport = require("passport");
 const Staff = require("../model/StaffModel");
+const Vehicle = require("../model/VehicleModel");
 const staffAuth = require("../middleware/staffAuth");
 
 const JWT_SECRET = process.env.SECRET_KEY;
@@ -46,12 +47,12 @@ router.post("/login", async (req, res) => {
       const token = jwt.sign(
         {
           id: user._id,
-          role: user.role,        // driver | helper | supervisor
+          role: user.role, // driver | helper | supervisor
           officeId: user.officeId,
           name: user.name,
         },
         JWT_SECRET,
-        { expiresIn: "7d" }
+        { expiresIn: "7d" },
       );
 
       return res.json({
@@ -76,17 +77,66 @@ router.post("/login", async (req, res) => {
   }
 });
 
-router.post("/logout", (req, res) => {
-  console.log("Staff logout attempt");
+// Logout Route
+router.post("/logout", async (req, res) => {
+  try {
+    console.log("Staff logout attempt");
+    const staffId = req.body.staffId;
+    console.log(`Logging out staff ID: ${staffId}`);
 
-  res.clearCookie("staffToken", {
-    path: "/",
-  });
+    if (staffId) {
+      const staff = await Staff.findById(staffId);
 
-  return res.json({
-    success: true,
-    message: "Staff logout successful",
-  });
+      if (staff) {
+        console.log("Setting staff and vehicle to offline:", staffId);
+
+        staff.isOnline = false;
+        staff.status = "Inactive";
+        await staff.save();
+
+        const updatedVehicle = await Vehicle.findByIdAndUpdate(
+          staff.assignedVehicleId,
+          {
+            isOnline: false,
+            lastSeen: new Date(),
+            status: "Inactive",
+          },
+          { new: true }, 
+        );
+
+        if (updatedVehicle) {
+
+          const io = req.app.get("io");
+
+          io.emit("vehicle_list_update", {
+            type: "UPDATE",
+            data: updatedVehicle,
+          });
+
+          io.emit("staff_list_update", {
+            type: "UPDATE",
+            data: staff,
+          });
+        }
+      }
+      console.log(`Staff ${staffId} status updated to Inactive`);
+    }
+
+    res.clearCookie("staffToken", {
+      path: "/",
+    });
+
+    return res.json({
+      success: true,
+      message: "Staff logged out and status updated to Inactive",
+    });
+  } catch (error) {
+    console.error("Logout DB Error:", error);
+    return res.status(500).json({
+      success: false,
+      message: "Internal server error during logout",
+    });
+  }
 });
 
 //get staf data send to the frontend
@@ -113,9 +163,9 @@ router.get("/userdata", staffAuth, async (req, res) => {
         select: "vehicleNumber routeId", // Vehicle se jo fields chahiye
         populate: {
           path: "routeId", // 2nd Level: Vehicle -> Route
-          model: "Route",  // Route model ka exact naam (case-sensitive)
-          select: "name" // Route se jo fields chahiye
-        }
+          model: "Route", // Route model ka exact naam (case-sensitive)
+          select: "name", // Route se jo fields chahiye
+        },
       });
 
     if (!staff) {

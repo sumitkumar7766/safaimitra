@@ -315,6 +315,13 @@ const DashboardView = React.memo(
             <div className="flex items-center gap-2">
               <div
                 className="w-4 h-4 rounded-full"
+                style={{ backgroundColor: "#000000" }}
+              ></div>
+              <span className="text-sm font-medium text-gray-700">Ideal</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <div
+                className="w-4 h-4 rounded-full"
                 style={{ backgroundColor: "#10b981" }}
               ></div>
               <span className="text-sm font-medium text-gray-700">Clean</span>
@@ -998,7 +1005,7 @@ export default function OfficeDashboard() {
     clean: dustbins.filter((d) => d.status === "clean").length,
     overflow: dustbins.filter((d) => d.status === "overflow").length,
     missed: dustbins.filter((d) => d.status === "missed").length,
-    activeVehicles: vehicles.filter((v) => v.status === "active").length,
+    activeVehicles: vehicles.filter((v) => v.status === "Active").length,
     pendingComplaints: complaints.filter(
       (c) => c.status === "pending" || c.status === "urgent",
     ).length,

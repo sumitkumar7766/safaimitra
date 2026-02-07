@@ -14,9 +14,10 @@ import {
   ActivityIndicator,
   Image,
   Linking,
+  Platform,
 } from "react-native";
 import { MaterialCommunityIcons } from "@expo/vector-icons";
-import MapView, { Marker, Polyline } from "react-native-maps";
+import MapView, { Marker, Polyline, Callout } from "react-native-maps";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import tw from "twrnc";
@@ -24,6 +25,203 @@ import { io } from "socket.io-client";
 
 const { width, height } = Dimensions.get("window");
 const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+
+// --- HELPER: Status Styles ---
+// --- HELPER: Web Style Status Colors ---
+const getWebStatusStyles = (status) => {
+  switch (status) {
+    case "clean":
+      return { bg: "bg-green-100", text: "text-green-800", dot: "#10b981" };
+    case "overflow":
+      return { bg: "bg-yellow-100", text: "text-yellow-800", dot: "#f59e0b" };
+    case "missed":
+      return { bg: "bg-red-100", text: "text-red-800", dot: "#ef4444" };
+    case "skiped":
+      return { bg: "bg-red-200", text: "text-blue-800", dot: "#ef4444" }; // Special Web Style
+    case "suspecies":
+      return { bg: "bg-orange-100", text: "text-orange-800", dot: "#cc760e" };
+    case "ideal":
+      return { bg: "bg-black", text: "text-white", dot: "#000000" };
+    default:
+      return { bg: "bg-gray-100", text: "text-gray-800", dot: "#6b7280" };
+  }
+};
+
+const VehicleMarker = React.memo(({ vehicle }) => {
+  return (
+    <Marker
+      coordinate={{
+        latitude: vehicle.latitude,
+        longitude: vehicle.longitude,
+      }}
+      title={vehicle.vehicleNumber}
+      anchor={{ x: 0.5, y: 0.5 }}
+    >
+      {/* Icon */}
+      <View
+        style={tw`bg-white p-1.5 rounded-full shadow-md border border-blue-200`}
+      >
+        <Text style={{ fontSize: 20 }}>🚛</Text>
+      </View>
+
+      {/* Popup / Callout */}
+      <Callout tooltip>
+        <View>
+          <View
+            style={tw`bg-white w-48 p-3 rounded-xl shadow-lg border border-gray-200`}
+          >
+            <Text
+              style={tw`font-bold text-gray-800 text-base mb-1 text-center`}
+            >
+              🚛 {vehicle.vehicleNumber}
+            </Text>
+            <Text style={tw`text-xs text-gray-600 mb-2 text-center`}>
+              Type: {vehicle.type || "-"}
+            </Text>
+
+            {/* Online Badge */}
+            <View
+              style={tw`self-center px-3 py-1 rounded-full bg-green-100 mb-2`}
+            >
+              <Text style={tw`text-green-800 text-[10px] font-bold uppercase`}>
+                Online
+              </Text>
+            </View>
+
+            {/* Coordinates Footer */}
+            <View style={tw`border-t border-gray-100 pt-2 mt-1`}>
+              <Text style={tw`text-[10px] text-gray-400 text-center`}>
+                Current Location:
+              </Text>
+              <Text
+                style={tw`text-[10px] font-mono text-gray-600 text-center mt-0.5`}
+              >
+                {vehicle.latitude?.toFixed(4)}, {vehicle.longitude?.toFixed(4)}
+              </Text>
+            </View>
+          </View>
+          {/* Arrow */}
+          <View style={tw`h-3 w-full items-center`}>
+            <View
+              style={tw`w-3 h-3 bg-white rotate-45 transform -translate-y-2 border-r border-b border-gray-200`}
+            />
+          </View>
+        </View>
+      </Callout>
+    </Marker>
+  );
+});
+
+// --- OPTIMIZED DUSTBIN MARKER (Prevent Blinking + Show Details) ---
+// --- OPTIMIZED DUSTBIN MARKER ---
+const OfficeBinMarker = React.memo(
+  ({ bin, handleManualClean }) => {
+    const styles = getWebStatusStyles(bin.status);
+
+    // Blinking Fix
+    const [tracksViewChanges, setTracksViewChanges] = useState(true);
+    useEffect(() => {
+      const timer = setTimeout(() => setTracksViewChanges(false), 200);
+      return () => clearTimeout(timer);
+    }, [bin.status]);
+
+    return (
+      <Marker
+        coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
+        tracksViewChanges={tracksViewChanges}
+        calloutOffset={{ x: 0, y: -10 }}
+        calloutAnchor={{ x: 0.5, y: 0 }}
+        onCalloutPress={() => {
+          // Mobile map me button click direct callout press se handle hota hai
+          if (bin.status !== "clean") handleManualClean(bin._id);
+        }}
+      >
+        {/* Icon on Map */}
+        <View style={tw`items-center`}>
+          <View
+            style={[
+              tw`bg-white p-1.5 rounded-full border-2 shadow-sm`,
+              { borderColor: styles.dot },
+            ]}
+          >
+            <Text style={{ fontSize: 16 }}>🗑️</Text>
+          </View>
+        </View>
+
+        {/* Detail Popup */}
+        <Callout tooltip>
+          <View>
+            <View
+              style={tw`bg-white w-60 rounded-xl shadow-lg border border-gray-200 overflow-hidden`}
+            >
+              {/* Title */}
+              <View style={tw`p-3 pb-2`}>
+                <Text style={tw`font-bold text-gray-800 text-base text-center`}>
+                  {bin.name}
+                </Text>
+              </View>
+
+              {/* Image (Visible only if URL exists) */}
+              {bin.imageUrl && (
+                <View
+                  style={tw`w-full h-32 bg-gray-100 border-t border-b border-gray-100`}
+                >
+                  <Image
+                    source={{ uri: bin.imageUrl }}
+                    style={tw`w-full h-full`}
+                    resizeMode="cover"
+                  />
+                </View>
+              )}
+
+              <View style={tw`p-3 items-center`}>
+                {/* Route */}
+                <Text style={tw`text-xs text-gray-600 mb-2`}>
+                  Route: {bin.routeId?.name || "N/A"}
+                </Text>
+
+                {/* Status Badge (Web Style) */}
+                <View style={tw`px-3 py-1 rounded-full ${styles.bg} mb-2`}>
+                  <Text
+                    style={tw`text-[10px] font-bold uppercase ${styles.text}`}
+                  >
+                    {bin.status}
+                  </Text>
+                </View>
+
+                {/* Action Button (Visual Only - Press handled by Callout) */}
+                {bin.status !== "clean" && (
+                  <View
+                    style={tw`w-full bg-green-500 py-2 rounded-lg items-center mt-1 shadow-sm`}
+                  >
+                    <Text style={tw`text-white text-xs font-bold`}>
+                      Mark Clean ✅
+                    </Text>
+                  </View>
+                )}
+
+                {/* Interaction Hint */}
+                {bin.status !== "clean" && Platform.OS === "ios" && (
+                  <Text style={tw`text-[9px] text-gray-400 mt-1`}>
+                    Tap to confirm
+                  </Text>
+                )}
+              </View>
+            </View>
+            {/* Arrow */}
+            <View style={tw`h-3 w-full items-center`}>
+              <View
+                style={tw`w-3 h-3 bg-white rotate-45 transform -translate-y-2 border-r border-b border-gray-200`}
+              />
+            </View>
+          </View>
+        </Callout>
+      </Marker>
+    );
+  },
+  (prev, next) =>
+    prev.bin._id === next.bin._id && prev.bin.status === next.bin.status,
+);
 
 export default function App({ goBack }) {
   // ===================== STATE MANAGEMENT =====================
@@ -221,6 +419,14 @@ export default function App({ goBack }) {
     }
   };
 
+  // --- REFRESH LOGIC FIX ---
+  const handleRefresh = async () => {
+    setRefreshing(true); // Sirf refreshing true karein, loading nahi
+    await loadInitialData(); // Data load hone ka wait karein
+    setRefreshing(false); // Data aane ke baad spinner band karein
+  };
+
+  // --- DATA LOADING FIX ---
   const loadInitialData = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
@@ -255,35 +461,40 @@ export default function App({ goBack }) {
       console.error("Initial Data Load Error:", err);
     } finally {
       setLoading(false);
-      setRefreshing(false);
     }
   };
 
+  // 1. DATA LOADING EFFECT (Sirf ek baar chalega jab User ID milegi)
+  useEffect(() => {
+    if (userData?._id) {
+      loadInitialData();
+    }
+  }, [userData?._id]); // Sirf ID change hone par chalega, poore object par nahi
+
+  // 2. SOCKET CONNECTION EFFECT (Ye Data reload nahi karega, bas updates sunega)
   useEffect(() => {
     if (!userData?._id) return;
-    loadInitialData();
+
+    // Socket initialize
     socketRef.current = io(API_URL);
     const socket = socketRef.current;
 
+    console.log("🟢 Socket Connected");
+
+    // --- Listeners ---
     socket.on("dustbin_data_update", (payload) => {
       setDustbins((prev) => {
         switch (payload.type) {
           case "ADD":
-            // Pehle check karein ki dustbin pehle se list mein toh nahi hai
             const exists = prev.some((b) => b._id === payload.data._id);
             if (exists) return prev;
             return [payload.data, ...prev];
-
           case "UPDATE":
-            // Dustbin ko update karein aur list mein uski position wahi rehne dein
             return prev.map((b) =>
               b._id === payload.data._id ? { ...b, ...payload.data } : b,
             );
-
           case "DELETE":
-            // Dustbin ko list se hta dein
             return prev.filter((b) => b._id !== payload.id);
-
           default:
             return prev;
         }
@@ -327,39 +538,38 @@ export default function App({ goBack }) {
         setRoutes((prev) => prev.filter((r) => r._id !== payload.id));
     });
 
-    return () => socket.disconnect();
-  }, [userData]);
-
-  const handleRefresh = () => {
-    setRefreshing(true);
-    loadInitialData();
-  };
+    // Cleanup
+    return () => {
+      console.log("🔴 Socket Disconnected");
+      socket.disconnect();
+    };
+  }, [userData?._id]); // Dependency fix ki gayi hai
 
   const handleLogout = () => {
-      Alert.alert("Logout", "Are you sure you want to logout?", [
-        { text: "Cancel", style: "cancel" },
-        {
-          text: "Logout",
-          style: "destructive",
-          onPress: async () => {
-            try {
-              await axios.post(`${API_URL}/office/logout`);
-              await AsyncStorage.multiRemove(["token", "user", "role", "userId"]);
-              Alert.alert("Success", "Logged out successfully");
-  
-              // Checking if goBack exists before calling to avoid crash
-              if (goBack) {
-                goBack();
-              } else {
-                console.warn("goBack prop not passed to OfficeDashboard");
-              }
-            } catch (error) {
-              console.error("Logout Error", error);
+    Alert.alert("Logout", "Are you sure you want to logout?", [
+      { text: "Cancel", style: "cancel" },
+      {
+        text: "Logout",
+        style: "destructive",
+        onPress: async () => {
+          try {
+            await axios.post(`${API_URL}/office/logout`);
+            await AsyncStorage.multiRemove(["token", "user", "role", "userId"]);
+            Alert.alert("Success", "Logged out successfully");
+
+            // Checking if goBack exists before calling to avoid crash
+            if (goBack) {
+              goBack();
+            } else {
+              console.warn("goBack prop not passed to OfficeDashboard");
             }
-          },
+          } catch (error) {
+            console.error("Logout Error", error);
+          }
         },
-      ]);
-    };
+      },
+    ]);
+  };
 
   const handleManualClean = (id) => {
     Alert.alert("Mark Clean", "Confirm?", [
@@ -561,7 +771,7 @@ export default function App({ goBack }) {
     </View>
   );
 
-  const DashboardView = () => (
+  const renderDashboard = () => (
     <ScrollView
       style={tw`flex-1 bg-gray-50`}
       refreshControl={
@@ -612,45 +822,27 @@ export default function App({ goBack }) {
         <MapView
           style={tw`h-80 rounded-xl mb-3`}
           initialRegion={{
-            latitude: userData?.latitude || 23.2599,
-            longitude: userData?.longitude || 77.4126,
+            latitude: userData?.latitude || 0,
+            longitude: userData?.longitude || 0,
             latitudeDelta: 0.0922,
             longitudeDelta: 0.0421,
           }}
         >
           {dustbins.map((bin) => (
-            <Marker
+            <OfficeBinMarker
               key={`bin-${bin._id}`}
-              coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
-              title={bin.name}
-            >
-              <View style={tw`items-center`}>
-                <Text style={{ fontSize: 20 }}>🗑️</Text>
-                <View
-                  style={[
-                    tw`w-3 h-3 rounded-full border-2 border-white`,
-                    { backgroundColor: getStatusColor(bin.status) },
-                  ]}
-                />
-              </View>
-            </Marker>
+              bin={bin}
+              handleManualClean={handleManualClean}
+            />
           ))}
+
           {vehicles
-            .filter((v) => v.isOnline)
+            .filter((v) => v.isOnline && v.latitude && v.longitude)
             .map((vehicle) => (
-              <Marker
-                key={`v-${vehicle._id}`}
-                coordinate={{
-                  latitude: vehicle.latitude,
-                  longitude: vehicle.longitude,
-                }}
-                title={vehicle.vehicleNumber}
-              >
-                <View style={tw`bg-white p-1 rounded-full shadow-md`}>
-                  <Text style={{ fontSize: 24 }}>🚛</Text>
-                </View>
-              </Marker>
+              <VehicleMarker key={`v-${vehicle._id}`} vehicle={vehicle} />
             ))}
+
+          {/* --- 3. ROUTES (Lines) --- */}
           {routePaths.map((route, idx) => (
             <Polyline
               key={`r-${idx}`}
@@ -661,11 +853,53 @@ export default function App({ goBack }) {
             />
           ))}
         </MapView>
+        <View
+          style={tw`mt-4 flex-row flex-wrap justify-center gap-6 p-4 bg-gray-50 rounded-xl`}
+        >
+          {/* Clean Indicator */}
+          <View style={tw`flex-row items-center gap-2`}>
+            <View
+              style={[tw`w-4 h-4 rounded-full`, { backgroundColor: "#10b981" }]}
+            />
+            <Text style={tw`text-sm font-medium text-gray-700`}>Clean</Text>
+          </View>
+
+          <View style={tw`flex-row items-center gap-2`}>
+            <View
+              style={[tw`w-4 h-4 rounded-full`, { backgroundColor: "#000000" }]}
+            />
+            <Text style={tw`text-sm font-medium text-gray-700`}>Ideal</Text>
+          </View>
+
+          {/* Overflow Indicator */}
+          <View style={tw`flex-row items-center gap-2`}>
+            <View
+              style={[tw`w-4 h-4 rounded-full`, { backgroundColor: "#f59e0b" }]}
+            />
+            <Text style={tw`text-sm font-medium text-gray-700`}>Overflow</Text>
+          </View>
+
+          {/* Skipped Indicator */}
+          <View style={tw`flex-row items-center gap-2`}>
+            <View
+              style={[tw`w-4 h-4 rounded-full`, { backgroundColor: "#ef4444" }]}
+            />
+            <Text style={tw`text-sm font-medium text-gray-700`}>Skipped</Text>
+          </View>
+
+          {/* Active Vehicles Indicator */}
+          <View style={tw`flex-row items-center gap-2`}>
+            <View style={tw`w-4 h-4 rounded-full bg-purple-500`} />
+            <Text style={tw`text-sm font-medium text-gray-700`}>
+              Active Vehicles
+            </Text>
+          </View>
+        </View>
       </View>
     </ScrollView>
   );
 
-  const ComplaintsView = () => {
+  const renderComplaints = () => {
     // Filter logic
     const filteredComplaints = complaints.filter((c) =>
       viewMode === "active" ? c.status !== "resolved" : c.status === "resolved",
@@ -814,7 +1048,7 @@ export default function App({ goBack }) {
     );
   };
 
-  const DustbinsView = () => {
+  const renderDustbins = () => {
     const filteredDustbins = dustbins.filter((bin) => {
       if (!filterRoute) return true;
       return bin.routeId?._id === filterRoute;
@@ -1058,7 +1292,7 @@ export default function App({ goBack }) {
     );
   };
 
-  const VehiclesView = () => {
+  const renderVehicles = () => {
     // Logic same rahega
     const filteredVehicles = vehicles.filter((vehicle) => {
       if (!filterRoute) return true;
@@ -1289,7 +1523,7 @@ export default function App({ goBack }) {
     );
   };
 
-  const StaffView = () => (
+  const renderStaff = () => (
     <ScrollView
       style={tw`flex-1 bg-gray-50`}
       refreshControl={
@@ -1451,7 +1685,7 @@ export default function App({ goBack }) {
     </ScrollView>
   );
 
-  const RoutesView = () => (
+  const renderRoutes = () => (
     <ScrollView
       style={tw`flex-1 bg-gray-50`}
       refreshControl={
@@ -1664,12 +1898,12 @@ export default function App({ goBack }) {
         </TouchableOpacity>
       </View>
 
-      {currentView === "dashboard" && <DashboardView />}
-      {currentView === "complaints" && <ComplaintsView />}
-      {currentView === "dustbins" && <DustbinsView />}
-      {currentView === "vehicles" && <VehiclesView />}
-      {currentView === "staff" && <StaffView />}
-      {currentView === "routes" && <RoutesView />}
+      {currentView === "dashboard" && renderDashboard()}
+      {currentView === "complaints" && renderComplaints()}
+      {currentView === "dustbins" && renderDustbins()}
+      {currentView === "vehicles" && renderVehicles()}
+      {currentView === "staff" && renderStaff()}
+      {currentView === "routes" && renderRoutes()}
 
       <BottomNav />
 

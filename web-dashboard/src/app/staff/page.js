@@ -165,8 +165,6 @@ export default function VehiclePage() {
 
           // 4. Listen for Emergency Jobs
           newSocket.on("new_job_alert", (data) => {
-            console.log("🚨 ALERT RECEIVED:", data);
-
             // Play Notification Sound
             try {
               const audio = new Audio(
@@ -298,32 +296,62 @@ export default function VehiclePage() {
     return () => navigator.geolocation.clearWatch(watchId);
   }, []);
 
-  // --- Offline/Heartbeat ---
+  // --- 💓 Heartbeat & Tab Close Logic (Offline Handling) 💓 ---
   useEffect(() => {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const heartbeatInterval = setInterval(async () => {
+    const BASE_URL = "http://localhost:5001";
+
+    const sendHeartbeat = async () => {
       try {
         await axios.post(
-          "http://localhost:5001/staff/ping-vehicle",
+          `${BASE_URL}/staff/ping-vehicle`,
           {},
           { headers: { Authorization: `Bearer ${token}` } },
         );
+        console.log("💓 Heartbeat sent");
       } catch (err) {
         console.error("Heartbeat failed", err);
       }
-    }, 60000);
-
-    const handleTabClose = () => {
-      const data = new Blob([JSON.stringify({})], { type: "application/json" });
-      navigator.sendBeacon("http://localhost:5001/staff/set-offline", data);
     };
-    window.addEventListener("beforeunload", handleTabClose);
+
+    const sendOfflineSignal = () => {
+      fetch(`${BASE_URL}/staff/set-offline`, {
+        method: "POST",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`, 
+        },
+        body: JSON.stringify({}),
+        keepalive: true, 
+      });
+    };
+    
+    sendHeartbeat();
+
+    const heartbeatInterval = setInterval(sendHeartbeat, 60000);
+
+    const handleBeforeUnload = (e) => {
+      sendOfflineSignal();
+    };
+
+    const handleVisibilityChange = () => {
+      if (document.visibilityState === "hidden") {
+      } else {
+        sendHeartbeat();
+      }
+    };
+
+    window.addEventListener("beforeunload", handleBeforeUnload);
+    document.addEventListener("visibilitychange", handleVisibilityChange);
 
     return () => {
       clearInterval(heartbeatInterval);
-      window.removeEventListener("beforeunload", handleTabClose);
+      window.removeEventListener("beforeunload", handleBeforeUnload);
+      document.removeEventListener("visibilitychange", handleVisibilityChange);
+
+      sendOfflineSignal();
     };
   }, []);
 
@@ -477,26 +505,20 @@ export default function VehiclePage() {
     }
   }, [currentStop, driverLocation, routeStops]); // Removed targetStop from dependency to avoid loop
 
-  // --- Auto-detect Current Stop ---
-  // --- 8. Update Location Name (Smart Auto-Switch) ---
   useEffect(() => {
     if (routeStops.length > 0) {
-      // Current selected bin ka data nikalo
       const activeStopData = routeStops[currentStop - 1];
 
-      // Check karo: Kya current selected bin abhi bhi "Pending/Overflow" hai?
       const isCurrentStillPending =
         activeStopData &&
         !["clean", "skiped", "suspecies", "resolved"].includes(
           activeStopData.status,
         );
 
-      // 🛑 AGAR CURRENT BIN PENDING HAI, TO KUCH MAT KARO (Manual Selection Retain Karo)
       if (isCurrentStillPending) {
         return;
       }
 
-      // ✅ AGAR CURRENT BIN COMPLETE HO GAYA HAI (Ya undefined hai), TO NEXT PENDING DHOONDHO
       const firstPendingIndex = routeStops.findIndex(
         (stop) =>
           !["clean", "skiped", "suspecies", "resolved"].includes(stop.status),
@@ -520,6 +542,7 @@ export default function VehiclePage() {
 
     setVerifying(true);
     setIsCleanVerified(false);
+    // Reset status
     setSubmissionStatus("clean");
 
     try {
@@ -537,21 +560,26 @@ export default function VehiclePage() {
       );
 
       const { status, confidence } = res.data;
+      const upperStatus = status.toUpperCase();
 
-      if (status !== "empty") {
+      // --- 🔄 OLD LOGIC RESTORED ---
+      if (upperStatus !== "EMPTY") {
+        // Agar EMPTY ke alawa kuch bhi hai -> Confirm -> Set "suspecies"
         if (
           confirm(
-            `⚠️ AI Alert: Bin looks '${status.toUpperCase()}' (${confidence}%)\n\nAre you sure you want to submit?`,
+            `⚠️ AI Alert: Bin looks '${status}' (${confidence}%)\n\nAre you sure you want to submit? This will be marked as Suspicious.`,
           )
         ) {
           setIsCleanVerified(true);
-          setSubmissionStatus("suspecies");
+          setSubmissionStatus("suspecies"); // <--- DB will receive "suspecies"
         } else {
           setAfterImage(null);
           setFileToUpload(null);
+          setIsCleanVerified(false);
           if (afterFileRef.current) afterFileRef.current.value = "";
         }
       } else {
+        // Agar status "EMPTY" hai -> Set "clean"
         setIsCleanVerified(true);
         setSubmissionStatus("clean");
       }
@@ -662,9 +690,27 @@ export default function VehiclePage() {
   };
 
   const handleLogout = async () => {
-    if (!confirm("Are you sure?")) return;
-    localStorage.clear();
-    router.replace("/");
+    if (!window.confirm("Are you sure you want to logout?")) return;
+
+    try {
+      const user = localStorage.getItem("userId");
+      const staffId = user;
+      console.log("Logging out staff ID:", staffId);
+
+      await axios.post("http://localhost:5001/staff/logout", {
+        staffId,
+      });
+
+      localStorage.clear();
+
+      alert("Logged out successfully!");
+      router.replace("/"); // User ko login page par bhejna
+    } catch (error) {
+      console.error("Logout Error:", error);
+
+      localStorage.clear();
+      navigate("/login");
+    }
   };
 
   const handleFindNearest = () => {
@@ -1005,6 +1051,120 @@ export default function VehiclePage() {
             </div>
           </div>
         </div>
+
+        {/* --- REVIEW & SUBMIT CARD (AI STATUS) --- */}
+        {!showCompletionUI && (
+          <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 relative z-20 border border-gray-100 transition-all duration-300">
+            {/* Header Section */}
+            <div className="bg-green-600 p-5 flex items-center gap-3">
+              <div className="w-10 h-10 bg-white rounded-full flex items-center justify-center shadow-md">
+                <span className="text-lg font-bold text-gray-800">4</span>
+              </div>
+              <div>
+                <h2 className="text-lg font-bold text-white leading-tight">
+                  Review & Submit
+                </h2>
+                <p className="text-sm text-white/90">AI Verification Status</p>
+              </div>
+            </div>
+
+            <div className="p-6">
+              {/* 1. Loading State */}
+              {verifying && (
+                <div className="flex flex-col items-center justify-center p-4">
+                  <div className="w-8 h-8 border-4 border-blue-600 border-t-transparent rounded-full animate-spin mb-2"></div>
+                  <p className="text-sm font-bold text-blue-600">
+                    🤖 AI is analyzing photo...
+                  </p>
+                </div>
+              )}
+
+              {/* 2. AI Result Display (Handles 4 Cases) */}
+              {/* 2. AI Result Display (Clean vs Suspicious Logic) */}
+              {!verifying && isCleanVerified && submissionStatus && (
+                <div
+                  className={`mb-4 p-4 rounded-xl border-l-4 transition-all ${
+                    submissionStatus === "clean"
+                      ? "bg-green-50 border-green-500"
+                      : "bg-orange-50 border-orange-500" // Orange for suspecies
+                  }`}
+                >
+                  <p className="text-[10px] font-black uppercase text-gray-500 tracking-wider mb-1">
+                    AI Detection Result
+                  </p>
+
+                  <div className="flex items-center">
+                    <p
+                      className={`text-lg font-black ${
+                        submissionStatus === "clean"
+                          ? "text-green-700"
+                          : "text-orange-700"
+                      }`}
+                    >
+                      {submissionStatus === "clean"
+                        ? "✅ Bin Looks Clean"
+                        : "⚠️ Suspicious / Issue Detected"}
+                    </p>
+                  </div>
+
+                  <p className="text-xs text-gray-500 mt-1 font-medium">
+                    {submissionStatus === "clean"
+                      ? "Verification successful. Bin is empty."
+                      : "AI detected garbage. Marked as 'Suspicious' for review."}
+                  </p>
+                </div>
+              )}
+
+              {/* 3. Status Bar */}
+              <div
+                className={`flex items-center gap-4 p-4 rounded-2xl transition-all duration-500 ${
+                  isSubmitting
+                    ? "bg-green-100"
+                    : afterImage
+                      ? "bg-blue-100"
+                      : "bg-gray-100"
+                }`}
+              >
+                {/* Icon Container */}
+                <div
+                  className={`w-14 h-14 rounded-2xl flex items-center justify-center shadow-md flex-shrink-0 transition-colors duration-500 ${
+                    isSubmitting
+                      ? "bg-green-500"
+                      : afterImage
+                        ? "bg-blue-500"
+                        : "bg-gray-400"
+                  }`}
+                >
+                  <span className="text-2xl transform transition-transform duration-300 scale-110">
+                    {isSubmitting ? "✅" : afterImage ? "👍" : "⏳"}
+                  </span>
+                </div>
+
+                {/* Text Details */}
+                <div className="flex-1">
+                  <p className="text-xs font-semibold text-gray-500 mb-1 uppercase">
+                    Current Status
+                  </p>
+                  <p
+                    className={`text-base font-bold leading-none ${
+                      isSubmitting
+                        ? "text-green-600"
+                        : afterImage
+                          ? "text-blue-600"
+                          : "text-gray-600"
+                    }`}
+                  >
+                    {isSubmitting
+                      ? "Submitting..."
+                      : afterImage
+                        ? "Ready to Submit"
+                        : "Waiting for Photo"}
+                  </p>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </main>
 
       <div className="fixed bottom-0 left-0 right-0 bg-white border-t-2 border-gray-200 px-4 py-4 flex gap-3 shadow-2xl z-20">

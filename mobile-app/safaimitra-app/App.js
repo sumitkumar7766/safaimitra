@@ -88,7 +88,7 @@ const processStrictLogin = async (username, password, endpoint, expectedRole, on
       } else if (expectedRole === "office") {
         onSuccess("officeDashboard"); // Office ke liye alag screen name
       } else if (expectedRole === "vehicle") {
-        onSuccess("staffDashboard");
+        onSuccess("vehicle");
       } else {
         onSuccess("citizen");
       }
@@ -139,8 +139,8 @@ const VehicleLogin = ({ goBack, onLoginSuccess }) => {
         </View>
         <View className="flex-1 bg-gray-50 rounded-t-[40px] px-8 pt-10 h-screen">
           <View className="bg-white p-6 rounded-3xl">
-            <TextInput className="bg-gray-50 border p-4 rounded-xl mb-4" placeholder="Driver ID" value={id} onChangeText={setId} />
-            <TextInput className="bg-gray-50 border p-4 rounded-xl mb-6" placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry />
+            <TextInput className="bg-gray-50 border p-4 rounded-xl mb-4" placeholder="Driver ID" value={id} onChangeText={setId} keyboardType="numeric"/>
+            <TextInput className="bg-gray-50 border p-4 rounded-xl mb-6" placeholder="Password" value={password} onChangeText={setPassword} secureTextEntry keyboardType="numeric"/>
             <TouchableOpacity className="bg-amber-500 p-4 rounded-xl items-center" onPress={() => processStrictLogin(id, password, "/staff/login", "vehicle", onLoginSuccess)}>
                 <Text className="text-white font-bold">Start Duty</Text>
             </TouchableOpacity>
