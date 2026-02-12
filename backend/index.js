@@ -186,7 +186,7 @@ app.get("/", (_req, res) => {
 /* ============================================================ */
 
 // '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("20 1 * * *", async () => {
+cron.schedule("27 14 * * *", async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
 
   try {
@@ -199,6 +199,7 @@ cron.schedule("20 1 * * *", async () => {
         }
       }
     );
+    
     console.log(`✅ System Reset: ${result.modifiedCount} dustbins are now Ideal & Ready.`);
   } catch (err) {
     console.error("❌ Error in Daily Reset Job:", err);

@@ -220,7 +220,8 @@ const OfficeBinMarker = React.memo(
     );
   },
   (prev, next) =>
-    prev.bin._id === next.bin._id && prev.bin.status === next.bin.status,
+    prev?.bin?._id === next?.bin?._id &&
+    prev?.bin?.status === next?.bin?.status,
 );
 
 export default function App({ goBack }) {
@@ -482,7 +483,11 @@ export default function App({ goBack }) {
     console.log("🟢 Socket Connected");
 
     // --- Listeners ---
+    // --- Listeners ---
     socket.on("dustbin_data_update", (payload) => {
+      // SAFETY CHECK: If payload or data is null, ignore
+      if (!payload || !payload.data) return;
+
       setDustbins((prev) => {
         switch (payload.type) {
           case "ADD":
@@ -502,15 +507,18 @@ export default function App({ goBack }) {
     });
 
     socket.on("vehicle_location_update", (updatedVehicle) => {
+      if (!updatedVehicle || !updatedVehicle._id) return; // SAFETY CHECK
       setVehicles((prev) =>
         prev.map((v) => (v._id === updatedVehicle._id ? updatedVehicle : v)),
       );
     });
 
     socket.on("vehicle_list_update", (payload) => {
-      if (payload.type === "ADD")
+      if (!payload) return;
+      if (payload.type === "ADD" && payload.data)
         setVehicles((prev) => [payload.data, ...prev]);
-      else if (payload.type === "UPDATE")
+      else if (payload.type === "UPDATE" && payload.data)
+        // Check payload.data
         setVehicles((prev) =>
           prev.map((v) => (v._id === payload.data._id ? payload.data : v)),
         );
@@ -519,8 +527,10 @@ export default function App({ goBack }) {
     });
 
     socket.on("staff_list_update", (payload) => {
-      if (payload.type === "ADD") setStaff((prev) => [payload.data, ...prev]);
-      else if (payload.type === "UPDATE")
+      if (!payload) return;
+      if (payload.type === "ADD" && payload.data)
+        setStaff((prev) => [payload.data, ...prev]);
+      else if (payload.type === "UPDATE" && payload.data)
         setStaff((prev) =>
           prev.map((s) => (s._id === payload.data._id ? payload.data : s)),
         );
@@ -529,8 +539,10 @@ export default function App({ goBack }) {
     });
 
     socket.on("route_data_update", (payload) => {
-      if (payload.type === "ADD") setRoutes((prev) => [payload.data, ...prev]);
-      else if (payload.type === "UPDATE")
+      if (!payload) return;
+      if (payload.type === "ADD" && payload.data)
+        setRoutes((prev) => [payload.data, ...prev]);
+      else if (payload.type === "UPDATE" && payload.data)
         setRoutes((prev) =>
           prev.map((r) => (r._id === payload.data._id ? payload.data : r)),
         );
@@ -1380,7 +1392,7 @@ export default function App({ goBack }) {
           ) : (
             filteredVehicles.map((vehicle) => {
               const assignedRoute = routes.find(
-                (r) => r.assignedVehicleId?._id === vehicle._id,
+                (r) => r?.assignedVehicleId?._id === vehicle._id,
               );
               const isActive = vehicle.status === "Active" || vehicle.isOnline;
 
@@ -1878,10 +1890,10 @@ export default function App({ goBack }) {
     );
 
   return (
-    <SafeAreaView style={[tw`flex-1 bg-gray-50`, { marginTop: 25 }]}>
+    <SafeAreaView style={tw`flex-1 bg-gray-50`}>
       <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
       <View
-        style={tw`bg-white px-5 py-4 flex-row justify-between items-center border-b border-gray-200 shadow-sm`}
+        style={[tw`bg-white px-5 py-4 flex-row justify-between items-center border-b border-gray-200 shadow-sm`, { paddingTop: 35 }]}
       >
         <View>
           <Text style={tw`text-xl font-bold text-gray-900`}>CleanBin AI</Text>

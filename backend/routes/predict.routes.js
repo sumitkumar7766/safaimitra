@@ -99,4 +99,78 @@ router.post("/predict", upload.single("image"), async (req, res) => {
   }
 });
 
+router.post("/predict/complaint", upload.single("image"), async (req, res) => {
+  let imagePath;
+
+  try {
+    if (!req.file) {
+      return res.status(400).json({ message: "Image required" });
+    }
+
+    imagePath = req.file.path;
+    const dustbinId = req.body.dustbinId; 
+
+    // 1. Roboflow se Prediction lena
+    const form = new FormData();
+    form.append("file", fs.createReadStream(imagePath));
+
+    const response = await axios.post(
+      `${process.env.ROBOFLOW_MODEL_URL}?api_key=${process.env.ROBOFLOW_API_KEY}`,
+      form,
+      {
+        headers: {
+          ...form.getHeaders(),
+        },
+        timeout: 30000,
+      }
+    );
+
+    const predictions = response.data?.predictions;
+    
+    // Default Status
+    let status = "UNKNOWN";
+    let confidence = 0;
+
+    if (predictions && predictions.length > 0) {
+      const prediction = predictions[0];
+      confidence = Number(prediction.confidence || 0);
+      const label = prediction.class; // Backend se small letters me class name aayega
+      const threshold = Number(process.env.CONFIDENCE_THRESHOLD || 0.7);
+
+      if (confidence >= threshold) {
+        // Aapne maanga tha ki backend se data small letter me aaye to use Capital karein
+        // Isliye hum yahan .toUpperCase() use kar rahe hain
+        status = label; 
+      }
+    }
+
+    // ❌ DATABASE UPDATE & SOCKET EMIT LOGIC REMOVED ❌
+    // Yahan humne Dustbin.findByIdAndUpdate() wala pura section hata diya hai.
+
+    console.log(`🤖 AI Prediction (Read Only): ${status} with confidence ${(confidence * 100).toFixed(2)}%`);
+
+    // 2. Sirf JSON return karein Camera/Frontend ko
+    return res.json({
+      dustbinId: dustbinId || null,
+      status: status, // Hamesha CAPITAL letter me (CLEAN, EMPTY, OVERFLOW etc.)
+      confidence: (confidence * 100).toFixed(2),
+      message: "AI analysis complete. Database remains unchanged."
+    });
+
+  } catch (err) {
+    console.error(
+      "❌ ROBOFLOW ERROR:",
+      err.response?.data || err.message
+    );
+    return res.status(500).json({ message: "Prediction failed" });
+  } finally {
+    // Temp image delete karna zaroori hai
+    if (imagePath) {
+      try {
+        fs.unlinkSync(imagePath);
+      } catch {}
+    }
+  }
+});
+
 module.exports = router;
