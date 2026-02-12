@@ -99,7 +99,7 @@ export default function VehiclePage() {
       clean: "#10b981",
       overflow: "#f59e0b",
       skiped: "#ef4444",
-      suspecies: "#cc760e",
+      suspecies: "#7f4804",
       ideal: "#000000",
       current: "#3b82f6", // Blue for current target
     };
@@ -321,13 +321,13 @@ export default function VehiclePage() {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
-          Authorization: `Bearer ${token}`, 
+          Authorization: `Bearer ${token}`,
         },
         body: JSON.stringify({}),
-        keepalive: true, 
+        keepalive: true,
       });
     };
-    
+
     sendHeartbeat();
 
     const heartbeatInterval = setInterval(sendHeartbeat, 60000);
@@ -915,6 +915,44 @@ export default function VehiclePage() {
                 </MapContainer>
               )}
             </div>
+            <div className="mt-4 flex flex-wrap items-center justify-center gap-6 p-4 bg-gray-50 rounded-lg">
+              {/* 1. Ideal - Black */}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-black"></div>
+                <span className="text-sm font-medium text-gray-700">Ideal</span>
+              </div>
+
+              {/* 2. Clean - Emerald Green */}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-emerald-500"></div>
+                <span className="text-sm font-medium text-gray-700">Clean</span>
+              </div>
+
+              {/* 3. Overflow - Amber */}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-amber-500"></div>
+                <span className="text-sm font-medium text-gray-700">
+                  Overflow
+                </span>
+              </div>
+
+              {/* 3. Overflow - Amber */}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-amber-600"></div>
+                <span className="text-sm font-medium text-gray-700">
+                  Suspicious
+                </span>
+              </div>
+
+              {/* 4. Skipped - Red */}
+              <div className="flex items-center gap-2">
+                <div className="w-4 h-4 rounded-full bg-red-500"></div>
+                <span className="text-sm font-medium text-gray-700">
+                  Skipped
+                </span>
+              </div>
+            </div>
+
             {driverLocation && targetStop && !showCompletionUI && (
               <div className="bg-white rounded-xl p-3 shadow mt-3 text-center border border-gray-200">
                 <div className="flex justify-between items-center px-4">

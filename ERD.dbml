@@ -1,0 +1,105 @@
+Table Admin {
+  id ObjectId [pk]
+  name varchar
+  email varchar
+  username varchar
+  role varchar
+}
+
+Table Office {
+  id ObjectId [pk]
+  stateName varchar
+  cityName varchar
+  officeName varchar
+  adminName varchar
+  adminEmail varchar
+  latitude number
+  longitude number
+  status varchar
+}
+
+Table Citizen {
+  id ObjectId [pk]
+  fullName varchar
+  email varchar
+  phone varchar
+  address varchar
+  cityName varchar
+  pincode varchar
+  latitude number
+  longitude number
+  role varchar
+  officeId ObjectId
+}
+
+Table Staff {
+  id ObjectId [pk]
+  name varchar
+  role varchar
+  phone varchar
+  active boolean
+  officeId ObjectId
+  assignedVehicleId ObjectId
+}
+
+Table Vehicle {
+  id ObjectId [pk]
+  vehicleNumber varchar
+  type varchar
+  status varchar
+  latitude number
+  longitude number
+  officeId ObjectId
+  routeId ObjectId
+  driverId ObjectId
+}
+
+Table Route {
+  id ObjectId [pk]
+  name varchar
+  description varchar
+  officeId ObjectId
+  assignedVehicleId ObjectId
+}
+
+Table Dustbin {
+  id ObjectId [pk]
+  name varchar
+  area varchar
+  latitude number
+  longitude number
+  status varchar
+  officeId ObjectId
+  routeId ObjectId
+}
+
+Table Complaint {
+  id ObjectId [pk]
+  complaintType varchar
+  description varchar
+  priority varchar
+  status varchar
+  reportedAt datetime
+  resolvedAt datetime
+
+  citizenId ObjectId
+  officeId ObjectId
+  dustbinId ObjectId
+  driverId ObjectId
+  assignedVehicleId ObjectId
+}
+
+Ref: Office.id < Citizen.officeId
+Ref: Office.id < Staff.officeId
+Ref: Office.id < Vehicle.officeId
+Ref: Office.id < Route.officeId
+Ref: Office.id < Dustbin.officeId
+
+Ref: Route.id < Dustbin.routeId
+Ref: Route.id < Vehicle.routeId
+
+Ref: Citizen.id < Complaint.citizenId
+Ref: Dustbin.id < Complaint.dustbinId
+Ref: Staff.id < Complaint.driverId
+Ref: Vehicle.id < Complaint.assignedVehicleId
+Ref: Office.id < Complaint.officeId

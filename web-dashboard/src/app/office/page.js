@@ -752,7 +752,25 @@ export default function OfficeDashboard() {
     });
 
     socket.on("complaint_status_update", (payload) => {
-      fetchComplaints(); // Refresh list to show assigned status
+      fetchComplaints();
+    });
+
+    socket.on("complaint_status_update", (payload) => {
+      console.log("⚡ Complaint Update Recieved:", payload);
+
+      if (payload.type === "RESOLVED") {
+        // 1. List Refresh karo (Taaki active se hat kar history me jaye)
+        fetchComplaints();
+
+        // 2. Stats update karo (Optional, agar alag event nahi hai to)
+        // fetchStats();
+
+        // 3. Admin ko Notification dikhao
+        alert(`✅ Complaint Resolved! ID: ${payload.complaintId}`);
+        // Note: Aap 'react-toastify' use kar sakte hain sunder popup ke liye
+      } else if (payload.type === "ASSIGNED") {
+        fetchComplaints(); // Assigned status update karne ke liye
+      }
     });
 
     // Cleanup on unmount
@@ -1273,7 +1291,16 @@ export default function OfficeDashboard() {
   };
 
   const assignVehicleToComplaint = async (vehicleId) => {
+    console.log("Selected Report Data:", selectedReport);
+
     if (!selectedReport || !selectedReport._id) return;
+
+    const dustbinId = selectedReport.dustbinId || selectedReport._id;
+    if (!dustbinId) {
+      alert("Error: Dustbin ID not found in this complaint!");
+      return;
+    }
+
     const idsToSend = selectedReport.complaintIds
       ? selectedReport.complaintIds
       : [selectedReport._id];
@@ -1284,6 +1311,7 @@ export default function OfficeDashboard() {
         {
           complaintIds: idsToSend,
           vehicleId: vehicleId,
+          dustbinId: dustbinId,
         },
         { headers: { Authorization: `Bearer ${token}` } },
       );
@@ -1291,6 +1319,7 @@ export default function OfficeDashboard() {
         setShowAssignVehicleModal(false);
         setModalVisible(false);
         alert(`✅ Vehicle assigned to ${idsToSend.length} reports!`);
+        fetchComplaints();
       }
     } catch (error) {
       console.error("Assignment Error:", error);

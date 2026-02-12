@@ -226,26 +226,68 @@ router.post(
 
       const imageUrl = req.file.path;
 
+      const io = req.app.get("io");
+
       // Resolve Complaint if linked
       if (complaintId && complaintId !== "undefined") {
-        await Complaint.findByIdAndUpdate(complaintId, {
-          status: "resolved",
-          resolvedAt: new Date(),
-          active: false,
-          ComimageUrl: imageUrl,
+        // A. Find ALL linked complaints (Current + Grouped)
+        // Hum pehle dhund rahe hain taaki citizens ki ID mil sake
+        const linkedComplaints = await Complaint.find({
+          $or: [
+            { _id: complaintId }, // The main complaint
+            {
+              dustbinId: dustbinId,
+              status: { $in: ["assigned", "in_progress"] },
+            }, // Others on same bin
+          ],
         });
 
-        await Complaint.updateMany(
-          { dustbinId: dustbinId, status: "assigned" },
-          {
-            $set: {
-              status: "resolved",
-              resolvedAt: new Date(),
-              active: false,
-              ComimageUrl: imageUrl,
+        // B. Update ALL found complaints to 'resolved' in Database
+        if (linkedComplaints.length > 0) {
+          const idsToUpdate = linkedComplaints.map((c) => c._id);
+
+          await Complaint.updateMany(
+            { _id: { $in: idsToUpdate } },
+            {
+              $set: {
+                status: "resolved",
+                resolvedAt: new Date(),
+                active: false,
+                ComimageUrl: imageUrl, // Proof photo sabme save hogi
+              },
             },
-          },
-        );
+          );
+
+          // C. 🔥 Notify Admin (List Refresh)
+          io.emit("complaint_status_update", {
+            type: "RESOLVED",
+            complaintIds: idsToUpdate,
+            dustbinId: dustbinId,
+          });
+
+          // D. 🔥 Notify Stats
+          io.emit("stats_update", {
+            type: "COMPLAINT_RESOLVED",
+            count: idsToUpdate.length,
+          });
+
+          // E. 🔥 Notify EACH Citizen individually (Loop)
+          linkedComplaints.forEach((comp) => {
+            if (comp.citizenId) {
+              console.log(
+                `📡 Sending Alert to Citizen Room: citizen_${comp.citizenId}`,
+              );
+
+              io.to(`citizen_${comp.citizenId}`).emit(
+                "complaint_resolved_alert",
+                {
+                  message: `Great news! The issue at ${dustbin.area} has been resolved.`,
+                  imageUrl: imageUrl,
+                },
+              );
+            }
+          });
+        }
       }
 
       const finalStatus = status === "suspecies" ? "suspecies" : "clean";
@@ -257,7 +299,6 @@ router.post(
       );
 
       // 🔥 SOCKET EMIT 1: Update Map Marker Color (Green)
-      const io = req.app.get("io");
       io.emit("dustbin_data_update", {
         type: "UPDATE",
         data: updatedBin,

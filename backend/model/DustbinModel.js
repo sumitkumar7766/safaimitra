@@ -28,7 +28,7 @@ const DustbinSchema = new mongoose.Schema({
 
   status: {
     type: String,
-    enum: ["clean", "overflow", "skiped", "suspecies", "ideal"],
+    enum: ["clean", "overflow", "skiped", "suspecies", "ideal", "full"],
     default: "ideal",
   },
   

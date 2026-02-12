@@ -19,60 +19,121 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
     const complaints = await Complaint.aggregate([
       {
         $match: {
-          officeId: new mongoose.Types.ObjectId(officeId)
-        }
+          officeId: new mongoose.Types.ObjectId(officeId),
+        },
       },
       { $sort: { createdAt: -1 } },
       {
         $group: {
-          _id: "$dustbinId", 
-          totalReports: { $sum: 1 }, 
-          activeReports: { 
-            $sum: { 
-              $cond: [ 
-                { $in: ["$status", ["pending", "assigned", "overflow", "in_progress"]] }, 
-                1, 
-                0 
-              ] 
-            } 
+          _id: "$dustbinId",
+          activeReports: {
+            $sum: {
+              $cond: [
+                {
+                  $in: [
+                    "$status",
+                    ["pending", "assigned", "overflow", "in_progress"],
+                  ],
+                },
+                1,
+                0,
+              ],
+            },
+          },
+
+          allComplaintIds: { $push: "$_id" }, // Keeps history
+
+          // Only push ID if status is NOT resolved/closed
+          activeComplaintIds: {
+            $push: {
+              $cond: [
+                {
+                  $in: [
+                    "$status",
+                    ["pending", "overflow", "assigned", "in_progress"],
+                  ],
+                },
+                "$_id",
+                "$$REMOVE",
+              ],
+            },
+          },
+          // 🔥 NEW: Total resolved count bhi nikal lo taaki history me dikha sako
+          resolvedReports: {
+            $sum: {
+              $cond: [{ $in: ["$status", ["resolved", "closed"]] }, 1, 0],
+            },
+          },
+          hasActiveAssignment: {
+            $max: {
+              $cond: [
+                { $in: ["$status", ["assigned", "in_progress"]] },
+                true,
+                false,
+              ],
+            },
           },
           latestDescription: { $first: "$description" },
-          latestPriority: { $max: "$priority" }, 
+          latestPriority: { $max: "$priority" },
           complaintIds: { $push: "$_id" },
           area: { $first: "$area" },
           latitude: { $first: "$latitude" },
           longitude: { $first: "$longitude" },
           ComimageUrl: { $first: "$ComimageUrl" },
-          status: { $first: "$status" },
+          rawStatus: { $first: "$status" },
           vehicle: { $first: "$vehicle" },
-          createdAt: { $first: "$createdAt" }
-        }
+          createdAt: { $first: "$createdAt" },
+        },
       },
       {
         $lookup: {
           from: "dustbins",
           localField: "_id",
           foreignField: "_id",
-          as: "dustbinDetails"
-        }
+          as: "dustbinDetails",
+        },
       },
-      { $unwind: { path: "$dustbinDetails", preserveNullAndEmptyArrays: true } },
+      {
+        $unwind: { path: "$dustbinDetails", preserveNullAndEmptyArrays: true },
+      },
       {
         $lookup: {
           from: "routes",
           localField: "dustbinDetails.routeId",
           foreignField: "_id",
-          as: "routeInfo"
-        }
+          as: "routeInfo",
+        },
       },
       { $unwind: { path: "$routeInfo", preserveNullAndEmptyArrays: true } },
       {
         $addFields: {
-          "dustbinDetails.routeName": "$routeInfo.name"
-        }
+          "dustbinDetails.routeName": "$routeInfo.name",
+          dustbinId: "$_id",
+
+          // 🔥 STATUS LOGIC:
+          // Agar activeReports 0 hai -> "resolved"
+          // Agar activeReports > 0 -> "assigned" / "pending"
+          status: {
+            $cond: {
+              if: { $eq: ["$activeReports", 0] },
+              then: "resolved",
+              else: {
+                $cond: {
+                  if: { $eq: ["$hasActiveAssignment", true] },
+                  then: "assigned",
+                  else: "$rawStatus",
+                },
+              },
+            },
+          },
+        },
       },
-      { $project: { routeInfo: 0 } },
-      { $sort: { activeReports: -1, createdAt: -1 } }
+      { $project: { routeInfo: 0, rawStatus: 0, hasActiveAssignment: 0 } },
+
+      // ❌ YAHAN SE { $match: { activeReports: { $gt: 0 } } } HATA DIYA GAYA HAI
+      // Ab ye Resolved complaints bhi return karega.
+
+      { $sort: { activeReports: -1, createdAt: -1 } },
     ]);
 
     return res.status(200).json({
@@ -80,7 +141,6 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
       count: complaints.length,
       complaints,
     });
-
   } catch (error) {
     console.error("Error fetching complaints:", error);
     return res.status(500).json({ success: false, message: error.message });
@@ -88,73 +148,104 @@ router.get("/all/:officeId", officeAuth, async (req, res) => {
 });
 
 // POST: Assign Vehicle (🔥 SOCKET IO LOGIC ADDED HERE 🔥)
+// POST: Assign Vehicle
 router.post("/assign-vehicle", async (req, res) => {
   try {
-    const { complaintIds, vehicleId } = req.body;
+    const { complaintIds, vehicleId, dustbinId } = req.body;
 
-    // 1. Get Socket Instance
     const io = req.app.get("io");
-    
+
     const vehicle = await Vehicle.findById(vehicleId);
-    if (!vehicle) return res.status(404).json({ success: false, message: "Vehicle not found" });
+    if (!vehicle)
+      return res
+        .status(404)
+        .json({ success: false, message: "Vehicle not found" });
 
-    const driver = await Staff.findOne({ assignedVehicleId: vehicleId, role: "driver" });
+    const driver = await Staff.findOne({
+      assignedVehicleId: vehicleId,
+      role: "driver",
+    });
 
-    // 2. Database Update
+    // 1. Update Dustbin Status
+    const dustbin = await Dustbin.findByIdAndUpdate(
+      dustbinId,
+      { status: "overflow" },
+      { new: true },
+    );
+
+    // 🔥 LOGIC FIX START: Only update complaints that are NOT resolved or closed 🔥
     await Complaint.updateMany(
-      { _id: { $in: complaintIds } }, 
+      {
+        _id: { $in: complaintIds },
+        status: { $nin: ["resolved", "closed"] }, // This prevents reopening old complaints
+      },
       {
         $set: {
           vehicle: vehicle.vehicleNumber,
           assignedVehicleId: vehicleId,
           status: "assigned",
-          driverId: driver ? driver._id : null
-        }
-      }
+          driverId: driver ? driver._id : null,
+        },
+      },
     );
+    // 🔥 LOGIC FIX END 🔥
 
-    // 3. Get Details for Notifications
-    const firstComplaint = await Complaint.findById(complaintIds[0]).populate("dustbinId");
-
-    // 🔥 SOCKET EMIT 1: Update Office Dashboard (Real-time List Refresh)
-    // This tells the frontend "Hey, complaints updated, refresh your list"
-    io.emit("complaint_status_update", {
-        type: "ASSIGNED",
-        complaintIds: complaintIds,
-        vehicleNumber: vehicle.vehicleNumber,
-        status: "assigned"
+    // 2. Fetch the updated valid complaints to send accurate socket data
+    // (We fetch only the ones that are now 'assigned' from the list we just sent)
+    const validAssignedComplaints = await Complaint.find({
+      _id: { $in: complaintIds },
+      status: "assigned",
     });
 
-    // 🔥 SOCKET EMIT 2: Notify Driver (Specific Room)
+    // Get the first one for location details
+    const firstComplaint = validAssignedComplaints[0];
+
+    if (!firstComplaint) {
+      return res.status(400).json({
+        success: false,
+        message: "No active complaints found to assign.",
+      });
+    }
+
+    // 🔥 SOCKET EMIT 1: Update Office Dashboard
+    io.emit("complaint_status_update", {
+      type: "ASSIGNED",
+      complaintIds: validAssignedComplaints.map((c) => c._id), // Only send IDs that actually changed
+      vehicleNumber: vehicle.vehicleNumber,
+      status: "assigned",
+    });
+
+    io.emit("dustbin_data_update", {
+      type: "UPDATE",
+      data: dustbin,
+    });
+
+    // 🔥 SOCKET EMIT 2: Notify Driver
     if (driver) {
       const newStopData = {
-        id: firstComplaint.dustbinId ? firstComplaint.dustbinId._id : firstComplaint._id,
-        name: firstComplaint.dustbinId ? `🚨 ${firstComplaint.dustbinId.name}` : "🚨 Urgent Cleanup",
+        id: dustbinId, // Grouping by Dustbin ID is safer for driver
+        name: `🚨 Cleanup Task`,
         coordinates: [firstComplaint.latitude, firstComplaint.longitude],
         status: "overflow",
         type: "complaint",
         isNew: true,
         complaintId: firstComplaint._id,
-        isGrouped: true
+        isGrouped: true,
       };
 
-      // Send alert specifically to this driver's room
       io.to(`driver_${driver._id}`).emit("new_job_alert", {
         title: "🚨 Emergency Task!",
-        message: `Total ${complaintIds.length} reports at ${firstComplaint.area}`,
+        message: `Total ${validAssignedComplaints.length} reports at ${firstComplaint.area}`,
         newStop: newStopData,
-        imageUrl: firstComplaint.ComimageUrl
+        imageUrl: firstComplaint.ComimageUrl,
       });
-      
-      console.log(`Socket sent to driver_${driver._id}`);
     }
 
     res.json({
       success: true,
-      message: `Vehicle assigned to ${complaintIds.length} reports successfully`,
-      vehicleNumber: vehicle.vehicleNumber
+      message: `Vehicle assigned to ${validAssignedComplaints.length} active reports. Resolved reports were ignored.`,
+      vehicleNumber: vehicle.vehicleNumber,
     });
-
   } catch (error) {
     console.error("Assign Error:", error);
     res.status(500).json({ success: false, message: "Server Error" });

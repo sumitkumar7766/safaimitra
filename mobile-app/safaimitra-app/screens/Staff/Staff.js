@@ -1108,6 +1108,51 @@ export default function VehiclePage({ goBack }) {
                 {renderMapContent()}
               </View>
 
+              <View
+                style={tw`mt-3 flex-row flex-wrap items-center justify-center gap-4 p-3 bg-gray-50 rounded-xl border border-gray-100`}
+              >
+                <View style={tw`flex-row items-center gap-1.5`}>
+                  <View style={tw`w-3 h-3 rounded-full bg-black`} />
+                  <Text
+                    style={tw`text-[11px] font-bold text-gray-600 uppercase`}
+                  >
+                    Ideal
+                  </Text>
+                </View>
+                <View style={tw`flex-row items-center gap-1.5`}>
+                  <View style={tw`w-3 h-3 rounded-full bg-emerald-500`} />
+                  <Text
+                    style={tw`text-[11px] font-bold text-gray-600 uppercase`}
+                  >
+                    Clean
+                  </Text>
+                </View>
+                <View style={tw`flex-row items-center gap-1.5`}>
+                  <View style={tw`w-3 h-3 rounded-full bg-amber-500`} />
+                  <Text
+                    style={tw`text-[11px] font-bold text-gray-600 uppercase`}
+                  >
+                    Overflow
+                  </Text>
+                </View>
+                <View style={tw`flex-row items-center gap-1.5`}>
+                  <View style={tw`w-3 h-3 rounded-full bg-amber-600`} />
+                  <Text
+                    style={tw`text-[11px] font-bold text-gray-600 uppercase`}
+                  >
+                    Suspicious
+                  </Text>
+                </View>
+                <View style={tw`flex-row items-center gap-1.5`}>
+                  <View style={tw`w-3 h-3 rounded-full bg-red-500`} />
+                  <Text
+                    style={tw`text-[11px] font-bold text-gray-600 uppercase`}
+                  >
+                    Skipped
+                  </Text>
+                </View>
+              </View>
+
               {driverLocation && targetStop && !showCompletionUI && (
                 <View
                   style={tw`mt-3 p-3 bg-white border border-gray-200 rounded-xl flex-row justify-between items-center`}
@@ -1475,7 +1520,7 @@ export default function VehiclePage({ goBack }) {
 
       <View style={tw`bg-white border-t border-gray-200 p-4 flex-row gap-3`}>
         <TouchableOpacity
-          onPress={skipStop}
+          onPress={pickImage}
           disabled={showCompletionUI}
           style={tw`flex-1 py-4 border-2 border-red-300 bg-red-50 rounded-xl items-center`}
         >
