@@ -1,0 +1,190 @@
+@startuml
+' === CINEMATIC THEME ENGINE ===
+skinparam backgroundColor #050505
+skinparam handwritten false
+skinparam shadow true
+skinparam roundcorner 10
+skinparam linetype ortho
+skinparam defaultFontName "Segoe UI"
+skinparam defaultFontSize 12
+skinparam defaultFontColor #ecf0f1
+
+' --- COLOR PALETTE ---
+!define NEON_CYAN #00ffff
+!define NEON_GREEN #39ff14
+!define NEON_PINK #ff007f
+!define NEON_GOLD #ffd700
+!define NEON_PURPLE #bd93f9
+!define DARK_BG #1a1a1a
+
+' --- COMPONENT & CLASS STYLING ---
+skinparam actor {
+    BackgroundColor DARK_BG
+    BorderColor NEON_GREEN
+    FontColor NEON_GREEN
+    FontSize 14
+}
+
+skinparam package {
+    BackgroundColor #0a0a0a
+    BorderColor #444444
+    FontColor #666666
+}
+
+skinparam class {
+    BackgroundColor DARK_BG
+    ArrowColor #888888
+    BorderColor #444444
+    AttributeFontSize 11
+    FontColor #eeeeee
+}
+
+skinparam component {
+    BackgroundColor DARK_BG
+    BorderColor NEON_CYAN
+    FontColor NEON_CYAN
+    Style rectangle
+}
+
+skinparam arrow {
+    Color #888888
+    FontColor #aaaaaa
+    Thickness 1.5
+}
+
+' --- CUSTOM CLASS STYLES ---
+skinparam class<<Hub>> {
+    BorderColor NEON_CYAN
+    HeaderBackgroundColor #002222
+    FontColor NEON_CYAN
+}
+
+skinparam class<<Master>> {
+    BorderColor NEON_GOLD
+    HeaderBackgroundColor #221a00
+    FontColor NEON_GOLD
+}
+
+skinparam class<<User>> {
+    BorderColor NEON_GREEN
+    HeaderBackgroundColor #002200
+    FontColor NEON_GREEN
+}
+
+skinparam class<<Asset>> {
+    BorderColor NEON_PINK
+    HeaderBackgroundColor #220011
+    FontColor NEON_PINK
+}
+
+skinparam class<<External>> {
+    BorderColor NEON_PURPLE
+    HeaderBackgroundColor #1a0033
+    FontColor NEON_PURPLE
+}
+
+' ================= DIAGRAM START =================
+title \n<size:24><color:NEON_CYAN>🌐 SAFAIMITRA: SYSTEM ARCHITECTURE</color></size>\n
+
+' --- 1. EXTERNAL SERVICES (Purple) ---
+package "☁️ External Integrations" {
+    class "Cloudinary\n(Image Store)" as Cloud <<External>> {
+        Stores Evidence Photos
+        Generates Secure Links
+    }
+    class "AI Predictor\n(Flask API)" as AI <<External>> {
+        Analyzes Garbage Severity
+        Verifies Image Validity
+    }
+    class "Google Maps\nAPI" as Maps <<External>> {
+        Provides Live Navigation
+        Optimizes Collection Routes
+    }
+}
+
+' --- 2. USERS (Green) ---
+package "👥 User Roles" {
+    class "Citizen" as Citizen <<User>> {
+        Reports Garbage Issues
+        Uploads Geotagged Photos
+        Tracks Complaint Status
+    }
+    class "Staff\n(Driver/Helper)" as Staff <<User>> {
+        Drives Garbage Trucks
+        Physically Cleans Dustbins
+        Updates Task Status
+    }
+}
+
+' --- 3. CENTRAL HUB (Cyan) ---
+package "🏢 Management Core" {
+    class "Admin\n(Super User)" as Admin <<Master>> {
+        Monitors Entire System
+        Creates City Offices
+        Analyzes Global Reports
+    }
+
+    class "Municipal Office" as Office <<Hub>> {
+        Central Command Center
+        Assigns Tasks to Staff
+        Manages City Assets
+    }
+}
+
+' --- 4. ASSETS & DATA (Pink) ---
+package "📦 Operational Assets" {
+    class "Complaint" as Complaint <<Asset>> {
+        Triggers System Action
+        Holds Issue Details
+        Tracks Resolution Lifecycle
+    }
+
+    class "Vehicle" as Vehicle <<Asset>> {
+        Transports Waste
+        Sends Live GPS Location
+        Follows Assigned Route
+    }
+
+    class "Dustbin" as Dustbin <<Asset>> {
+        Waste Collection Point
+        Digital Status Tracking
+    }
+
+    class "Route" as Route <<Asset>> {
+        Defines Pickup Path
+        Links Multiple Dustbins
+        Optimizes Travel Time
+    }
+}
+
+' ================= RELATIONS (The Flow) =================
+
+' --- Hierarchy (Gold Lines) ---
+Admin -[#ffd700]-> Office : 1. Controls
+Office -[#00ffff]-> Staff : 2. Employs
+Office -[#00ffff]-> Vehicle : 3. Owns
+Office -[#00ffff]-> Dustbin : 4. Manages
+Office -[#00ffff]-> Route : 5. Defines
+
+' --- Citizen Flow (Green/Purple) ---
+Citizen -[#39ff14]-> Complaint : Reports Issue
+Complaint -[#bd93f9]-> Cloud : Upload Photo
+Complaint -[#bd93f9]-> AI : Verify Severity
+Complaint ..> Office : Notify
+
+' --- Staff Operations (Green/Pink) ---
+Staff -[#39ff14]-> Vehicle : Drives
+Vehicle -[#ff007f]-> Route : Covers
+Route o-- Dustbin : Contains
+
+' --- Operational Logic (Pink/Purple) ---
+Staff -[#39ff14]-> Dustbin : Cleans
+Dustbin -[#bd93f9]-> Cloud : Upload Proof
+Dustbin -[#bd93f9]-> AI : Validate Cleaning
+Vehicle .[#bd93f9].> Maps : Live Tracking
+
+' --- Assignments ---
+Complaint ..> Vehicle : Assigned To
+Complaint ..> Staff : Assigned To
+
+@enduml
