@@ -1,8 +1,8 @@
 Table Admin {
   id ObjectId [pk]
   name varchar
-  email varchar
-  username varchar
+  email varchar [unique]
+  username varchar [unique]
   role varchar
 }
 
@@ -12,7 +12,7 @@ Table Office {
   cityName varchar
   officeName varchar
   adminName varchar
-  adminEmail varchar
+  adminEmail varchar [unique]
   latitude number
   longitude number
   status varchar
@@ -88,6 +88,8 @@ Table Complaint {
   driverId ObjectId
   assignedVehicleId ObjectId
 }
+
+Ref: Admin.id < Office.id
 
 Ref: Office.id < Citizen.officeId
 Ref: Office.id < Staff.officeId

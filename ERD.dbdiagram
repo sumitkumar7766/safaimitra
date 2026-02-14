@@ -3,8 +3,253 @@
   "darkMode": true,
   "gridEnabling": false,
   "detailLevel": "All",
-  "tablePositions": [],
+  "tablePositions": [
+    {
+      "name": "Admin",
+      "schemaName": "public",
+      "x": 0,
+      "y": 50
+    },
+    {
+      "name": "Office",
+      "schemaName": "public",
+      "x": 275.1966888211178,
+      "y": 41.03176271456191
+    },
+    {
+      "name": "Citizen",
+      "schemaName": "public",
+      "x": 558.6817193595342,
+      "y": 107.7425848300589
+    },
+    {
+      "name": "Staff",
+      "schemaName": "public",
+      "x": 790.2568359375,
+      "y": 50
+    },
+    {
+      "name": "Vehicle",
+      "schemaName": "public",
+      "x": 0,
+      "y": 292
+    },
+    {
+      "name": "Route",
+      "schemaName": "public",
+      "x": 256.13918458956186,
+      "y": 449.7579406786404
+    },
+    {
+      "name": "Dustbin",
+      "schemaName": "public",
+      "x": 534.1749420767559,
+      "y": 796.7672753296539
+    },
+    {
+      "name": "Complaint",
+      "schemaName": "public",
+      "x": 790.2568359375,
+      "y": 356
+    }
+  ],
   "tableGroupCollapseStates": [],
   "stickyNoteLayouts": [],
-  "referencePaths": []
+  "referencePaths": [
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Admin",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "id"
+      ],
+      "secondTableName": "Office",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Citizen",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Staff",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Vehicle",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Route",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Dustbin",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Route",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "routeId"
+      ],
+      "secondTableName": "Dustbin",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Route",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "routeId"
+      ],
+      "secondTableName": "Vehicle",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Citizen",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "citizenId"
+      ],
+      "secondTableName": "Complaint",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Dustbin",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "dustbinId"
+      ],
+      "secondTableName": "Complaint",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Staff",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "driverId"
+      ],
+      "secondTableName": "Complaint",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Vehicle",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "assignedVehicleId"
+      ],
+      "secondTableName": "Complaint",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    },
+    {
+      "firstFieldNames": [
+        "id"
+      ],
+      "firstTableName": "Office",
+      "firstSchemaName": "public",
+      "firstRelation": "1",
+      "secondFieldNames": [
+        "officeId"
+      ],
+      "secondTableName": "Complaint",
+      "secondSchemaName": "public",
+      "secondRelation": "*",
+      "checkPoints": []
+    }
+  ]
 }
