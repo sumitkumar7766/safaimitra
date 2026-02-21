@@ -1,0 +1,15 @@
+@startuml
+actor User
+participant "Frontend" as FE
+participant "Auth API" as BE
+database DB
+
+User -> FE : Enter credentials
+FE -> BE : POST /auth/login
+BE -> DB : Validate user
+DB --> BE : User data
+BE -> FE : JWT token
+FE -> BE : API request with token
+BE -> BE : Token verification
+BE -> FE : Authorized response
+@enduml

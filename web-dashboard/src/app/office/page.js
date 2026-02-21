@@ -155,7 +155,7 @@ const DashboardView = React.memo(
                 🗺️ Live City Map
               </h3>
               <p className="text-sm text-gray-600">
-                Real-time tracking of bins and vehicles across {profile.city}
+                Real-time tracking of bins and vehicles
               </p>
             </div>
             <div className="flex items-center gap-2">
@@ -172,8 +172,8 @@ const DashboardView = React.memo(
             {typeof window !== "undefined" && L && (
               <MapContainer
                 center={[
-                  userData?.latitude ? Number(userData.latitude) : 23.2599,
-                  userData?.longitude ? Number(userData.longitude) : 77.4126,
+                  userData?.latitude ? Number(userData.latitude) : 0,
+                  userData?.longitude ? Number(userData.longitude) : 0,
                 ]}
                 zoom={13}
                 style={{ height: "100%", width: "100%" }}
@@ -2205,7 +2205,7 @@ export default function OfficeDashboard() {
               { view: "dustbins", icon: Building2, label: "Dustbins" },
               { view: "vehicles", icon: Truck, label: "Vehicles" },
               { view: "staff", icon: UserCog, label: "Staff" },
-              { view: "settings", icon: Settings, label: "Settings" },
+              // { view: "settings", icon: Settings, label: "Settings" },
             ].map((item) => (
               <li key={item.view}>
                 <button
@@ -2467,8 +2467,8 @@ export default function OfficeDashboard() {
                       {typeof window !== "undefined" && L && (
                         <MapContainer
                           center={[
-                            userData.latitude || 23.2599,
-                            userData.longitude || 77.4126,
+                            userData.latitude || 0,
+                            userData.longitude || 0,
                           ]}
                           zoom={13}
                           style={{ height: "100%", width: "100%" }}

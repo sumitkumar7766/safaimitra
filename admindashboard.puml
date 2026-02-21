@@ -1,0 +1,16 @@
+@startuml
+actor Admin
+participant "Dashboard UI" as UI
+participant "Backend API" as BE
+participant "WebSocket Server" as WS
+database DB
+
+Admin -> UI : Open dashboard
+UI -> BE : GET /dashboard/overview
+BE -> DB : Fetch stats
+DB --> BE : Data
+BE --> UI : Dashboard data
+
+BE -> WS : Emit live update
+WS -> UI : Real-time status refresh
+@enduml

@@ -54,6 +54,7 @@ export default function CitizenScreen({ navigation, goBack }) {
 
   const socketRef = useRef(null);
   const mapRef = useRef(null);
+  const locationSubscription = useRef(null);
 
   // ==================== API FUNCTIONS ====================
 
@@ -138,6 +139,7 @@ export default function CitizenScreen({ navigation, goBack }) {
 
   // ==================== LOCATION FUNCTIONS ====================
 
+  // ==================== LIVE LOCATION TRACKING ====================
   const getCurrentLocation = async () => {
     setLoadingLocation(true);
     try {
@@ -151,30 +153,42 @@ export default function CitizenScreen({ navigation, goBack }) {
       }
 
       setLocationPermission("granted");
-      const location = await Location.getCurrentPositionAsync({
-        accuracy: Location.Accuracy.High,
-      });
 
-      const { latitude, longitude } = location.coords;
-      setUserLocation([latitude, longitude]);
-
-      if (mapRef.current) {
-        mapRef.current.animateToRegion({
-          latitude,
-          longitude,
-          latitudeDelta: 0.01,
-          longitudeDelta: 0.01,
-        });
+      // Agar pehle se koi tracking chal rahi hai to usko band karein
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
       }
 
-      reverseGeocode(latitude, longitude);
-      fetchAreaStats(latitude, longitude);
-      fetchNearbyVehicles(latitude, longitude);
+      // 🔥 Live Tracking Start (Har 1 Second Update)
+      locationSubscription.current = await Location.watchPositionAsync(
+        {
+          accuracy: Location.Accuracy.High,
+          timeInterval: 1000, // Har 1000ms (1 second) me update karega
+          distanceInterval: 1, // Agar 1 meter bhi hila to update hoga
+        },
+        (location) => {
+          const { latitude, longitude } = location.coords;
+
+          // State Update (Coordinate Update)
+          setUserLocation([latitude, longitude]);
+          setLoadingLocation(false);
+
+          // Address bhi update karein (Optional: Ise throttle kar sakte hain taaki API limit hit na ho)
+          // reverseGeocode(latitude, longitude);
+
+          // Agar aap chahte hain ki Map user ke sath-sath move kare:
+          mapRef.current?.animateToRegion({
+            latitude,
+            longitude,
+            latitudeDelta: 0.005,
+            longitudeDelta: 0.005,
+          }, 500);
+        },
+      );
     } catch (error) {
       console.error("Error getting location:", error);
       setLocationPermission("denied");
-      setAddress("Location access denied");
-    } finally {
+      setAddress("Location error");
       setLoadingLocation(false);
     }
   };
@@ -223,7 +237,7 @@ export default function CitizenScreen({ navigation, goBack }) {
     const result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true,
-      aspect: [4, 3],
+      aspect: [9, 16],
       quality: 0.8,
     });
 
@@ -389,6 +403,15 @@ export default function CitizenScreen({ navigation, goBack }) {
       bin.latitude,
       bin.longitude,
     );
+
+    // 🔒 200m Geo-fence check
+    if (distance > 70) {
+      Alert.alert(
+        "Too Far from Dustbin",
+        `❌ You are ${distance.toFixed(0)} meters away.\nPlease move within 70 meters to report this bin.`,
+      );
+      return;
+    }
 
     setSelectedBin(bin);
     setAddress(`✅ Selected: ${bin.name} (${distance.toFixed(0)}m away)`);
@@ -561,10 +584,71 @@ export default function CitizenScreen({ navigation, goBack }) {
         socketRef.current.disconnect();
         socketRef.current = null;
       }
+
+      if (locationSubscription.current) {
+        locationSubscription.current.remove();
+      }
     };
   }, []);
 
-  // ==================== RENDER ====================
+  const BIN_STATUS_COLOR = {
+    clean: "#10b981", // green
+    pending: "#f59e0b", // yellow
+    overflow: "#ef4444", // red
+    complaint: "#7c3aed", // purple
+  };
+
+  // Nearest dustbin
+  // ==================== NEW FUNCTION: FIND NEAREST BIN ====================
+  const findNearestBin = () => {
+    if (!userLocation) {
+      Alert.alert(
+        "Location Required",
+        "📍 Please wait for your location to be detected.",
+      );
+      return;
+    }
+
+    if (dustbins.length === 0) {
+      Alert.alert("No Bins", "❌ No dustbins data available.");
+      return;
+    }
+
+    let nearestBin = null;
+    let minDistance = Infinity;
+
+    // Loop through all bins to find the closest one
+    dustbins.forEach((bin) => {
+      const distance = calculateDistance(
+        userLocation[0],
+        userLocation[1],
+        bin.latitude,
+        bin.longitude,
+      );
+
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestBin = bin;
+      }
+    });
+
+    if (nearestBin) {
+      if (minDistance > 70) {
+        Alert.alert(
+          "Too Far",
+          `❌ No dustbin found within 70 meters.\n📏 Nearest bin is ${minDistance.toFixed(0)} meters away.`,
+        );
+        return; // Stop execution here
+      }
+      // Auto-select the bin using your existing logic
+      handleBinSelect(nearestBin);
+
+      Alert.alert(
+        "Nearest Bin Found",
+        `✅ Auto-selected: ${nearestBin.name || "Dustbin"} \n📏 Distance: ${minDistance.toFixed(0)} meters`,
+      );
+    }
+  };
 
   return (
     <View className="flex-1 bg-gray-100 relative">
@@ -786,9 +870,12 @@ export default function CitizenScreen({ navigation, goBack }) {
                   </View>
                 </View>
                 {locationPermission === "granted" ? (
-                  <View className="flex-row items-center gap-2 bg-green-500 px-3 py-1.5 rounded-lg">
-                    <View className="w-2 h-2 bg-white rounded-full" />
-                    <Text className="text-xs font-bold text-white">
+                  <View className="flex-row items-center justify-center bg-green-500 px-3 py-1.5 rounded-lg">
+                    <View className="w-2 h-2 bg-white rounded-full mr-2" />
+                    <Text
+                      style={{ textAlignVertical: "center" }}
+                      className="text-xs font-bold text-white leading-[12px]"
+                    >
                       DETECTED
                     </Text>
                   </View>
@@ -846,9 +933,22 @@ export default function CitizenScreen({ navigation, goBack }) {
               </LinearGradient>
 
               <View className="p-6">
+                {/* the extra buttion add */}
+                <TouchableOpacity
+                  onPress={findNearestBin}
+                  className="flex-row items-center justify-center bg-purple-100 border border-purple-300 py-3 rounded-xl mb-4 active:bg-purple-200"
+                >
+                  <Text className="text-xl mr-2">🎯</Text>
+                  <Text className="text-purple-700 font-bold text-base">
+                    Auto-Select Nearest Bin
+                  </Text>
+                </TouchableOpacity>
+
                 <View className="h-96 rounded-2xl overflow-hidden border-2 border-gray-200 mb-4">
                   <MapView
                     ref={mapRef}
+                    showsMyLocationButton={true}
+                    showsUserLocation={true}
                     provider={PROVIDER_GOOGLE}
                     style={{ flex: 1 }}
                     initialRegion={{
@@ -860,7 +960,7 @@ export default function CitizenScreen({ navigation, goBack }) {
                       longitudeDelta: 0.02,
                     }}
                   >
-                    {userLocation && (
+                    {/* {userLocation && (
                       <>
                         <Circle
                           center={{
@@ -880,11 +980,11 @@ export default function CitizenScreen({ navigation, goBack }) {
                           description={address}
                         >
                           <View className="w-8 h-8 justify-center items-center">
-                            <Text className="text-2xl">📍</Text>
+                            <Text className="text-2xl"></Text>
                           </View>
                         </Marker>
                       </>
-                    )}
+                    )} */}
 
                     {dustbins.map((bin) => (
                       <Marker
@@ -899,11 +999,7 @@ export default function CitizenScreen({ navigation, goBack }) {
                           className="w-8 h-8 rounded-full border-2 border-white justify-center items-center"
                           style={{
                             backgroundColor:
-                              bin.status === "clean"
-                                ? "#10b981"
-                                : bin.status === "overflow"
-                                  ? "#ef4444"
-                                  : "#f59e0b",
+                              BIN_STATUS_COLOR[bin.status] || "#9ca3af",
                           }}
                         >
                           <Text className="text-base">🗑️</Text>

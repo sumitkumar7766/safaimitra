@@ -1,0 +1,19 @@
+@startuml
+actor Citizen
+participant "Frontend" as FE
+participant "Backend API" as BE
+database DB
+actor Office
+
+Citizen -> FE : Submit complaint
+FE -> BE : POST /complaints
+BE -> DB : Save complaint (OPEN)
+BE -> Office : Notify new complaint
+
+Office -> BE : Assign staff
+BE -> DB : Update assignment
+
+Staff -> BE : Resolve complaint
+BE -> DB : Update status = RESOLVED
+BE -> Citizen : Send resolution notification
+@enduml

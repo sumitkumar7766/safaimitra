@@ -754,6 +754,40 @@ export default function CitizenPage() {
     }
   };
 
+  const tryOpenCameraCitizen = () => {
+    if (!selectedBin) {
+      alert("🗑️ Please select a dustbin first");
+      return;
+    }
+
+    if (!userLocation) {
+      alert("📍 Waiting for your location. Please enable GPS.");
+      return;
+    }
+
+    const distance = calculateDistance(
+      userLocation[0],
+      userLocation[1],
+      selectedBin.latitude,
+      selectedBin.longitude,
+    );
+
+    console.log("📏 Citizen distance:", Math.round(distance), "meters");
+
+    if (distance > 100) {
+      alert(
+        `❌ You are too far from this dustbin.\n\n` +
+          `Allowed distance: ${100} meters\n` +
+          `Your distance: ${Math.round(distance)} meters\n\n` +
+          `Please move closer to report this bin.`,
+      );
+      return;
+    }
+
+    // ✅ Within 100m → open camera
+    fileInputRef.current?.click();
+  };
+
   return (
     <div className="relative min-h-screen bg-gray-100">
       {/* Success Notification */}
@@ -1180,6 +1214,8 @@ export default function CitizenPage() {
                     else
                       alert("🚫 Please select a dustbin from the map first!");
                   }}
+                  // onClick={tryOpenCameraCitizen}
+
                   className={`w-full h-60 rounded-2xl border-3 border-dashed overflow-hidden transition-all group
                     ${
                       !selectedBin

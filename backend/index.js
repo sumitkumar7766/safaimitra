@@ -84,7 +84,7 @@ const server = http.createServer(app);
 // 2. 🔥 SOCKET.IO SETUP WITH CORS (Ye Important Hai) 🔥
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://10.242.244.129:5001"], // Dono URLs allow kar diye
+    origin: ["http://localhost:3000", "http://10.242.244.129:5001", "http://172.24.64.210:3000", "http://172.24.64.210:5001","http://127.0.0.1:3000", "http://172.24.64.210:3000", "https://f208-103-39-236-130.ngrok-free.app"], // Dono URLs allow kar diye
     methods: ["GET", "POST"],
     credentials: true
   },
@@ -186,7 +186,7 @@ app.get("/", (_req, res) => {
 /* ============================================================ */
 
 // '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("27 14 * * *", async () => {
+cron.schedule("10 9 * * *", async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
 
   try {

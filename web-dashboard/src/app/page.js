@@ -135,7 +135,7 @@ export default function SafaiMitra() {
       </main>
 
       <footer className="py-12 text-center text-gray-400 text-sm">
-        Powered by SmartCity Solutions © 2026
+        Powered by CleanBin AI © 2026
       </footer>
     </div>
   );

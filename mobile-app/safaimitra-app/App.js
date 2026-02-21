@@ -1319,7 +1319,7 @@ export default function App() {
           <View className="items-center mb-4">
             <FloatingElement delay={0}>
               <View className="bg-white w-20 h-20 rounded-3xl justify-center items-center mb-4 shadow-xl">
-                <Text className="text-5xl">🌿</Text>
+                <Text className="text-4xl">🌿</Text>
               </View>
             </FloatingElement>
             <Text className="text-white text-5xl font-bold mb-2">

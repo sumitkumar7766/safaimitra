@@ -1,0 +1,25 @@
+@startuml
+actor Staff
+participant "Frontend (Web/App)" as FE
+participant "Backend API" as BE
+participant "AI Verification Service" as AI
+database DB
+participant "Cloud Storage" as CS
+actor Office
+
+Staff -> FE : Capture dustbin image
+FE -> BE : POST /staff/mark-clean (image + metadata)
+BE -> CS : Upload image
+CS --> BE : Image URL
+BE -> DB : Save cleaning log (PENDING)
+BE -> AI : Verify image (async)
+AI -> BE : Verification result (VERIFIED / REJECTED)
+
+alt Image Verified
+  BE -> DB : Update status = CLEANED
+  BE -> Office : Notify update
+else Image Rejected
+  BE -> DB : Update status = REJECTED
+  BE -> Staff : Re-upload request
+end
+@enduml

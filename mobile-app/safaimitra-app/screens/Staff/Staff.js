@@ -200,7 +200,7 @@ export default function VehiclePage({ goBack }) {
         />
       )}
 
-      {driverLocation && (
+      {/* {driverLocation && (
         <Marker
           coordinate={{
             latitude: driverLocation[0],
@@ -209,11 +209,11 @@ export default function VehiclePage({ goBack }) {
           anchor={{ x: 0.5, y: 0.5 }}
           zIndex={999}
         >
-          <View style={tw`bg-blue-600 p-1 rounded-full border-2 border-white`}>
-            <Text style={{ fontSize: 12 }}>🚛</Text>
+          <View className="w-8 h-8 justify-center items-center">
+            <Text className="text-2xl"></Text>
           </View>
         </Marker>
-      )}
+      )} */}
 
       {routeStops.map((stop, index) => (
         <DustbinMarker
@@ -359,8 +359,6 @@ export default function VehiclePage({ goBack }) {
 
           // 4. Handle Emergency Jobs (Merged Logic)
           newSocket.on("new_job_alert", async (data) => {
-            console.log("🚨 New Job Alert Received:", data);
-
             // A. Play Audio (Expo Way)
             try {
               const { sound } = await Audio.Sound.createAsync({
@@ -686,6 +684,26 @@ export default function VehiclePage({ goBack }) {
 
   // --- 🔥 FIX: Image Quality & Size ---
   const pickImage = async () => {
+    if (!driverLocation || !targetStop) {
+      Alert.alert("Wait", "📍 Waiting for GPS location");
+      return;
+    }
+
+    const dist = getDistance(
+      driverLocation[0],
+      driverLocation[1],
+      targetStop.coordinates[0],
+      targetStop.coordinates[1],
+    );
+
+    if (dist > 70) {
+      Alert.alert(
+        "❌ You are too far",
+        `You are ${(dist / 1000).toFixed(2)} km away.\nMove within 70 meters to upload photo.`,
+      );
+      return;
+    }
+
     if (showCompletionUI) return;
     const { status } = await ImagePicker.requestCameraPermissionsAsync();
     if (status !== "granted") {
@@ -697,8 +715,8 @@ export default function VehiclePage({ goBack }) {
     let result = await ImagePicker.launchCameraAsync({
       mediaTypes: ImagePicker.MediaTypeOptions.Images,
       allowsEditing: true, // Editing on karne se aspect ratio fix rehta hai
-      aspect: [4, 3],
-      quality: 0.3, // 🔥 Quality 0.3 (30%) taaki size kam ho (Important)
+      aspect: [9, 16],
+      quality: 0.8, // 🔥 Quality 0.8 (80%) taaki size kam ho (Important)
     });
 
     if (!result.canceled) {
@@ -924,15 +942,21 @@ export default function VehiclePage({ goBack }) {
   };
 
   const handleFindNearest = () => {
+    // 1. GPS Check
     if (!driverLocation) return Alert.alert("Wait", "📍 Waiting for GPS...");
+
+    // 2. Filter Pending Bins
     const pendingBins = routeStops
       .map((stop, index) => ({ ...stop, originalIndex: index + 1 }))
       .filter(
         (stop) =>
           !["clean", "skiped", "suspecies", "resolved"].includes(stop.status),
       );
+
     if (pendingBins.length === 0)
       return Alert.alert("Done", "🎉 All bins completed!");
+
+    // 3. Sort by Distance
     const sorted = pendingBins.sort((a, b) => {
       const distA = getDistance(
         driverLocation[0],
@@ -948,16 +972,32 @@ export default function VehiclePage({ goBack }) {
       );
       return distA - distB;
     });
-    Alert.alert("Nearest Bin", `Found: "${sorted[0].name}"\nGo there now?`, [
-      { text: "No", style: "cancel" },
-      {
-        text: "Go",
-        onPress: () => {
-          setCurrentStop(sorted[0].originalIndex);
-          if (!showMap) setShowMap(true);
+
+    const nearestBin = sorted[0];
+
+    // 4. Calculate exact distance for display
+    const distMeters = getDistance(
+      driverLocation[0],
+      driverLocation[1],
+      nearestBin.coordinates[0],
+      nearestBin.coordinates[1],
+    );
+
+    // 5. Alert with Distance Info
+    Alert.alert(
+      "Nearest Bin Found",
+      `Found: "${nearestBin.name}"\n📏 Distance: ${distMeters.toFixed(0)} meters\n\nGo there now?`,
+      [
+        { text: "No", style: "cancel" },
+        {
+          text: "Go",
+          onPress: () => {
+            setCurrentStop(nearestBin.originalIndex);
+            if (!showMap) setShowMap(true);
+          },
         },
-      },
-    ]);
+      ],
+    );
   };
 
   const mapCenter =
@@ -1577,7 +1617,7 @@ export default function VehiclePage({ goBack }) {
             <View
               style={tw`w-20 h-20 bg-red-100 rounded-full items-center justify-center mb-4`}
             >
-              <Text style={{ fontSize: 40 }}>🚨</Text>
+              <Text style={{ fontSize: 40 }}>⚠️</Text>
             </View>
             <Text style={tw`text-2xl font-black text-gray-900 mb-2`}>
               {newJobAlert?.title}

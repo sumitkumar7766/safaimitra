@@ -551,6 +551,9 @@ export default function VehiclePage() {
       formData.append("image", file);
       formData.append("dustbinId", currentStopData.id);
 
+      formData.append("latitude", driverLocation[0]);
+      formData.append("longitude", driverLocation[1]);
+
       const res = await axios.post(
         "http://localhost:5001/api/predict",
         formData,
@@ -758,6 +761,29 @@ export default function VehiclePage() {
     driverLocation && driverLocation.length >= 2
       ? [driverLocation[0], driverLocation[1]]
       : [23.2599, 77.4126];
+
+  // 200 meter logic
+  const tryOpenCamera = () => {
+    if (showCompletionUI) return;
+
+    if (!driverLocation || !targetStop?.coordinates) {
+      alert("📍 Location not available yet. Please wait...");
+      return;
+    }
+
+    if (distance > 200) {
+      alert(
+        `❌ You are too far from the dustbin.\n\n` +
+          `Allowed distance: 200 meters\n` +
+          `Your distance: ${Math.round(distance)} meters\n\n` +
+          `Please move closer to the dustbin to take photo.`,
+      );
+      return;
+    }
+
+    // ✅ Within range → open camera
+    afterFileRef.current?.click();
+  };
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-blue-50 to-indigo-100 pb-10">
@@ -1061,6 +1087,8 @@ export default function VehiclePage() {
                 onClick={() =>
                   !showCompletionUI && afterFileRef.current?.click()
                 }
+                // onClick={tryOpenCamera}
+
                 className={`w-full h-56 rounded-xl border-2 border-dashed overflow-hidden flex flex-col items-center justify-center ${showCompletionUI ? "bg-gray-100" : "cursor-pointer hover:border-blue-500 bg-gray-50"}`}
               >
                 {afterImage ? (
