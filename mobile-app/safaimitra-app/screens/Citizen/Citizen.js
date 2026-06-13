@@ -11,6 +11,8 @@ import {
   Modal,
   RefreshControl,
   Dimensions,
+  Share,
+  Linking,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from "react-native-maps";
@@ -30,6 +32,8 @@ export default function CitizenScreen({ navigation, goBack }) {
   // State Management
   const [selectedTab, setSelectedTab] = useState("report");
   const [image, setImage] = useState(null);
+  const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
+  const [showDetailModal, setShowDetailModal] = useState(false);
   const [status, setStatus] = useState("waiting");
   const [address, setAddress] = useState("Detecting location...");
   const [showNotification, setShowNotification] = useState(false);
@@ -1318,9 +1322,13 @@ export default function CitizenScreen({ navigation, goBack }) {
                   </View>
                 ) : (
                   myComplaints.map((complaint, index) => (
-                    <View
+                    <TouchableOpacity
                       key={complaint._id || index}
-                      className="flex-row gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50 mb-4"
+                      onPress={() => {
+                        setSelectedComplaintDetail(complaint);
+                        setShowDetailModal(true);
+                      }}
+                      className="flex-row gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50 mb-4 active:opacity-90"
                     >
                       <View className="w-20 h-20 rounded-xl overflow-hidden bg-gray-200 border border-gray-200 relative">
                         {complaint.ComimageUrl ? (
@@ -1406,18 +1414,33 @@ export default function CitizenScreen({ navigation, goBack }) {
                             </Text>
                           </View>
 
-                          {complaint.vehicle &&
-                            complaint.vehicle !== "Not Assigned" && (
-                              <View className="flex-row items-center gap-1 bg-gray-200 px-2 py-1 rounded-lg">
-                                <Text className="text-[10px]">🚛</Text>
-                                <Text className="text-[10px] font-semibold text-gray-600">
-                                  {complaint.vehicle}
+                          <View className="flex-row items-center gap-2">
+                            {complaint.status !== "resolved" && complaint.nextEscalationAt && (
+                              <View className="bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                                <Text className="text-[10px] text-amber-700 font-bold">
+                                  ⏱️ {(() => {
+                                    const diff = new Date(complaint.nextEscalationAt) - new Date();
+                                    if (diff <= 0) return "Escalating...";
+                                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                    return `${hours}h ${mins}m`;
+                                  })()}
                                 </Text>
                               </View>
                             )}
+                            {complaint.vehicle &&
+                              complaint.vehicle !== "Not Assigned" && (
+                                <View className="flex-row items-center gap-1 bg-gray-200 px-2 py-1 rounded-lg">
+                                  <Text className="text-[10px]">🚛</Text>
+                                  <Text className="text-[10px] font-semibold text-gray-600">
+                                    {complaint.vehicle}
+                                  </Text>
+                                </View>
+                              )}
+                          </View>
                         </View>
                       </View>
-                    </View>
+                    </TouchableOpacity>
                   ))
                 )}
               </ScrollView>
@@ -1670,6 +1693,223 @@ export default function CitizenScreen({ navigation, goBack }) {
                   Awesome! 👍
                 </Text>
               </TouchableOpacity>
+            </View>
+          </BlurView>
+        </View>
+      </Modal>
+
+      {/* ==================== JAES COMPLAINT DETAIL & TIMELINE MODAL ==================== */}
+      <Modal
+        visible={showDetailModal && selectedComplaintDetail !== null}
+        animationType="slide"
+        transparent
+      >
+        <View className="flex-1 justify-end bg-black/60">
+          <BlurView
+            intensity={90}
+            className="w-full h-[85%] rounded-t-3xl overflow-hidden bg-white"
+          >
+            <View className="flex-1 p-6">
+              <View className="flex-row justify-between items-center pb-4 border-b border-gray-100">
+                <Text className="text-xl font-bold text-gray-800">
+                  ⚠️ Grievance SLA Timeline
+                </Text>
+                <TouchableOpacity
+                  onPress={() => {
+                    setShowDetailModal(false);
+                    setSelectedComplaintDetail(null);
+                  }}
+                  className="w-10 h-10 bg-gray-100 rounded-full justify-center items-center"
+                >
+                  <Text className="text-lg font-bold text-black">✕</Text>
+                </TouchableOpacity>
+              </View>
+
+              {selectedComplaintDetail && (
+                <ScrollView className="flex-1 mt-4" showsVerticalScrollIndicator={false}>
+                  <View className="flex-row gap-4 mb-5">
+                    <View className="w-28 h-28 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
+                      {selectedComplaintDetail.ComimageUrl ? (
+                        <Image
+                          source={{ uri: selectedComplaintDetail.ComimageUrl }}
+                          className="w-full h-full"
+                          resizeMode="cover"
+                        />
+                      ) : (
+                        <View className="w-full h-full justify-center items-center">
+                          <Text className="text-3xl">🗑️</Text>
+                        </View>
+                      )}
+                    </View>
+                    <View className="flex-1 justify-between py-1">
+                      <View>
+                        <Text className="text-base font-black text-gray-900">
+                          ID: #SM{selectedComplaintDetail._id.toString().slice(-6).toUpperCase()}
+                        </Text>
+                        <Text className="text-xs text-gray-500 mt-1">
+                          📍 {selectedComplaintDetail.area || "Location Area"}
+                        </Text>
+                        <Text className="text-xs text-gray-400 mt-1">
+                          📅 Created: {new Date(selectedComplaintDetail.createdAt || selectedComplaintDetail.reportedAt).toLocaleDateString("en-IN", {
+                            day: "2-digit",
+                            month: "short",
+                            year: "numeric"
+                          })}
+                        </Text>
+                      </View>
+                      <View className="flex-row gap-2">
+                        <View className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
+                          <Text className="text-[10px] font-bold text-blue-600">
+                            Level {selectedComplaintDetail.currentEscalationLevel || 1}
+                          </Text>
+                        </View>
+                        <View className="bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
+                          <Text className="text-[10px] font-bold text-gray-600">
+                            {selectedComplaintDetail.pendingDays || 0} Days Pending
+                          </Text>
+                        </View>
+                      </View>
+                    </View>
+                  </View>
+
+                  <View className="bg-gray-50 p-4 rounded-2xl mb-5 border border-gray-100">
+                    <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
+                      Description
+                    </Text>
+                    <Text className="text-sm text-gray-700 leading-relaxed">
+                      {selectedComplaintDetail.description || "No description provided."}
+                    </Text>
+                  </View>
+
+                  <View className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-5">
+                    <Text className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">
+                      SLA Countdown / Next Escalation
+                    </Text>
+                    {selectedComplaintDetail.status === "resolved" ? (
+                      <Text className="text-sm font-bold text-green-700">
+                        ✅ Issue Resolved! Escalation Stopped.
+                      </Text>
+                    ) : selectedComplaintDetail.nextEscalationAt ? (
+                      <View>
+                        <Text className="text-base font-black text-amber-800">
+                          {(() => {
+                            const diff = new Date(selectedComplaintDetail.nextEscalationAt) - new Date();
+                            if (diff <= 0) return "Escalating...";
+                            const hours = Math.floor(diff / (1000 * 60 * 60));
+                            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                            if (selectedComplaintDetail.currentEscalationLevel >= 5) {
+                              return `${hours}h ${mins}m remaining before Public Share Eligibility`;
+                            }
+                            return `${hours}h ${mins}m remaining before Level ${selectedComplaintDetail.currentEscalationLevel + 1}`;
+                          })()}
+                        </Text>
+                        <Text className="text-xs text-amber-600 mt-1">
+                          Deadline: {new Date(selectedComplaintDetail.nextEscalationAt).toLocaleString("en-IN", {
+                            hour: "2-digit",
+                            minute: "2-digit",
+                            day: "2-digit",
+                            month: "short"
+                          })}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text className="text-sm font-bold text-red-700">
+                        🚨 Max Escalation reached (Level 5 Commissioner).
+                      </Text>
+                    )}
+                  </View>
+
+                  <View className="mb-6">
+                    <Text className="text-sm font-bold text-gray-800 mb-4">
+                      📈 JAES Escalation Timeline
+                    </Text>
+
+                    {[
+                      { level: 1, label: "Level 1: Driver / Worker", staff: selectedComplaintDetail.driverId?.name || selectedComplaintDetail.vehicle || "Assigned Driver" },
+                      { level: 2, label: "Level 2: Area Supervisor", staff: selectedComplaintDetail.supervisorId?.name || "Area Supervisor" },
+                      { level: 3, label: "Level 3: Zone Officer", staff: selectedComplaintDetail.zoneOfficerId?.name || "Zone Officer" },
+                      { level: 4, label: "Level 4: Municipal Officer", staff: selectedComplaintDetail.municipalOfficerId?.name || "Municipal Officer" },
+                      { level: 5, label: "Level 5: City Commissioner", staff: selectedComplaintDetail.commissionerId?.name || "City Commissioner" }
+                    ].map((stage, idx) => {
+                      const isReached = selectedComplaintDetail.currentEscalationLevel >= stage.level;
+                      return (
+                        <View key={stage.level} className="flex-row items-start mb-6 relative">
+                          {idx < 4 && (
+                            <View 
+                              className="absolute left-[11px] top-6 w-[2px] h-10" 
+                              style={{ backgroundColor: selectedComplaintDetail.currentEscalationLevel > stage.level ? "#ef4444" : "#d1d5db" }} 
+                            />
+                          )}
+                          
+                          <View 
+                            className="w-6 h-6 rounded-full items-center justify-center border-2 mr-4 flex-shrink-0"
+                            style={{ 
+                              backgroundColor: isReached ? "#ef4444" : "#ffffff", 
+                              borderColor: isReached ? "#ef4444" : "#9ca3af" 
+                            }}
+                          >
+                            {isReached && (
+                              <Text className="text-[10px] font-black text-white">✓</Text>
+                            )}
+                          </View>
+
+                          <View className="flex-1">
+                            <Text className={`text-sm font-bold ${isReached ? 'text-gray-900' : 'text-gray-400'}`}>
+                              {stage.label}
+                            </Text>
+                            <Text className="text-xs text-gray-500">
+                              Responsible: {stage.staff}
+                            </Text>
+                            {isReached && selectedComplaintDetail.currentEscalationLevel === stage.level && selectedComplaintDetail.status !== "resolved" && (
+                              <Text className="text-[10px] font-bold text-red-500 mt-1">
+                                ⚠️ CURRENT ACTIVE RESPONSIBILITY
+                              </Text>
+                            )}
+                          </View>
+                        </View>
+                      );
+                    })}
+                  </View>
+
+                  {selectedComplaintDetail.status !== "resolved" && selectedComplaintDetail.publicEscalationEligible === true && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        Alert.alert(
+                          "Share Grievance Card",
+                          "Select a platform to share this card publicly:",
+                          [
+                            {
+                              text: "WhatsApp 🟢",
+                              onPress: () => {
+                                const msg = `📢 Grievance #${selectedComplaintDetail._id.toString().slice(-6).toUpperCase()} at ${selectedComplaintDetail.area} remains UNRESOLVED after 5 days.\n\nEscalated to: Commissioner\n\nView details: ${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`;
+                                Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
+                              }
+                            },
+                            {
+                              text: "X / Twitter 🐦",
+                              onPress: () => {
+                                const msg = `Grievance #${selectedComplaintDetail._id.toString().slice(-6).toUpperCase()} at ${selectedComplaintDetail.area} remains UNRESOLVED after 5 days. Escalated to Commissioner. @SafaiMitra: ${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`;
+                                Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}`);
+                              }
+                            },
+                            {
+                              text: "Download / Open Card 📥",
+                              onPress: () => {
+                                Linking.openURL(`${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`);
+                              }
+                            },
+                            { text: "Cancel", style: "cancel" }
+                          ]
+                        );
+                      }}
+                      className="w-full py-4 bg-red-600 rounded-2xl flex-row items-center justify-center gap-2 mb-8 shadow-lg active:opacity-85"
+                    >
+                      <Text className="text-xl">📢</Text>
+                      <Text className="text-base font-bold text-white">Share Publicly</Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+              )}
             </View>
           </BlurView>
         </View>

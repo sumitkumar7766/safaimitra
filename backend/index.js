@@ -186,7 +186,7 @@ app.get("/", (_req, res) => {
 /* ============================================================ */
 
 // '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("10 9 * * *", async () => {
+cron.schedule("48 22 * * *", async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
 
   try {
@@ -239,6 +239,149 @@ cron.schedule("*/2 * * * *", async () => {
     }
   } catch (err) {
     console.error("❌ Error in Auto-Offline Job:", err);
+  }
+});
+
+/* ============================================================ */
+/* 👇 JAES AUTOMATIC ESCALATION ENGINE (Har 1 Minute mein) 👇  */
+/* ============================================================ */
+
+cron.schedule("*/1 * * * *", async () => {
+  const io = app.get("io");
+  const now = new Date();
+  
+  try {
+    const unresolvedComplaints = await Complaint.find({
+      status: { $nin: ["resolved", "closed", "rejected"] }
+    });
+
+    const authorityNames = {
+      1: "Driver",
+      2: "Area Supervisor",
+      3: "Zone Officer",
+      4: "Municipal Officer",
+      5: "City Commissioner"
+    };
+
+    const roles = {
+      2: "supervisor",
+      3: "zone_officer",
+      4: "municipal_officer",
+      5: "commissioner"
+    };
+
+    for (const comp of unresolvedComplaints) {
+      const createdTime = comp.reportedAt || comp.createdAt;
+      const elapsedMs = now - createdTime;
+      const elapsedHours = elapsedMs / (1000 * 60 * 60);
+      const pendingDays = Math.floor(elapsedHours / 24);
+
+      comp.pendingDays = pendingDays;
+
+      let updated = false;
+
+      // Fallback: If for some reason nextEscalationAt is missing, initialize it to 24h after report time
+      if (!comp.nextEscalationAt && comp.currentEscalationLevel < 5) {
+        comp.nextEscalationAt = new Date(createdTime.getTime() + 24 * 60 * 60 * 1000);
+        updated = true;
+      }
+
+      // Check if current escalation level timer has expired
+      if (comp.nextEscalationAt && now >= comp.nextEscalationAt) {
+        const oldLevel = comp.currentEscalationLevel;
+
+        if (oldLevel < 5) {
+          const targetLevel = oldLevel + 1;
+          comp.currentEscalationLevel = targetLevel;
+          comp.escalatedAt = now;
+          // Every hierarchy level gets a fresh 24 hours countdown!
+          comp.nextEscalationAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+          const role = roles[targetLevel];
+          let targetStaffId = null;
+          if (role) {
+            const fieldName = `${role === "supervisor" ? "supervisor" : role}Id`;
+            if (!comp[fieldName]) {
+              const staff = await Staff.findOne({ officeId: comp.officeId, role: role });
+              if (staff) {
+                comp[fieldName] = staff._id;
+                targetStaffId = staff._id;
+              }
+            } else {
+              targetStaffId = comp[fieldName];
+            }
+          }
+
+          const prevAuthName = authorityNames[oldLevel];
+          const newAuthName = authorityNames[targetLevel];
+
+          comp.escalationHistory.push({
+            escalationTime: now,
+            prevLevel: oldLevel,
+            newLevel: targetLevel,
+            prevAuthority: prevAuthName,
+            newAuthority: newAuthName,
+            statusChange: `Escalated to Level ${targetLevel} (${newAuthName})`,
+            resolutionTime: null
+          });
+
+          updated = true;
+
+          if (comp.citizenId) {
+            io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
+              type: "ESCALATED",
+              message: `Your complaint has been automatically escalated to ${newAuthName}!`,
+              complaintId: comp._id
+            });
+          }
+
+          if (targetStaffId) {
+            io.to(`driver_${targetStaffId}`).emit("new_job_alert", {
+              title: "🚨 JAES Escalated Complaint!",
+              message: `Complaint #${comp._id.toString().slice(-6)} has been escalated to you: ${comp.description}`,
+              newStop: {
+                id: comp.dustbinId || comp._id,
+                name: `🚨 Escalated: ${comp.area}`,
+                coordinates: [comp.latitude, comp.longitude],
+                status: "overflow",
+                type: "complaint",
+                isNew: true,
+                complaintId: comp._id
+              },
+              imageUrl: comp.ComimageUrl
+            });
+          }
+
+          io.emit("complaint_status_update", {
+            type: "ESCALATED",
+            complaintId: comp._id,
+            level: targetLevel,
+            authority: newAuthName
+          });
+        } else if (oldLevel === 5) {
+          // Level 5 timer expired -> mark public escalation eligible!
+          if (!comp.publicEscalationEligible) {
+            comp.publicEscalationEligible = true;
+            comp.nextEscalationAt = null; // No further countdowns
+            updated = true;
+
+            if (comp.citizenId) {
+              io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
+                type: "PUBLIC_ELIGIBLE",
+                message: `Your complaint is now eligible for public sharing on social media!`,
+                complaintId: comp._id
+              });
+            }
+          }
+        }
+      }
+
+      if (updated || comp.isModified("pendingDays")) {
+        await comp.save();
+      }
+    }
+  } catch (error) {
+    console.error("❌ JAES Escalation Cron Error:", error);
   }
 });
 

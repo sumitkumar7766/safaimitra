@@ -75,6 +75,63 @@ const ComplaintSchema = new mongoose.Schema({
     reportedAt: { type: Date, default: Date.now },
     resolvedAt: { type: Date, default: null },
     active: { type: Boolean, default: true },
+
+    // JAES Escalation fields
+    currentEscalationLevel: {
+        type: Number,
+        default: 1,
+    },
+    escalatedAt: {
+        type: Date,
+        default: null,
+    },
+    nextEscalationAt: {
+        type: Date,
+        default: null,
+    },
+    publicEscalationEligible: {
+        type: Boolean,
+        default: false,
+    },
+    slaDeadline: {
+        type: Date,
+        default: null,
+    },
+    pendingDays: {
+        type: Number,
+        default: 0,
+    },
+    supervisorId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Staff",
+        default: null,
+    },
+    zoneOfficerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Staff",
+        default: null,
+    },
+    municipalOfficerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Staff",
+        default: null,
+    },
+    commissionerId: {
+        type: mongoose.Schema.Types.ObjectId,
+        ref: "Staff",
+        default: null,
+    },
+    escalationHistory: [
+        {
+            escalationTime: { type: Date, default: Date.now },
+            prevLevel: { type: Number },
+            newLevel: { type: Number },
+            prevAuthority: { type: String },
+            newAuthority: { type: String },
+            statusChange: { type: String },
+            resolutionTime: { type: Date, default: null }
+        }
+    ]
 }, { timestamps: true });
 
 ComplaintSchema.index({ location: "2dsphere" });
