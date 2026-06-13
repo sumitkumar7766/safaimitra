@@ -2306,7 +2306,7 @@ function OfficeDashboard() {
                     placeholder="Enter official suspension reason (e.g. Uploaded 3 misleading fake images consecutively)"
                     value={suspensionReason}
                     onChange={(e) => setSuspensionReason(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                     rows="3"
                   />
                 </div>
@@ -2318,7 +2318,7 @@ function OfficeDashboard() {
                     placeholder="Describe verification evidence (e.g. Workers inspected site, confirmed fake image)"
                     value={suspensionEvidence}
                     onChange={(e) => setSuspensionEvidence(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
@@ -2328,7 +2328,7 @@ function OfficeDashboard() {
                     placeholder="Enter evidence URL (e.g. site inspection photo URL)"
                     value={suspensionEvidenceUrl}
                     onChange={(e) => setSuspensionEvidenceUrl(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <button
@@ -2355,7 +2355,7 @@ function OfficeDashboard() {
               <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚖️ Resolve Citizen Appeal</h4>
               
               <div className="space-y-4">
-                <div className="bg-gray-50 p-3 rounded-lg border text-xs">
+                <div className="bg-gray-50 p-3 rounded-lg border text-xs text-black">
                   <span className="font-bold">Citizen:</span> {resolvingAppeal.citizenId?.fullName}<br />
                   <span className="font-bold">Appeal explanation:</span> "{resolvingAppeal.reason}"
                 </div>
@@ -2366,7 +2366,7 @@ function OfficeDashboard() {
                     placeholder="Provide details on why you are accepting or rejecting the appeal (e.g. Appeal accepted. User uploaded correct proof. Account restored.)"
                     value={appealNotes}
                     onChange={(e) => setAppealNotes(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                     rows="3"
                   />
                 </div>

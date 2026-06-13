@@ -17,10 +17,11 @@ module.exports = function officeAuth(req, res, next) {
     const decoded = jwt.verify(token, process.env.SECRET_KEY);
     // console.log("DECODED OFFICE TOKEN:", decoded);
 
-    if (decoded.role !== "office") {
+    const allowedRoles = ["office", "admin", "supervisor", "zone_officer", "municipal_officer", "commissioner"];
+    if (!allowedRoles.includes(decoded.role)) {
       return res.status(403).json({ 
         success: false, 
-        message: "Only office allowed" 
+        message: "Only office/admin/administrative staff allowed" 
       });
     }
 
