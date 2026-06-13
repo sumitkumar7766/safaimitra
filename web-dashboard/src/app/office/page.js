@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, Suspense } from "react";
 import dynamic from "next/dynamic";
 import { useRouter, useSearchParams } from "next/navigation";
 import {
@@ -402,7 +402,7 @@ const DashboardView = React.memo(
   },
 );
 
-export default function OfficeDashboard() {
+function OfficeDashboard() {
   const router = useRouter();
   const searchParams = useSearchParams();
 
@@ -427,6 +427,7 @@ export default function OfficeDashboard() {
   const [showAddModal, setShowAddModal] = useState(false);
   const [modalType, setModalType] = useState("");
   const [selectedReport, setSelectedReport] = useState(null);
+  const [detailedReport, setDetailedReport] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [showAssignVehicleModal, setShowAssignVehicleModal] = useState(false);
   const [selectedComplaint, setSelectedComplaint] = useState(null);
@@ -436,6 +437,39 @@ export default function OfficeDashboard() {
   const [editStaffId, setEditStaffId] = useState(null);
   const [filterRoute, setFilterRoute] = useState("");
   const [loading, setLoading] = useState(true);
+
+  const authorityNames = {
+    1: "Driver / Worker",
+    2: "Area Supervisor",
+    3: "Zone Officer",
+    4: "Municipal Officer",
+    5: "City Commissioner"
+  };
+
+  const getEscalationBadgeColor = (level) => {
+    switch (level) {
+      case 1: return "bg-gray-100 text-gray-800 border-gray-200";
+      case 2: return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case 3: return "bg-orange-100 text-orange-800 border-orange-200";
+      case 4: return "bg-red-100 text-red-800 border-red-200";
+      case 5: return "bg-red-200 text-red-900 border-red-300 font-extrabold animate-pulse";
+      default: return "bg-gray-100 text-gray-800";
+    }
+  };
+
+  const getRemainingTime = (comp) => {
+    if (comp.status === "resolved" || comp.status === "closed") return "Stopped";
+    if (!comp.nextEscalationAt) return "Max Escalation (Commissioner)";
+    
+    const now = new Date();
+    const next = new Date(comp.nextEscalationAt);
+    const diffMs = next - now;
+    if (diffMs <= 0) return "Escalating...";
+    
+    const hours = Math.floor(diffMs / (1000 * 60 * 60));
+    const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
+    return `${hours}h ${mins}m remaining`;
+  };
 
   const [showEditVehicleModal, setShowEditVehicleModal] = useState(false);
   const [editVehicleId, setEditVehicleId] = useState(null);
@@ -478,6 +512,9 @@ export default function OfficeDashboard() {
   const [staff, setStaff] = useState([]);
   const [routes, setRoutes] = useState([]);
   const [complaints, setComplaints] = useState([]);
+  const [escalations, setEscalations] = useState([]);
+  const [selectedEscalation, setSelectedEscalation] = useState(null);
+  const [showEscalationModal, setShowEscalationModal] = useState(false);
   const [reviews, setReviews] = useState([
     {
       id: 1,
@@ -648,6 +685,23 @@ export default function OfficeDashboard() {
     }
   };
 
+  const fetchEscalations = async () => {
+    try {
+      const officeId = localStorage.getItem("userId");
+      const token = localStorage.getItem("token");
+      if (!officeId) return;
+      const res = await axios.get(
+        `http://localhost:5001/complaint/escalations/${officeId}`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
+      if (res.data.success) setEscalations(res.data.complaints);
+    } catch (error) {
+      console.error("Error fetching escalations:", error);
+    }
+  };
+
   // 2. Main Socket & Initial Load Effect
   useEffect(() => {
     const fetchUserData = async () => {
@@ -679,6 +733,7 @@ export default function OfficeDashboard() {
     fetchStaff();
     fetchRoutes();
     fetchComplaints();
+    fetchEscalations();
 
     // 🔥 Connect to Socket.io Server
     const socket = io("http://localhost:5001");
@@ -749,10 +804,12 @@ export default function OfficeDashboard() {
       // Re-fetch to handle complex aggregation logic from backend if necessary, or push
       // For accurate grouping, refetching is safer for complaints
       fetchComplaints();
+      fetchEscalations();
     });
 
     socket.on("complaint_status_update", (payload) => {
       fetchComplaints();
+      fetchEscalations();
     });
 
     socket.on("complaint_status_update", (payload) => {
@@ -761,6 +818,7 @@ export default function OfficeDashboard() {
       if (payload.type === "RESOLVED") {
         // 1. List Refresh karo (Taaki active se hat kar history me jaye)
         fetchComplaints();
+        fetchEscalations();
 
         // 2. Stats update karo (Optional, agar alag event nahi hai to)
         // fetchStats();
@@ -770,6 +828,9 @@ export default function OfficeDashboard() {
         // Note: Aap 'react-toastify' use kar sakte hain sunder popup ke liye
       } else if (payload.type === "ASSIGNED") {
         fetchComplaints(); // Assigned status update karne ke liye
+        fetchEscalations();
+      } else if (payload.type === "ESCALATED") {
+        fetchEscalations();
       }
     });
 
@@ -1280,9 +1341,21 @@ export default function OfficeDashboard() {
     }
   };
 
-  const openReportDetails = (report) => {
+  const openReportDetails = async (report) => {
     setSelectedReport(report);
     setModalVisible(true);
+    setDetailedReport(null);
+    try {
+      const targetId = report.allComplaintIds ? report.allComplaintIds[0] : (report._id || report.id);
+      if (targetId) {
+        const res = await axios.get(`http://localhost:5001/complaint/detail/${targetId}`);
+        if (res.data.success) {
+          setDetailedReport(res.data.complaint);
+        }
+      }
+    } catch (err) {
+      console.error("Error loading detailed report:", err);
+    }
   };
 
   const openAssignVehicle = (complaint) => {
@@ -1480,6 +1553,9 @@ export default function OfficeDashboard() {
                     Status
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
+                    Escalation Level
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
                     Vehicle
                   </th>
                   <th className="px-6 py-4 text-left text-xs font-bold text-gray-600 uppercase tracking-wider">
@@ -1494,7 +1570,7 @@ export default function OfficeDashboard() {
                 {filteredList.length === 0 ? (
                   <tr>
                     <td
-                      colSpan="8"
+                      colSpan="9"
                       className="px-6 py-10 text-center text-gray-500"
                     >
                       No {viewMode} complaints found.
@@ -1556,6 +1632,20 @@ export default function OfficeDashboard() {
                         </span>
                       </td>
                       <td className="px-6 py-4 whitespace-nowrap">
+                        <div className="flex flex-col">
+                          <span
+                            className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${getEscalationBadgeColor(complaint.currentEscalationLevel || 1)}`}
+                          >
+                            Level {complaint.currentEscalationLevel || 1}: {authorityNames[complaint.currentEscalationLevel || 1]}
+                          </span>
+                          {complaint.status !== "resolved" && (
+                            <span className="text-[10px] text-gray-500 font-semibold mt-1">
+                              ⏳ {getRemainingTime(complaint)}
+                            </span>
+                          )}
+                        </div>
+                      </td>
+                      <td className="px-6 py-4 whitespace-nowrap">
                         <span className="text-sm text-gray-700 font-mono">
                           {complaint.vehicle || "Not Assigned"}
                         </span>
@@ -1595,6 +1685,176 @@ export default function OfficeDashboard() {
           </div>
         </div>
       </>
+    );
+  };
+
+  const EscalationView = () => {
+    const [viewMode, setViewMode] = useState("pending");
+
+    const filteredList = escalations.filter((c) => {
+      const isResolved = c.status === "resolved" || c.status === "closed";
+      
+      if (viewMode === "pending") {
+        return c.status === "pending";
+      } else if (viewMode === "in_progress") {
+        return c.status === "in_progress" || c.status === "assigned";
+      } else if (viewMode === "escalated") {
+        return !isResolved && c.currentEscalationLevel > 1;
+      } else if (viewMode === "near_deadline") {
+        if (isResolved) return false;
+        if (!c.nextEscalationAt) return false;
+        const diffHours = (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
+        return diffHours > 0 && diffHours <= 4;
+      } else if (viewMode === "public_escalation_eligible") {
+        return !isResolved && c.publicEscalationEligible === true;
+      } else if (viewMode === "resolved") {
+        return isResolved;
+      }
+      return true;
+    });
+
+    const totalActive = escalations.filter(c => c.status !== "resolved" && c.status !== "closed").length;
+    const level5Count = escalations.filter(c => c.status !== "resolved" && c.status !== "closed" && c.currentEscalationLevel === 5).length;
+    const nearDeadlineCount = escalations.filter(c => {
+      if (c.status === "resolved" || c.status === "closed" || !c.nextEscalationAt) return false;
+      const diff = (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
+      return diff > 0 && diff <= 4;
+    }).length;
+    const publicEligibleCount = escalations.filter(c => c.status !== "resolved" && c.status !== "closed" && c.publicEscalationEligible === true).length;
+
+    return (
+      <div className="space-y-6">
+        <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
+          <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-blue-500">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active Complaints</h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">{totalActive}</p>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-yellow-500">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Critical (Level 5)</h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">{level5Count}</p>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-orange-500">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Near Escalation (&lt;4h)</h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">{nearDeadlineCount}</p>
+          </div>
+          <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-red-500">
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Public Share Eligible</h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">{publicEligibleCount}</p>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800">⚠️ Escalation Monitoring Dashboard</h3>
+              <p className="text-sm text-gray-600 mt-1">Monitor SLA times, automatic escalations, and citizen accountability status.</p>
+            </div>
+            <div className="flex flex-wrap gap-2 bg-gray-100 p-1.5 rounded-xl">
+              {[
+                { mode: "pending", label: "⏳ Pending" },
+                { mode: "in_progress", label: "⚙️ In Progress" },
+                { mode: "escalated", label: "🔥 Escalated" },
+                { mode: "near_deadline", label: "🕒 Near Deadline" },
+                { mode: "public_escalation_eligible", label: "📢 Public Eligible" },
+                { mode: "resolved", label: "✅ Resolved" }
+              ].map((btn) => (
+                <button
+                  key={btn.mode}
+                  onClick={() => setViewMode(btn.mode)}
+                  className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${viewMode === btn.mode ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
+                >
+                  {btn.label}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
+
+        <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+          <div className="overflow-x-auto">
+            <table className="w-full">
+              <thead className="bg-gray-50 border-b border-gray-200">
+                <tr>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Complaint ID</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Grievance Type</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Escalation Level</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Responsible Authority</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Time Remaining</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Days Pending</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                </tr>
+              </thead>
+              <tbody className="divide-y divide-gray-200 bg-white">
+                {filteredList.length === 0 ? (
+                  <tr>
+                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                      No complaints found in this category.
+                    </td>
+                  </tr>
+                ) : (
+                  filteredList.map((comp) => {
+                    let currentAuth = "Unassigned";
+                    if (comp.currentEscalationLevel === 1) {
+                      currentAuth = comp.driverId ? `Driver: ${comp.driverId.name}` : (comp.vehicle !== "Not Assigned" ? comp.vehicle : "Assigned Driver");
+                    } else if (comp.currentEscalationLevel === 2) {
+                      currentAuth = comp.supervisorId ? `Supervisor: ${comp.supervisorId.name}` : "Area Supervisor";
+                    } else if (comp.currentEscalationLevel === 3) {
+                      currentAuth = comp.zoneOfficerId ? `Zone Officer: ${comp.zoneOfficerId.name}` : "Zone Officer";
+                    } else if (comp.currentEscalationLevel === 4) {
+                      currentAuth = comp.municipalOfficerId ? `Municipal Officer: ${comp.municipalOfficerId.name}` : "Municipal Officer";
+                    } else if (comp.currentEscalationLevel === 5) {
+                      currentAuth = comp.commissionerId ? `Commissioner: ${comp.commissionerId.name}` : "City Commissioner";
+                    }
+
+                    return (
+                      <tr key={comp._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 font-mono">
+                          #SM{comp._id.slice(-6).toUpperCase()}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="text-sm font-semibold text-gray-900">{comp.complaintType}</div>
+                          <div className="text-xs text-gray-500">{comp.area}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getEscalationBadgeColor(comp.currentEscalationLevel)}`}>
+                            Level {comp.currentEscalationLevel}: {authorityNames[comp.currentEscalationLevel || 1]}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
+                          {currentAuth}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                          {getRemainingTime(comp)}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-900">
+                          {comp.pendingDays || 0} days
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${comp.status === "resolved" ? "bg-green-100 text-green-700 border border-green-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
+                            {comp.status}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          <button
+                            onClick={() => {
+                              setSelectedEscalation(comp);
+                              setShowEscalationModal(true);
+                            }}
+                            className="bg-blue-50 text-blue-600 hover:bg-blue-100 p-2 rounded-lg font-bold transition-all text-xs"
+                          >
+                            Timeline & Info
+                          </button>
+                        </td>
+                      </tr>
+                    );
+                  })
+                )}
+              </tbody>
+            </table>
+          </div>
+        </div>
+      </div>
     );
   };
 
@@ -2199,6 +2459,7 @@ export default function OfficeDashboard() {
           <ul className="space-y-2">
             {[
               { view: "dashboard", icon: Activity, label: "Dashboard" },
+              { view: "escalations", icon: AlertCircle, label: "Escalation Monitor" },
               { view: "complaints", icon: MessageSquare, label: "Complaints" },
               { view: "reviews", icon: Star, label: "Reviews" },
               { view: "routes", icon: MapPin, label: "Routes" },
@@ -2237,6 +2498,7 @@ export default function OfficeDashboard() {
             <div>
               <h2 className="text-2xl font-bold text-gray-800 capitalize">
                 {currentView === "dashboard" && "Office Dashboard"}
+                {currentView === "escalations" && "Escalation Monitor"}
                 {currentView === "complaints" && "Complaints Management"}
                 {currentView === "reviews" && "User Reviews"}
                 {currentView === "routes" && "Routes Management"}
@@ -2248,6 +2510,8 @@ export default function OfficeDashboard() {
               <p className="text-sm text-gray-500 mt-1">
                 {currentView === "dashboard" &&
                   "Manage all waste management operations"}
+                {currentView === "escalations" &&
+                  "Track SLA and automatic hierarchical escalation"}
                 {currentView === "complaints" &&
                   "Track and manage citizen complaints"}
                 {currentView === "reviews" && "View user feedback and ratings"}
@@ -2327,6 +2591,7 @@ export default function OfficeDashboard() {
               L={L}
             />
           )}
+          {currentView === "escalations" && <EscalationView />}
           {currentView === "complaints" && <ComplaintsView />}
           {currentView === "reviews" && <ReviewsView />}
           {currentView === "routes" && <RouteView />}
@@ -2640,7 +2905,10 @@ export default function OfficeDashboard() {
                       <option value="">Select Role</option>
                       <option value="driver">Driver</option>
                       <option value="helper">Helper</option>
-                      <option value="supervisor">Supervisor</option>
+                      <option value="supervisor">Area Supervisor</option>
+                      <option value="zone_officer">Zone Officer</option>
+                      <option value="municipal_officer">Municipal Officer</option>
+                      <option value="commissioner">City Commissioner</option>
                     </select>
                   </div>
                   <div>
@@ -3301,6 +3569,7 @@ export default function OfficeDashboard() {
                     "
                   </p>
                 </div>
+                
                 <div className="pt-2">
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">
                     Dispatch Status
@@ -3327,6 +3596,35 @@ export default function OfficeDashboard() {
                     </div>
                   )}
                 </div>
+
+                {/* JAES Hierarchy Timeline */}
+                {detailedReport && (
+                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                      JAES Escalation Timeline Status
+                    </p>
+                    <div className="relative border-l-2 border-gray-200 pl-4 ml-2 space-y-4">
+                      {[
+                        { level: 1, name: "Driver / Worker", staff: detailedReport.driverId?.name || detailedReport.vehicle || "Assigned Driver" },
+                        { level: 2, name: "Area Supervisor", staff: detailedReport.supervisorId?.name || "Area Supervisor" },
+                        { level: 3, name: "Zone Officer", staff: detailedReport.zoneOfficerId?.name || "Zone Officer" },
+                        { level: 4, name: "Municipal Officer", staff: detailedReport.municipalOfficerId?.name || "Municipal Officer" },
+                        { level: 5, name: "City Commissioner", staff: detailedReport.commissionerId?.name || "City Commissioner" }
+                      ].map((stage) => {
+                        const isActive = detailedReport.currentEscalationLevel >= stage.level;
+                        return (
+                          <div key={stage.level} className="relative">
+                            <span className={`absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200' : 'bg-gray-100 border-gray-300'}`}></span>
+                            <div>
+                              <p className={`text-xs font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
+                              <p className="text-[10px] text-gray-500">Responsible: {stage.staff}</p>
+                            </div>
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                )}
               </div>
               <div className="mt-6 pt-6 border-t-2 border-dashed border-gray-100">
                 {(!selectedReport.vehicle ||
@@ -3471,6 +3769,115 @@ export default function OfficeDashboard() {
             </form>
           </div>
         </div>
+       )}
+      {showEscalationModal && selectedEscalation && (
+        <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+          <div className="bg-white rounded-3xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
+            
+            <button
+              onClick={() => {
+                setShowEscalationModal(false);
+                setSelectedEscalation(null);
+              }}
+              className="absolute top-4 right-4 w-10 h-10 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 transition-colors text-black"
+            >
+              <X className="w-5 h-5" />
+            </button>
+
+            <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
+              ⚠️ Escalation Detail Timeline - #SM{selectedEscalation._id.slice(-6).toUpperCase()}
+            </h2>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              <div className="space-y-4">
+                <div className="w-full h-64 rounded-2xl overflow-hidden border bg-gray-100">
+                  <img
+                    src={selectedEscalation.ComimageUrl}
+                    alt="Complaint Proof"
+                    className="w-full h-full object-cover"
+                  />
+                </div>
+                <div className="bg-gray-50 p-4 rounded-xl space-y-2">
+                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Type:</span> {selectedEscalation.complaintType}</p>
+                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Location:</span> {selectedEscalation.area}</p>
+                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Description:</span> {selectedEscalation.description}</p>
+                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Days Pending:</span> {selectedEscalation.pendingDays || 0} days</p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">Status:</span>{" "}
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold uppercase">{selectedEscalation.status}</span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">Public Shared Eligible:</span>{" "}
+                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${selectedEscalation.publicEscalationEligible ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
+                      {selectedEscalation.publicEscalationEligible ? "YES" : "NO"}
+                    </span>
+                  </p>
+                  <div className="pt-3">
+                    <button 
+                      onClick={() => window.open(`http://localhost:5001/complaint/share-card/${selectedEscalation._id}`, '_blank')}
+                      className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-bold text-xs hover:from-blue-700 hover:to-indigo-700 transition-all shadow"
+                    >
+                      📢 View Social Media Share Card
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              <div className="space-y-6">
+                <h3 className="text-lg font-bold text-gray-800">📊 JAES Escalation Stages</h3>
+                <div className="relative border-l-2 border-gray-200 pl-6 ml-4 space-y-6">
+                  
+                  {[
+                    { level: 1, name: "Driver / Worker", staff: selectedEscalation.driverId?.name || selectedEscalation.vehicle || "Assigned Driver" },
+                    { level: 2, name: "Area Supervisor", staff: selectedEscalation.supervisorId?.name || "Area Supervisor" },
+                    { level: 3, name: "Zone Officer", staff: selectedEscalation.zoneOfficerId?.name || "Zone Officer" },
+                    { level: 4, name: "Municipal Officer", staff: selectedEscalation.municipalOfficerId?.name || "Municipal Officer" },
+                    { level: 5, name: "City Commissioner", staff: selectedEscalation.commissionerId?.name || "City Commissioner" }
+                  ].map((stage) => {
+                    const isActive = selectedEscalation.currentEscalationLevel >= stage.level;
+                    return (
+                      <div key={stage.level} className="relative">
+                        <span className={`absolute -left-[33px] top-1 w-4 h-4 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200 shadow-lg' : 'bg-gray-100 border-gray-300'}`}></span>
+                        <div>
+                          <p className={`text-sm font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
+                          <p className="text-xs text-gray-500">Responsible: {stage.staff}</p>
+                          <p className="text-[10px] font-bold text-blue-600 mt-0.5">
+                            {isActive ? "⚠️ ACTIVE RESPONSIBILITY" : "⏳ PENDING ESCALATION"}
+                          </p>
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+
+                <div className="mt-4 pt-4 border-t">
+                  <h4 className="text-sm font-bold text-gray-800 mb-2">📋 Audit History Trail Logs:</h4>
+                  <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
+                    {selectedEscalation.escalationHistory && selectedEscalation.escalationHistory.length > 0 ? (
+                      selectedEscalation.escalationHistory.map((log, index) => (
+                        <div key={index} className="bg-gray-50 p-2 rounded border text-xs flex justify-between gap-4">
+                          <div>
+                            <span className="font-bold text-gray-700">{log.statusChange || "Status Change"}</span>
+                            <p className="text-gray-500 mt-1">
+                              From Level {log.prevLevel} ({log.prevAuthority}) &rarr; Level {log.newLevel} ({log.newAuthority})
+                            </p>
+                          </div>
+                          <span className="text-[10px] text-gray-400 whitespace-nowrap self-center">
+                            {new Date(log.escalationTime).toLocaleDateString()} {new Date(log.escalationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                          </span>
+                        </div>
+                      ))
+                    ) : (
+                      <p className="text-xs text-gray-400">No logs captured yet.</p>
+                    )}
+                  </div>
+                </div>
+
+              </div>
+            </div>
+
+          </div>
+        </div>
       )}
       <style jsx global>{`
         @import url("https://unpkg.com/leaflet@1.7.1/dist/leaflet.css");
@@ -3495,5 +3902,13 @@ export default function OfficeDashboard() {
         }
       `}</style>
     </div>
+  );
+}
+
+export default function OfficeDashboardWithSuspense() {
+  return (
+    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500 font-medium">Loading Dashboard...</div>}>
+      <OfficeDashboard />
+    </Suspense>
   );
 }

@@ -21,7 +21,7 @@ const StaffSchema = new Schema(
 
     role: {
       type: String,
-      enum: ["driver", "helper", "supervisor"],
+      enum: ["driver", "helper", "supervisor", "zone_officer", "municipal_officer", "commissioner"],
       required: true,
     },
 

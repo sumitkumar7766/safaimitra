@@ -210,6 +210,12 @@ router.post(
       }
       // 🔥 AUTO-ASSIGNMENT LOGIC END 🔥
 
+      const Staff = require("../model/StaffModel");
+      const supervisor = await Staff.findOne({ officeId: new mongoose.Types.ObjectId(officeId), role: "supervisor" });
+      const zoneOfficer = await Staff.findOne({ officeId: new mongoose.Types.ObjectId(officeId), role: "zone_officer" });
+      const municipalOfficer = await Staff.findOne({ officeId: new mongoose.Types.ObjectId(officeId), role: "municipal_officer" });
+      const commissioner = await Staff.findOne({ officeId: new mongoose.Types.ObjectId(officeId), role: "commissioner" });
+
       const newComplaint = new Complaint({
         citizenId: req.user.id,
         officeId: new mongoose.Types.ObjectId(officeId),
@@ -232,6 +238,29 @@ router.post(
           coordinates: [Number(longitude), Number(latitude)],
         },
         ComimageUrl: result.secure_url,
+
+        // JAES fields
+        currentEscalationLevel: 1,
+        escalatedAt: new Date(),
+        nextEscalationAt: new Date(Date.now() + 24 * 60 * 60 * 1000),
+        publicEscalationEligible: false,
+        slaDeadline: new Date(Date.now() + 5 * 24 * 60 * 60 * 1000),
+        pendingDays: 0,
+        supervisorId: supervisor ? supervisor._id : null,
+        zoneOfficerId: zoneOfficer ? zoneOfficer._id : null,
+        municipalOfficerId: municipalOfficer ? municipalOfficer._id : null,
+        commissionerId: commissioner ? commissioner._id : null,
+        escalationHistory: [
+          {
+            escalationTime: new Date(),
+            prevLevel: 0,
+            newLevel: 1,
+            prevAuthority: "None",
+            newAuthority: "Driver",
+            statusChange: "Complaint Submitted",
+            resolutionTime: null
+          }
+        ]
       });
 
       await newComplaint.save();

@@ -311,17 +311,34 @@ router.post(
         if (linkedComplaints.length > 0) {
           const idsToUpdate = linkedComplaints.map((c) => c._id);
 
-          await Complaint.updateMany(
-            { _id: { $in: idsToUpdate } },
-            {
-              $set: {
-                status: "resolved",
-                resolvedAt: new Date(),
-                active: false,
-                ComimageUrl: imageUrl, // Proof photo sabme save hogi
-              },
-            },
-          );
+          const authorityNames = {
+            1: "Driver",
+            2: "Area Supervisor",
+            3: "Zone Officer",
+            4: "Municipal Officer",
+            5: "City Commissioner"
+          };
+
+          for (const comp of linkedComplaints) {
+            comp.status = "resolved";
+            comp.resolvedAt = new Date();
+            comp.active = false;
+            comp.ComimageUrl = imageUrl;
+            comp.nextEscalationAt = null;
+            comp.publicEscalationEligible = false;
+
+            comp.escalationHistory.push({
+              escalationTime: new Date(),
+              prevLevel: comp.currentEscalationLevel || 1,
+              newLevel: comp.currentEscalationLevel || 1,
+              prevAuthority: authorityNames[comp.currentEscalationLevel || 1],
+              newAuthority: "None (Resolved)",
+              statusChange: "Resolved",
+              resolutionTime: new Date()
+            });
+
+            await comp.save();
+          }
 
           // C. 🔥 Notify Admin (List Refresh)
           io.emit("complaint_status_update", {
