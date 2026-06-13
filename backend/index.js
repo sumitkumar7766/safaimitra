@@ -278,111 +278,102 @@ cron.schedule("*/1 * * * *", async () => {
 
       comp.pendingDays = pendingDays;
 
-      let targetLevel = 1;
-      let targetPublicEligible = false;
-
-      if (elapsedHours >= 120) {
-        targetLevel = 5;
-        targetPublicEligible = true;
-      } else if (elapsedHours >= 96) {
-        targetLevel = 5;
-      } else if (elapsedHours >= 72) {
-        targetLevel = 4;
-      } else if (elapsedHours >= 48) {
-        targetLevel = 3;
-      } else if (elapsedHours >= 24) {
-        targetLevel = 2;
-      }
-
       let updated = false;
 
-      // 1. Check if public escalation eligibility changed
-      if (targetPublicEligible && !comp.publicEscalationEligible) {
-        comp.publicEscalationEligible = true;
+      // Fallback: If for some reason nextEscalationAt is missing, initialize it to 24h after report time
+      if (!comp.nextEscalationAt && comp.currentEscalationLevel < 5) {
+        comp.nextEscalationAt = new Date(createdTime.getTime() + 24 * 60 * 60 * 1000);
         updated = true;
-        
-        if (comp.citizenId) {
-          io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
-            type: "PUBLIC_ELIGIBLE",
-            message: `Your complaint is now eligible for public sharing on social media!`,
-            complaintId: comp._id
-          });
-        }
       }
 
-      // 2. Check if level changed
-      if (targetLevel > comp.currentEscalationLevel) {
+      // Check if current escalation level timer has expired
+      if (comp.nextEscalationAt && now >= comp.nextEscalationAt) {
         const oldLevel = comp.currentEscalationLevel;
-        comp.currentEscalationLevel = targetLevel;
-        comp.escalatedAt = now;
-        
-        if (targetLevel < 5) {
-          comp.nextEscalationAt = new Date(createdTime.getTime() + (targetLevel * 24 * 60 * 60 * 1000));
-        } else {
-          comp.nextEscalationAt = null;
-        }
 
-        const role = roles[targetLevel];
-        let targetStaffId = null;
-        if (role) {
-          const fieldName = `${role === "supervisor" ? "supervisor" : role}Id`;
-          if (!comp[fieldName]) {
-            const staff = await Staff.findOne({ officeId: comp.officeId, role: role });
-            if (staff) {
-              comp[fieldName] = staff._id;
-              targetStaffId = staff._id;
+        if (oldLevel < 5) {
+          const targetLevel = oldLevel + 1;
+          comp.currentEscalationLevel = targetLevel;
+          comp.escalatedAt = now;
+          // Every hierarchy level gets a fresh 24 hours countdown!
+          comp.nextEscalationAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+
+          const role = roles[targetLevel];
+          let targetStaffId = null;
+          if (role) {
+            const fieldName = `${role === "supervisor" ? "supervisor" : role}Id`;
+            if (!comp[fieldName]) {
+              const staff = await Staff.findOne({ officeId: comp.officeId, role: role });
+              if (staff) {
+                comp[fieldName] = staff._id;
+                targetStaffId = staff._id;
+              }
+            } else {
+              targetStaffId = comp[fieldName];
             }
-          } else {
-            targetStaffId = comp[fieldName];
+          }
+
+          const prevAuthName = authorityNames[oldLevel];
+          const newAuthName = authorityNames[targetLevel];
+
+          comp.escalationHistory.push({
+            escalationTime: now,
+            prevLevel: oldLevel,
+            newLevel: targetLevel,
+            prevAuthority: prevAuthName,
+            newAuthority: newAuthName,
+            statusChange: `Escalated to Level ${targetLevel} (${newAuthName})`,
+            resolutionTime: null
+          });
+
+          updated = true;
+
+          if (comp.citizenId) {
+            io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
+              type: "ESCALATED",
+              message: `Your complaint has been automatically escalated to ${newAuthName}!`,
+              complaintId: comp._id
+            });
+          }
+
+          if (targetStaffId) {
+            io.to(`driver_${targetStaffId}`).emit("new_job_alert", {
+              title: "🚨 JAES Escalated Complaint!",
+              message: `Complaint #${comp._id.toString().slice(-6)} has been escalated to you: ${comp.description}`,
+              newStop: {
+                id: comp.dustbinId || comp._id,
+                name: `🚨 Escalated: ${comp.area}`,
+                coordinates: [comp.latitude, comp.longitude],
+                status: "overflow",
+                type: "complaint",
+                isNew: true,
+                complaintId: comp._id
+              },
+              imageUrl: comp.ComimageUrl
+            });
+          }
+
+          io.emit("complaint_status_update", {
+            type: "ESCALATED",
+            complaintId: comp._id,
+            level: targetLevel,
+            authority: newAuthName
+          });
+        } else if (oldLevel === 5) {
+          // Level 5 timer expired -> mark public escalation eligible!
+          if (!comp.publicEscalationEligible) {
+            comp.publicEscalationEligible = true;
+            comp.nextEscalationAt = null; // No further countdowns
+            updated = true;
+
+            if (comp.citizenId) {
+              io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
+                type: "PUBLIC_ELIGIBLE",
+                message: `Your complaint is now eligible for public sharing on social media!`,
+                complaintId: comp._id
+              });
+            }
           }
         }
-
-        const prevAuthName = authorityNames[oldLevel];
-        const newAuthName = authorityNames[targetLevel];
-
-        comp.escalationHistory.push({
-          escalationTime: now,
-          prevLevel: oldLevel,
-          newLevel: targetLevel,
-          prevAuthority: prevAuthName,
-          newAuthority: newAuthName,
-          statusChange: `Escalated to Level ${targetLevel} (${newAuthName})`,
-          resolutionTime: null
-        });
-
-        updated = true;
-
-        if (comp.citizenId) {
-          io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
-            type: "ESCALATED",
-            message: `Your complaint has been automatically escalated to ${newAuthName}!`,
-            complaintId: comp._id
-          });
-        }
-
-        if (targetStaffId) {
-          io.to(`driver_${targetStaffId}`).emit("new_job_alert", {
-            title: "🚨 JAES Escalated Complaint!",
-            message: `Complaint #${comp._id.toString().slice(-6)} has been escalated to you: ${comp.description}`,
-            newStop: {
-              id: comp.dustbinId || comp._id,
-              name: `🚨 Escalated: ${comp.area}`,
-              coordinates: [comp.latitude, comp.longitude],
-              status: "overflow",
-              type: "complaint",
-              isNew: true,
-              complaintId: comp._id
-            },
-            imageUrl: comp.ComimageUrl
-          });
-        }
-
-        io.emit("complaint_status_update", {
-          type: "ESCALATED",
-          complaintId: comp._id,
-          level: targetLevel,
-          authority: newAuthName
-        });
       }
 
       if (updated || comp.isModified("pendingDays")) {

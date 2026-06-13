@@ -1414,15 +1414,30 @@ export default function CitizenScreen({ navigation, goBack }) {
                             </Text>
                           </View>
 
-                          {complaint.vehicle &&
-                            complaint.vehicle !== "Not Assigned" && (
-                              <View className="flex-row items-center gap-1 bg-gray-200 px-2 py-1 rounded-lg">
-                                <Text className="text-[10px]">🚛</Text>
-                                <Text className="text-[10px] font-semibold text-gray-600">
-                                  {complaint.vehicle}
+                          <View className="flex-row items-center gap-2">
+                            {complaint.status !== "resolved" && complaint.nextEscalationAt && (
+                              <View className="bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
+                                <Text className="text-[10px] text-amber-700 font-bold">
+                                  ⏱️ {(() => {
+                                    const diff = new Date(complaint.nextEscalationAt) - new Date();
+                                    if (diff <= 0) return "Escalating...";
+                                    const hours = Math.floor(diff / (1000 * 60 * 60));
+                                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                                    return `${hours}h ${mins}m`;
+                                  })()}
                                 </Text>
                               </View>
                             )}
+                            {complaint.vehicle &&
+                              complaint.vehicle !== "Not Assigned" && (
+                                <View className="flex-row items-center gap-1 bg-gray-200 px-2 py-1 rounded-lg">
+                                  <Text className="text-[10px]">🚛</Text>
+                                  <Text className="text-[10px] font-semibold text-gray-600">
+                                    {complaint.vehicle}
+                                  </Text>
+                                </View>
+                              )}
+                          </View>
                         </View>
                       </View>
                     </TouchableOpacity>
@@ -1782,6 +1797,9 @@ export default function CitizenScreen({ navigation, goBack }) {
                             if (diff <= 0) return "Escalating...";
                             const hours = Math.floor(diff / (1000 * 60 * 60));
                             const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
+                            if (selectedComplaintDetail.currentEscalationLevel >= 5) {
+                              return `${hours}h ${mins}m remaining before Public Share Eligibility`;
+                            }
                             return `${hours}h ${mins}m remaining before Level ${selectedComplaintDetail.currentEscalationLevel + 1}`;
                           })()}
                         </Text>

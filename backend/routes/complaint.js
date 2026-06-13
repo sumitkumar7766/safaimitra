@@ -194,6 +194,7 @@ router.post("/assign-vehicle", async (req, res) => {
       comp.assignedVehicleId = vehicleId;
       comp.status = "assigned";
       comp.driverId = driver ? driver._id : null;
+      comp.nextEscalationAt = new Date(Date.now() + 24 * 60 * 60 * 1000); // Reset countdown to 24h
       if (supervisor) comp.supervisorId = supervisor._id;
       if (zoneOfficer) comp.zoneOfficerId = zoneOfficer._id;
       if (municipalOfficer) comp.municipalOfficerId = municipalOfficer._id;
