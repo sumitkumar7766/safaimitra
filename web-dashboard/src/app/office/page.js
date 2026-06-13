@@ -515,6 +515,15 @@ function OfficeDashboard() {
   const [escalations, setEscalations] = useState([]);
   const [selectedEscalation, setSelectedEscalation] = useState(null);
   const [showEscalationModal, setShowEscalationModal] = useState(false);
+  const [appeals, setAppeals] = useState([]);
+  const [auditLogs, setAuditLogs] = useState([]);
+  const [citizens, setCitizens] = useState([]);
+  const [moderationTab, setModerationTab] = useState("leaderboard");
+  const [vStatus, setVStatus] = useState("genuine");
+  const [vReason, setVReason] = useState("");
+  const [vNotes, setVNotes] = useState("");
+  const [vEvidenceUrl, setVEvidenceUrl] = useState("");
+  const [vLegalReview, setVLegalReview] = useState(false);
   const [reviews, setReviews] = useState([
     {
       id: 1,
@@ -702,6 +711,42 @@ function OfficeDashboard() {
     }
   };
 
+  const fetchAppeals = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5001/citizen-system/appeals", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) setAppeals(res.data.appeals);
+    } catch (err) {
+      console.error("Fetch Appeals Error:", err);
+    }
+  };
+
+  const fetchAuditLogs = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5001/citizen-system/audit-logs", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) setAuditLogs(res.data.logs);
+    } catch (err) {
+      console.error("Fetch Audit Logs Error:", err);
+    }
+  };
+
+  const fetchCitizens = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get("http://localhost:5001/citizen-system/citizens", {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) setCitizens(res.data.citizens);
+    } catch (err) {
+      console.error("Fetch Citizens Error:", err);
+    }
+  };
+
   // 2. Main Socket & Initial Load Effect
   useEffect(() => {
     const fetchUserData = async () => {
@@ -734,6 +779,9 @@ function OfficeDashboard() {
     fetchRoutes();
     fetchComplaints();
     fetchEscalations();
+    fetchAppeals();
+    fetchAuditLogs();
+    fetchCitizens();
 
     // 🔥 Connect to Socket.io Server
     const socket = io("http://localhost:5001");
@@ -1345,6 +1393,11 @@ function OfficeDashboard() {
     setSelectedReport(report);
     setModalVisible(true);
     setDetailedReport(null);
+    setVStatus("genuine");
+    setVReason("");
+    setVNotes("");
+    setVEvidenceUrl("");
+    setVLegalReview(false);
     try {
       const targetId = report.allComplaintIds ? report.allComplaintIds[0] : (report._id || report.id);
       if (targetId) {
@@ -1355,6 +1408,35 @@ function OfficeDashboard() {
       }
     } catch (err) {
       console.error("Error loading detailed report:", err);
+    }
+  };
+
+  const handleVerifyComplaint = async (e) => {
+    e.preventDefault();
+    if (!detailedReport?._id) return;
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post("http://localhost:5001/citizen-system/complaint/verify", {
+        complaintId: detailedReport._id,
+        verificationStatus: vStatus,
+        verificationReason: vReason,
+        verificationNotes: vNotes,
+        verificationEvidenceUrl: vEvidenceUrl,
+        legalReviewRequired: vLegalReview
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        alert("Complaint verified and scores updated successfully!");
+        setModalVisible(false);
+        fetchComplaints();
+        fetchEscalations();
+        fetchAuditLogs();
+        fetchCitizens();
+      }
+    } catch (err) {
+      console.error("Verification Error:", err);
+      alert(err.response?.data?.message || "Failed to verify complaint");
     }
   };
 
@@ -1854,6 +1936,458 @@ function OfficeDashboard() {
             </table>
           </div>
         </div>
+      </div>
+    );
+  };
+
+  const ModerationView = () => {
+    const [suspendingCitizen, setSuspendingCitizen] = useState(null);
+    const [suspensionReason, setSuspensionReason] = useState("");
+    const [suspensionEvidence, setSuspensionEvidence] = useState("");
+    const [suspensionEvidenceUrl, setSuspensionEvidenceUrl] = useState("");
+
+    const [resolvingAppeal, setResolvingAppeal] = useState(null);
+    const [appealNotes, setAppealNotes] = useState("");
+
+    const handleSuspend = async (e) => {
+      e.preventDefault();
+      if (!suspendingCitizen) return;
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.post("http://localhost:5001/citizen-system/citizen/suspend", {
+          citizenId: suspendingCitizen._id,
+          suspensionReason,
+          verificationEvidence: suspensionEvidence,
+          evidenceUrl: suspensionEvidenceUrl
+        }, { headers: { Authorization: `Bearer ${token}` } });
+
+        if (res.data.success) {
+          alert("Citizen suspended successfully!");
+          setSuspendingCitizen(null);
+          setSuspensionReason("");
+          setSuspensionEvidence("");
+          setSuspensionEvidenceUrl("");
+          fetchCitizens();
+          fetchAuditLogs();
+        }
+      } catch (err) {
+        console.error("Suspend error:", err);
+        alert("Failed to suspend citizen");
+      }
+    };
+
+    const handleUnsuspend = async (citizenId) => {
+      const reason = prompt("Please provide a reason for unsuspending this citizen:");
+      if (!reason) return;
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.post("http://localhost:5001/citizen-system/citizen/unsuspend", {
+          citizenId,
+          reason
+        }, { headers: { Authorization: `Bearer ${token}` } });
+
+        if (res.data.success) {
+          alert("Citizen unsuspended successfully!");
+          fetchCitizens();
+          fetchAuditLogs();
+        }
+      } catch (err) {
+        console.error("Unsuspend error:", err);
+        alert("Failed to unsuspend citizen");
+      }
+    };
+
+    const handleResolveAppeal = async (appealId, action) => {
+      if (!appealNotes) {
+        alert("Please provide admin decision notes first.");
+        return;
+      }
+      try {
+        const token = localStorage.getItem("token");
+        const res = await axios.post("http://localhost:5001/citizen-system/appeal/resolve", {
+          appealId,
+          action, // "accept" or "reject"
+          adminNotes: appealNotes
+        }, { headers: { Authorization: `Bearer ${token}` } });
+
+        if (res.data.success) {
+          alert(`Appeal ${action}ed successfully!`);
+          setResolvingAppeal(null);
+          setAppealNotes("");
+          fetchAppeals();
+          fetchCitizens();
+          fetchAuditLogs();
+        }
+      } catch (err) {
+        console.error("Resolve appeal error:", err);
+        alert("Failed to resolve appeal");
+      }
+    };
+
+    return (
+      <div className="space-y-6">
+        {/* Navigation Tabs */}
+        <div className="bg-white rounded-xl shadow-lg p-6">
+          <div className="flex flex-col md:flex-row items-center justify-between gap-4">
+            <div>
+              <h3 className="text-2xl font-bold text-gray-800 font-black tracking-tight">🛡️ Citizen Moderation Panel</h3>
+              <p className="text-sm text-gray-600 mt-1">Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs.</p>
+            </div>
+            <div className="flex bg-gray-100 p-1.5 rounded-xl gap-2">
+              <button
+                onClick={() => setModerationTab("leaderboard")}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${moderationTab === "leaderboard" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                👥 Citizen Ranks & Strikes
+              </button>
+              <button
+                onClick={() => setModerationTab("appeals")}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${moderationTab === "appeals" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                ⚖️ Pending Appeals ({appeals.filter(a => a.status === "pending").length})
+              </button>
+              <button
+                onClick={() => setModerationTab("logs")}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${moderationTab === "logs" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
+              >
+                📋 Admin Audit Logs
+              </button>
+            </div>
+          </div>
+        </div>
+
+        {/* Tab Content: Citizen Leaderboard / Ranks */}
+        {moderationTab === "leaderboard" && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+            <div className="p-6 border-b bg-gray-50/50">
+              <h4 className="text-lg font-bold text-gray-800">Citizens Leaderboard & Moderation List</h4>
+              <p className="text-xs text-gray-500 mt-1">Sorted by Trust Score. View citizen level, valid/false complaints, active strikes, and suspend eligible misusers.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Citizen Name</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">City / Pincode</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Trust Score</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Level</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valid / False</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Strikes</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white">
+                  {citizens.length === 0 ? (
+                    <tr>
+                      <td colSpan="8" className="px-6 py-12 text-center text-gray-400">No citizens registered yet.</td>
+                    </tr>
+                  ) : (
+                    citizens.map((cit) => (
+                      <tr key={cit._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <div className="font-bold text-gray-900">{cit.fullName}</div>
+                          <div className="text-xs text-gray-500">{cit.phone} | {cit.email}</div>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
+                          🏙️ {cit.cityName || "N/A"} ({cit.pincode})
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-black text-blue-600">
+                          ⭐️ {cit.trustScore}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-1 rounded-full text-xs font-bold border bg-blue-50 text-blue-800 border-blue-200`}>
+                            {cit.citizenLevel || "Beginner Citizen"}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
+                          <span className="text-green-600">✅ {cit.validComplaints}</span> / <span className="text-red-500">❌ {cit.falseComplaints}</span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${cit.strikeCount >= 3 ? "bg-red-100 text-red-800 border-red-200 animate-pulse" : cit.strikeCount > 0 ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-gray-50 text-gray-600"}`}>
+                            Strike {cit.strikeCount || 0}/3
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {cit.isSuspended ? (
+                            <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 text-xs font-bold uppercase animate-pulse">Suspended</span>
+                          ) : (
+                            <span className="px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200 text-xs font-bold uppercase">Active</span>
+                          )}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-sm">
+                          {cit.isSuspended ? (
+                            <button
+                              onClick={() => handleUnsuspend(cit._id)}
+                              className="px-3 py-1 bg-green-50 text-green-600 hover:bg-green-100 rounded-lg font-black text-xs transition-all"
+                            >
+                              Unsuspend Account
+                            </button>
+                          ) : (
+                            <button
+                              onClick={() => setSuspendingCitizen(cit)}
+                              className={`px-3 py-1 rounded-lg font-black text-xs transition-all ${cit.strikeCount >= 3 ? "bg-red-50 text-red-600 hover:bg-red-100" : "bg-gray-100 text-gray-400 hover:bg-gray-200"}`}
+                            >
+                              Suspend Account
+                            </button>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Appeals */}
+        {moderationTab === "appeals" && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+            <div className="p-6 border-b bg-gray-50/50">
+              <h4 className="text-lg font-bold text-gray-800">Suspended Citizen Appeals</h4>
+              <p className="text-xs text-gray-500 mt-1">Review appeal explanations, supporting documents, and either Accept (restores account) or Reject appeals.</p>
+            </div>
+            <div className="divide-y divide-gray-200">
+              {appeals.length === 0 ? (
+                <div className="p-12 text-center text-gray-400">No appeals submitted yet.</div>
+              ) : (
+                appeals.map((app) => (
+                  <div key={app._id} className="p-6 hover:bg-gray-50 transition-colors flex flex-col md:flex-row gap-6">
+                    <div className="w-full md:w-1/3 space-y-2">
+                      <h5 className="font-bold text-gray-800 text-base">👤 {app.citizenId?.fullName || "Citizen"}</h5>
+                      <p className="text-xs text-gray-500">Email: {app.citizenId?.email}</p>
+                      <p className="text-xs text-gray-500">Phone: {app.citizenId?.phone}</p>
+                      <div className="flex gap-2 mt-2">
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-bold">Score: {app.citizenId?.trustScore}</span>
+                        <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-100 rounded text-xs font-bold">{app.citizenId?.strikeCount || 0} Strikes</span>
+                      </div>
+                      <div className="mt-2 text-xs">
+                        <span className="font-bold text-gray-700">Suspension Reason:</span>
+                        <p className="text-red-600 italic bg-red-50 p-2 rounded mt-1">"{app.citizenId?.suspensionReason || "N/A"}"</p>
+                      </div>
+                    </div>
+                    <div className="w-full md:w-2/3 space-y-3">
+                      <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
+                        <span className="text-xs font-bold text-gray-400 uppercase">Appeal Reason / Explanation:</span>
+                        <p className="text-sm text-gray-700 mt-1 leading-relaxed">"{app.reason}"</p>
+                      </div>
+                      {app.evidenceUrl && (
+                        <div className="text-xs">
+                          <span className="font-bold text-gray-700">Appeal Evidence:</span>
+                          <a href={app.evidenceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold block mt-1">
+                            📄 View Appeal Attachment Documents
+                          </a>
+                        </div>
+                      )}
+                      
+                      <div className="flex items-center justify-between border-t pt-4">
+                        <div className="text-xs text-gray-400">
+                          Submitted At: {new Date(app.createdAt).toLocaleString("en-IN")}
+                        </div>
+                        <div>
+                          {app.status === "pending" ? (
+                            <div className="flex items-center gap-3">
+                              <button
+                                onClick={() => setResolvingAppeal(app)}
+                                className="px-4 py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-bold text-xs shadow-md"
+                              >
+                                Resolve Appeal
+                              </button>
+                            </div>
+                          ) : (
+                            <span className={`px-3 py-1 rounded text-xs font-black uppercase tracking-wider ${app.status === "accepted" ? "bg-green-100 text-green-700 border border-green-200" : "bg-red-100 text-red-700 border border-red-200"}`}>
+                              {app.status.toUpperCase()}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ))
+              )}
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: Logs */}
+        {moderationTab === "logs" && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
+            <div className="p-6 border-b bg-gray-50/50">
+              <h4 className="text-lg font-bold text-gray-800">Admin Moderation Audit Logs</h4>
+              <p className="text-xs text-gray-500 mt-1">Audit log records of points, strikes, suspensions, legal reviews, and appeal decisions.</p>
+            </div>
+            <div className="overflow-x-auto">
+              <table className="w-full text-sm text-left text-gray-500">
+                <thead className="bg-gray-50 border-b border-gray-200">
+                  <tr>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Timestamp</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Moderator</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Target Citizen</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Reason & Details</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Evidence Reference</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-gray-200 bg-white text-sm text-gray-600">
+                  {auditLogs.length === 0 ? (
+                    <tr>
+                      <td colSpan="6" className="px-6 py-12 text-center text-gray-400">No logs captured yet.</td>
+                    </tr>
+                  ) : (
+                    auditLogs.map((log) => (
+                      <tr key={log._id} className="hover:bg-gray-50 transition-colors">
+                        <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400">
+                          {new Date(log.createdAt).toLocaleString("en-IN")}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap font-bold text-gray-800">
+                          🛡️ {log.adminName}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                            log.action === "SUSPENSION" ? "bg-red-100 text-red-700" :
+                            log.action === "LEGAL_REVIEW" ? "bg-purple-100 text-purple-700" :
+                            log.action === "VERIFICATION_DECISION" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
+                          }`}>
+                            {log.action}
+                          </span>
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap">
+                          {log.citizenId ? (
+                            <div>
+                              <div className="font-semibold text-gray-800">{log.citizenId.fullName}</div>
+                              <div className="text-[10px] text-gray-400">{log.citizenId.email}</div>
+                            </div>
+                          ) : "System"}
+                        </td>
+                        <td className="px-6 py-4 font-medium text-gray-700 max-w-xs truncate" title={log.reason}>
+                          {log.reason}
+                        </td>
+                        <td className="px-6 py-4 whitespace-nowrap text-xs font-bold">
+                          {log.evidenceReference && log.evidenceReference !== "No Attachment" ? (
+                            <a href={log.evidenceReference} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                              Attachment 📄
+                            </a>
+                          ) : (
+                            <span className="text-gray-400">None</span>
+                          )}
+                        </td>
+                      </tr>
+                    ))
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Suspend Account Form */}
+        {suspendingCitizen && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative animate-in zoom-in duration-300">
+              <button
+                onClick={() => setSuspendingCitizen(null)}
+                className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 text-black border-none cursor-pointer"
+              >
+                ✕
+              </button>
+              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚠️ Suspend Citizen Account</h4>
+              <p className="text-xs text-gray-500 mb-4">Suspended users cannot submit complaints, earn rewards, or appear in leaderboards.</p>
+              
+              <form onSubmit={handleSuspend} className="space-y-4">
+                <div className="bg-gray-50 p-3 rounded-lg border text-xs mb-2">
+                  <span className="font-bold">Citizen Name:</span> {suspendingCitizen.fullName}<br />
+                  <span className="font-bold">Strikes:</span> {suspendingCitizen.strikeCount}/3 consecutive
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Suspension Reason *</label>
+                  <textarea
+                    required
+                    placeholder="Enter official suspension reason (e.g. Uploaded 3 misleading fake images consecutively)"
+                    value={suspensionReason}
+                    onChange={(e) => setSuspensionReason(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    rows="3"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Evidence Notes *</label>
+                  <input
+                    type="text"
+                    required
+                    placeholder="Describe verification evidence (e.g. Workers inspected site, confirmed fake image)"
+                    value={suspensionEvidence}
+                    onChange={(e) => setSuspensionEvidence(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Evidence URL / Image Reference (Optional)</label>
+                  <input
+                    type="text"
+                    placeholder="Enter evidence URL (e.g. site inspection photo URL)"
+                    value={suspensionEvidenceUrl}
+                    onChange={(e) => setSuspensionEvidenceUrl(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                  />
+                </div>
+                <button
+                  type="submit"
+                  className="w-full py-3 bg-gradient-to-r from-red-600 to-pink-600 text-white rounded-xl font-bold text-sm shadow-md"
+                >
+                  Confirm Suspension & Log
+                </button>
+              </form>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Resolve Appeal Form */}
+        {resolvingAppeal && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-md shadow-2xl relative animate-in zoom-in duration-300">
+              <button
+                onClick={() => setResolvingAppeal(null)}
+                className="absolute top-4 right-4 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 text-black border-none cursor-pointer"
+              >
+                ✕
+              </button>
+              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚖️ Resolve Citizen Appeal</h4>
+              
+              <div className="space-y-4">
+                <div className="bg-gray-50 p-3 rounded-lg border text-xs">
+                  <span className="font-bold">Citizen:</span> {resolvingAppeal.citizenId?.fullName}<br />
+                  <span className="font-bold">Appeal explanation:</span> "{resolvingAppeal.reason}"
+                </div>
+                <div>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Admin Resolution Notes *</label>
+                  <textarea
+                    required
+                    placeholder="Provide details on why you are accepting or rejecting the appeal (e.g. Appeal accepted. User uploaded correct proof. Account restored.)"
+                    value={appealNotes}
+                    onChange={(e) => setAppealNotes(e.target.value)}
+                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    rows="3"
+                  />
+                </div>
+                <div className="grid grid-cols-2 gap-3">
+                  <button
+                    onClick={() => handleResolveAppeal(resolvingAppeal._id, "accept")}
+                    className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs shadow-md"
+                  >
+                    Accept Appeal ✅
+                  </button>
+                  <button
+                    onClick={() => handleResolveAppeal(resolvingAppeal._id, "reject")}
+                    className="py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md"
+                  >
+                    Reject Appeal ❌
+                  </button>
+                </div>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     );
   };
@@ -2466,6 +3000,7 @@ function OfficeDashboard() {
               { view: "dustbins", icon: Building2, label: "Dustbins" },
               { view: "vehicles", icon: Truck, label: "Vehicles" },
               { view: "staff", icon: UserCog, label: "Staff" },
+              { view: "moderation", icon: Shield, label: "Citizen Moderation" },
               // { view: "settings", icon: Settings, label: "Settings" },
             ].map((item) => (
               <li key={item.view}>
@@ -2505,6 +3040,7 @@ function OfficeDashboard() {
                 {currentView === "dustbins" && "Dustbins Management"}
                 {currentView === "vehicles" && "Vehicles Management"}
                 {currentView === "staff" && "Staff Management"}
+                {currentView === "moderation" && "Citizen Moderation"}
                 {currentView === "settings" && "System Settings"}
               </h2>
               <p className="text-sm text-gray-500 mt-1">
@@ -2521,6 +3057,7 @@ function OfficeDashboard() {
                 {currentView === "vehicles" &&
                   "Track and manage collection vehicles"}
                 {currentView === "staff" && "Manage staff members and roles"}
+                {currentView === "moderation" && "Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs"}
                 {currentView === "settings" && "Configure system settings"}
               </p>
             </div>
@@ -2598,6 +3135,7 @@ function OfficeDashboard() {
           {currentView === "dustbins" && <DustbinsView />}
           {currentView === "vehicles" && <VehiclesView />}
           {currentView === "staff" && <StaffView />}
+          {currentView === "moderation" && <ModerationView />}
           {currentView === "settings" && <SettingsView />}
         </main>
       </div>
@@ -3599,35 +4137,167 @@ function OfficeDashboard() {
 
                 {/* JAES Hierarchy Timeline */}
                 {detailedReport && (
-                  <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
-                    <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
-                      JAES Escalation Timeline Status
-                    </p>
-                    <div className="relative border-l-2 border-gray-200 pl-4 ml-2 space-y-4">
-                      {[
-                        { level: 1, name: "Driver / Worker", staff: detailedReport.driverId?.name || detailedReport.vehicle || "Assigned Driver" },
-                        { level: 2, name: "Area Supervisor", staff: detailedReport.supervisorId?.name || "Area Supervisor" },
-                        { level: 3, name: "Zone Officer", staff: detailedReport.zoneOfficerId?.name || "Zone Officer" },
-                        { level: 4, name: "Municipal Officer", staff: detailedReport.municipalOfficerId?.name || "Municipal Officer" },
-                        { level: 5, name: "City Commissioner", staff: detailedReport.commissionerId?.name || "City Commissioner" }
-                      ].map((stage) => {
-                        const isActive = detailedReport.currentEscalationLevel >= stage.level;
-                        return (
-                          <div key={stage.level} className="relative">
-                            <span className={`absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200' : 'bg-gray-100 border-gray-300'}`}></span>
-                            <div>
-                              <p className={`text-xs font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
-                              <p className="text-[10px] text-gray-500">Responsible: {stage.staff}</p>
+                  <div className="space-y-4">
+                    <div className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                      <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest">
+                        JAES Escalation Timeline Status
+                      </p>
+                      <div className="relative border-l-2 border-gray-200 pl-4 ml-2 space-y-4">
+                        {[
+                          { level: 1, name: "Driver / Worker", staff: detailedReport.driverId?.name || detailedReport.vehicle || "Assigned Driver" },
+                          { level: 2, name: "Area Supervisor", staff: detailedReport.supervisorId?.name || "Area Supervisor" },
+                          { level: 3, name: "Zone Officer", staff: detailedReport.zoneOfficerId?.name || "Zone Officer" },
+                          { level: 4, name: "Municipal Officer", staff: detailedReport.municipalOfficerId?.name || "Municipal Officer" },
+                          { level: 5, name: "City Commissioner", staff: detailedReport.commissionerId?.name || "City Commissioner" }
+                        ].map((stage) => {
+                          const isActive = detailedReport.currentEscalationLevel >= stage.level;
+                          return (
+                            <div key={stage.level} className="relative">
+                              <span className={`absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200' : 'bg-gray-100 border-gray-300'}`}></span>
+                              <div>
+                                <p className={`text-xs font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
+                                <p className="text-[10px] text-gray-500">Responsible: {stage.staff}</p>
+                              </div>
                             </div>
-                          </div>
-                        );
-                      })}
+                          );
+                        })}
+                      </div>
                     </div>
+
+                    {/* Admin Verification Panel */}
+                    {detailedReport.verificationStatus && detailedReport.verificationStatus !== "none" ? (
+                      <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
+                        <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">
+                          Admin Verification Details
+                        </p>
+                        <div className="space-y-2 text-sm text-gray-800">
+                          <div>
+                            <span className="font-bold">Status:</span>{" "}
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold capitalize">
+                              {detailedReport.verificationStatus.replace("_", " ")}
+                            </span>
+                          </div>
+                          <div>
+                            <span className="font-bold">Reason:</span> {detailedReport.verificationReason}
+                          </div>
+                          {detailedReport.verificationNotes && (
+                            <div>
+                              <span className="font-bold">Notes:</span> {detailedReport.verificationNotes}
+                            </div>
+                          )}
+                          {detailedReport.verificationEvidenceUrl && (
+                            <div>
+                              <span className="font-bold">Evidence:</span>{" "}
+                              <a href={detailedReport.verificationEvidenceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                                View Attachment
+                              </a>
+                            </div>
+                          )}
+                          <div className="text-xs text-gray-500 border-t pt-2 mt-2 text-left">
+                            Verified by <span className="font-semibold">{detailedReport.verifiedBy}</span> on {new Date(detailedReport.verificationDate).toLocaleString("en-IN")}
+                          </div>
+                          {detailedReport.legalReviewRequired && (
+                            <div className="mt-2 px-3 py-1 bg-purple-100 text-purple-800 border border-purple-200 rounded text-xs font-bold uppercase animate-pulse">
+                              ⚖️ Legal Review Required
+                            </div>
+                          )}
+                        </div>
+                      </div>
+                    ) : (
+                      <form onSubmit={handleVerifyComplaint} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                        <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
+                          Verify Complaint & Update Citizen Score
+                        </p>
+                        
+                        {detailedReport.imageFraudFlag && (
+                          <div className="p-3 bg-red-100 text-red-800 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse">
+                            <span>⚠️</span>
+                            <span>IMAGE FRAUD WARNING: Duplicate Image Detected! Needs Verification.</span>
+                          </div>
+                        )}
+
+                        <div className="space-y-3 text-left">
+                          <div>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Decision *</label>
+                            <select
+                              value={vStatus}
+                              onChange={(e) => setVStatus(e.target.value)}
+                              className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500 font-bold"
+                            >
+                              <option value="genuine">Genuine Complaint (+10 Pts)</option>
+                              <option value="partially_valid">Partially Valid Complaint (+10 Pts)</option>
+                              <option value="duplicate">Duplicate Complaint (-20 Pts)</option>
+                              <option value="false">False Complaint (-20 Pts + Strike)</option>
+                              <option value="misleading">Misleading Complaint (-20 Pts + Strike)</option>
+                              <option value="spam">Spam Complaint (-20 Pts + Strike)</option>
+                            </select>
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Written Reason *</label>
+                            <input
+                              type="text"
+                              required
+                              placeholder="e.g. Verified by site inspection photo or GPS match"
+                              value={vReason}
+                              onChange={(e) => setVReason(e.target.value)}
+                              className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Notes</label>
+                            <textarea
+                              placeholder="Additional details / investigation log"
+                              value={vNotes}
+                              onChange={(e) => setVNotes(e.target.value)}
+                              className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                              rows="2"
+                            />
+                          </div>
+
+                          <div>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Evidence Reference URL / File Link</label>
+                            <input
+                              type="text"
+                              placeholder="e.g. http://evidence-image-url.com"
+                              value={vEvidenceUrl}
+                              onChange={(e) => setVEvidenceUrl(e.target.value)}
+                              className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                            />
+                          </div>
+
+                          <div className="flex items-center gap-2 pt-1">
+                            <input
+                              type="checkbox"
+                              id="legalReviewCheck"
+                              checked={vLegalReview}
+                              onChange={(e) => setVLegalReview(e.target.checked)}
+                              className="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
+                            />
+                            <label htmlFor="legalReviewCheck" className="text-xs font-bold text-gray-700 uppercase cursor-pointer select-none">
+                              ⚖️ Flag for Legal Review (Escalate Severe Misuse)
+                            </label>
+                          </div>
+                        </div>
+
+                        <button
+                          type="submit"
+                          className="w-full py-2.5 bg-blue-600 hover:bg-blue-700 text-white font-bold rounded-xl text-xs transition-all shadow-md active:scale-95"
+                        >
+                          Submit Verification & Update Scores
+                        </button>
+                      </form>
+                    )}
                   </div>
                 )}
               </div>
               <div className="mt-6 pt-6 border-t-2 border-dashed border-gray-100">
-                {(!selectedReport.vehicle ||
+                {detailedReport?.legalReviewRequired ? (
+                  <div className="p-4 bg-purple-50 rounded-2xl text-purple-700 font-bold border border-purple-200 flex items-center justify-center gap-2">
+                    <span>🔒 Locked for Legal Review</span>
+                  </div>
+                ) : (!selectedReport.vehicle ||
                   selectedReport.vehicle === "Not Assigned") &&
                 selectedReport.status !== "resolved" ? (
                   <div className="space-y-4">

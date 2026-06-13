@@ -64,6 +64,17 @@ const CitizenSchema = new Schema({
       required: true,
     },
   },
+  trustScore: { type: Number, default: 0 },
+  validComplaints: { type: Number, default: 0 },
+  falseComplaints: { type: Number, default: 0 },
+  consecutiveFalseComplaints: { type: Number, default: 0 },
+  citizenLevel: { type: String, default: "Beginner Citizen" },
+  areaRank: { type: Number, default: 0 },
+  cityRank: { type: Number, default: 0 },
+  badges: { type: [String], default: [] },
+  isSuspended: { type: Boolean, default: false },
+  suspensionReason: { type: String, default: "" },
+  strikeCount: { type: Number, default: 0 },
   role: { 
     type: String, 
     default: "citizen" 

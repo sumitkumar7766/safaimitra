@@ -295,6 +295,14 @@ router.post(
 
       // Resolve Complaint if linked
       if (complaintId && complaintId !== "undefined") {
+        const checkComp = await Complaint.findById(complaintId);
+        if (checkComp && checkComp.legalReviewRequired) {
+          return res.status(400).json({
+            success: false,
+            message: "Action blocked: This complaint is locked for Legal Review."
+          });
+        }
+
         // A. Find ALL linked complaints (Current + Grouped)
         // Hum pehle dhund rahe hain taaki citizens ki ID mil sake
         const linkedComplaints = await Complaint.find({

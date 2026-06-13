@@ -159,6 +159,22 @@ router.post("/assign-vehicle", async (req, res) => {
 
     const io = req.app.get("io");
 
+    const hasLegalReview = await Complaint.exists({
+      _id: { $in: complaintIds },
+      legalReviewRequired: true
+    });
+    if (hasLegalReview) {
+      return res.status(400).json({
+        success: false,
+        message: "Action blocked: One or more complaints are locked for Legal Review."
+      });
+    }
+
+    const firstComplaint = await Complaint.findById(complaintIds[0]);
+    if (!firstComplaint) {
+      return res.status(404).json({ success: false, message: "Complaint not found" });
+    }
+
     const vehicle = await Vehicle.findById(vehicleId);
     if (!vehicle)
       return res
@@ -222,9 +238,9 @@ router.post("/assign-vehicle", async (req, res) => {
     });
 
     // Get the first one for location details
-    const firstComplaint = validAssignedComplaints[0];
+    const assignedFirstComplaint = validAssignedComplaints[0];
 
-    if (!firstComplaint) {
+    if (!assignedFirstComplaint) {
       return res.status(400).json({
         success: false,
         message: "No active complaints found to assign.",
@@ -249,19 +265,19 @@ router.post("/assign-vehicle", async (req, res) => {
       const newStopData = {
         id: dustbinId, // Grouping by Dustbin ID is safer for driver
         name: `🚨 Cleanup Task`,
-        coordinates: [firstComplaint.latitude, firstComplaint.longitude],
+        coordinates: [assignedFirstComplaint.latitude, assignedFirstComplaint.longitude],
         status: "overflow",
         type: "complaint",
         isNew: true,
-        complaintId: firstComplaint._id,
+        complaintId: assignedFirstComplaint._id,
         isGrouped: true,
       };
 
       io.to(`driver_${driver._id}`).emit("new_job_alert", {
         title: "🚨 Emergency Task!",
-        message: `Total ${validAssignedComplaints.length} reports at ${firstComplaint.area}`,
+        message: `Total ${validAssignedComplaints.length} reports at ${assignedFirstComplaint.area}`,
         newStop: newStopData,
-        imageUrl: firstComplaint.ComimageUrl,
+        imageUrl: assignedFirstComplaint.ComimageUrl,
       });
     }
 

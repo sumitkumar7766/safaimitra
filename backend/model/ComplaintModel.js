@@ -76,6 +76,21 @@ const ComplaintSchema = new mongoose.Schema({
     resolvedAt: { type: Date, default: null },
     active: { type: Boolean, default: true },
 
+    // Verification & Fraud detection fields
+    imageHash: { type: String, default: "" },
+    imageFraudFlag: { type: Boolean, default: false },
+    verificationStatus: {
+        type: String,
+        enum: ["none", "genuine", "partially_valid", "duplicate", "false", "misleading", "spam"],
+        default: "none"
+    },
+    verificationReason: { type: String, default: "" },
+    verificationNotes: { type: String, default: "" },
+    verificationEvidenceUrl: { type: String, default: "" },
+    verificationDate: { type: Date, default: null },
+    verifiedBy: { type: String, default: "" },
+    legalReviewRequired: { type: Boolean, default: false },
+
     // JAES Escalation fields
     currentEscalationLevel: {
         type: Number,
