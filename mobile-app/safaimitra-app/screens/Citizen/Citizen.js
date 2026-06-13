@@ -13,6 +13,7 @@ import {
   Dimensions,
   Share,
   Linking,
+  TextInput,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from "react-native-maps";
@@ -55,12 +56,79 @@ export default function CitizenScreen({ navigation, goBack }) {
   const [resolvedModal, setResolvedModal] = useState(null);
   const [dustbins, setDustbins] = useState([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [scorecard, setScorecard] = useState(null);
+  const [cityLeaderboard, setCityLeaderboard] = useState([]);
+  const [areaLeaderboard, setAreaLeaderboard] = useState([]);
+  const [appealReason, setAppealReason] = useState("");
+  const [appealEvidenceUrl, setAppealEvidenceUrl] = useState("");
+  const [appealSubmitting, setAppealSubmitting] = useState(false);
 
   const socketRef = useRef(null);
   const mapRef = useRef(null);
   const locationSubscription = useRef(null);
 
   // ==================== API FUNCTIONS ====================
+
+  const fetchScorecard = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const userId = await AsyncStorage.getItem("userId");
+      if (!userId) return;
+
+      const res = await axios.get(
+        `${API_URL}/citizen-system/profile-scorecard/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        setScorecard(res.data.scorecard);
+      }
+    } catch (err) {
+      console.error("Error loading scorecard", err);
+    }
+  };
+
+  const fetchLeaderboards = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const userId = await AsyncStorage.getItem("userId");
+      if (!userId) return;
+
+      const res = await axios.get(
+        `${API_URL}/citizen-system/leaderboard/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        setCityLeaderboard(res.data.cityLeaderboard || []);
+        setAreaLeaderboard(res.data.areaLeaderboard || []);
+      }
+    } catch (err) {
+      console.error("Error loading leaderboards", err);
+    }
+  };
+
+  const handleSubmitAppeal = async () => {
+    if (!appealReason) return;
+    setAppealSubmitting(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const res = await axios.post(
+        `${API_URL}/citizen-system/citizen/appeal`,
+        { reason: appealReason, evidenceUrl: appealEvidenceUrl },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        Alert.alert("Success", "Appeal submitted successfully! Admin will review it shortly.");
+        setAppealReason("");
+        setAppealEvidenceUrl("");
+        fetchScorecard();
+      }
+    } catch (err) {
+      console.error("Appeal submit error", err);
+      Alert.alert("Error", err.response?.data?.message || "Failed to submit appeal");
+    } finally {
+      setAppealSubmitting(false);
+    }
+  };
 
   const fetchMyComplaints = async () => {
     try {
@@ -499,7 +567,7 @@ export default function CitizenScreen({ navigation, goBack }) {
 
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchMyComplaints(), fetchDustbins()]);
+    await Promise.all([fetchMyComplaints(), fetchDustbins(), fetchScorecard(), fetchLeaderboards()]);
     if (userLocation) {
       await fetchAreaStats(userLocation[0], userLocation[1]);
       await fetchNearbyVehicles(userLocation[0], userLocation[1]);
@@ -513,6 +581,8 @@ export default function CitizenScreen({ navigation, goBack }) {
     fetchDustbins();
     fetchMyComplaints();
     getCurrentLocation();
+    fetchScorecard();
+    fetchLeaderboards();
 
     const initSocket = async () => {
       const userStr = await AsyncStorage.getItem("user");
@@ -542,6 +612,8 @@ export default function CitizenScreen({ navigation, goBack }) {
           console.log(`🔄 Reconnected after ${attemptNumber} attempts`);
           socket.emit("join_room", `citizen_${parsedUser._id}`);
           fetchMyComplaints();
+          fetchScorecard();
+          fetchLeaderboards();
         });
 
         socket.on("complaint_resolved_alert", async (data) => {
@@ -572,6 +644,14 @@ export default function CitizenScreen({ navigation, goBack }) {
         socket.on("complaint_accepted", (payload) => {
           console.log("✅ Complaint Accepted Event:", payload);
           fetchMyComplaints();
+        });
+
+        socket.on("complaint_notification", (data) => {
+          console.log("🔔 Citizen Notification Event Received:", data);
+          Alert.alert("System Notification", data.message);
+          fetchScorecard();
+          fetchMyComplaints();
+          fetchLeaderboards();
         });
 
         socket.on("connect_error", (error) => {
@@ -809,36 +889,68 @@ export default function CitizenScreen({ navigation, goBack }) {
         </View>
 
         {/* Tabs Section */}
-        <View className="flex-row bg-white/10 p-1 rounded-2xl">
+        <View className="flex-row bg-white/10 p-1 rounded-2xl flex-wrap justify-between">
           <TouchableOpacity
-            className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${
+            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
               selectedTab === "report" ? "bg-white shadow-sm" : "bg-transparent"
             } active:opacity-80`}
             onPress={() => setSelectedTab("report")}
           >
-            <Text className="text-lg">📸</Text>
+            <Text className="text-base">📸</Text>
             <Text
-              className={`text-sm font-bold ${
+              className={`text-[9px] font-bold mt-0.5 ${
                 selectedTab === "report" ? "text-blue-700" : "text-blue-100"
               }`}
             >
-              Report Issue
+              Report
             </Text>
           </TouchableOpacity>
 
           <TouchableOpacity
-            className={`flex-1 py-3 rounded-xl flex-row justify-center items-center ${
+            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
               selectedTab === "track" ? "bg-white shadow-sm" : "bg-transparent"
             } active:opacity-80`}
             onPress={() => setSelectedTab("track")}
           >
-            <Text className="text-lg">🗺️</Text>
+            <Text className="text-base">🗺️</Text>
             <Text
-              className={`text-sm font-bold ${
+              className={`text-[9px] font-bold mt-0.5 ${
                 selectedTab === "track" ? "text-blue-700" : "text-blue-100"
               }`}
             >
-              Track Status
+              Track
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
+              selectedTab === "leaderboard" ? "bg-white shadow-sm" : "bg-transparent"
+            } active:opacity-80`}
+            onPress={() => setSelectedTab("leaderboard")}
+          >
+            <Text className="text-base">🏆</Text>
+            <Text
+              className={`text-[9px] font-bold mt-0.5 ${
+                selectedTab === "leaderboard" ? "text-blue-700" : "text-blue-100"
+              }`}
+            >
+              Ranks
+            </Text>
+          </TouchableOpacity>
+
+          <TouchableOpacity
+            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
+              selectedTab === "profile" ? "bg-white shadow-sm" : "bg-transparent"
+            } active:opacity-80`}
+            onPress={() => setSelectedTab("profile")}
+          >
+            <Text className="text-base">👤</Text>
+            <Text
+              className={`text-[9px] font-bold mt-0.5 ${
+                selectedTab === "profile" ? "text-blue-700" : "text-blue-100"
+              }`}
+            >
+              Profile
             </Text>
           </TouchableOpacity>
         </View>
@@ -852,8 +964,14 @@ export default function CitizenScreen({ navigation, goBack }) {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
         }
       >
-        {selectedTab === "report" ? (
+        {selectedTab === "report" && (
           <>
+            {scorecard?.isSuspended && (
+              <View className="bg-red-50 rounded-2xl p-4 border border-red-200 mb-6">
+                <Text className="text-red-700 font-bold text-sm">🚨 Your account is suspended.</Text>
+                <Text className="text-red-600 text-xs mt-1">You cannot submit new complaints. Switch to the Profile tab to appeal.</Text>
+              </View>
+            )}
             {/* Step 1: Location Status */}
             <View className="bg-white rounded-3xl overflow-hidden mb-6">
               <LinearGradient
@@ -1294,7 +1412,9 @@ export default function CitizenScreen({ navigation, goBack }) {
               ))}
             </View>
           </>
-        ) : (
+        )}
+
+        {selectedTab === "track" && (
           <>
             {/* Complaint History */}
             <View className="bg-white rounded-3xl overflow-hidden mb-6">
@@ -1580,6 +1700,190 @@ export default function CitizenScreen({ navigation, goBack }) {
               </Text>
             </View>
           </>
+        )}
+
+        {selectedTab === "leaderboard" && (
+          <View className="space-y-4">
+            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
+              <Text className="text-xl font-bold text-gray-800 mb-1">🏆 Community Leaderboard</Text>
+              <Text className="text-xs text-gray-500">See who is contributing the most to clean the city!</Text>
+            </View>
+
+            {/* City Leaderboard */}
+            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
+              <Text className="text-base font-bold text-blue-700 mb-3">🏙️ City Top Contributors</Text>
+              {cityLeaderboard.length === 0 ? (
+                <Text className="text-sm text-gray-400 text-center py-4">No data available</Text>
+              ) : (
+                cityLeaderboard.map((user, idx) => (
+                  <View key={user._id} className="flex-row items-center justify-between py-3 border-b border-gray-100">
+                    <View className="flex-row items-center gap-3">
+                      <Text className="font-bold text-gray-500 w-6">#{idx + 1}</Text>
+                      <View>
+                        <Text className="font-bold text-gray-800">{user.fullName}</Text>
+                        <Text className="text-[10px] text-gray-400">{user.citizenLevel || "Beginner Citizen"}</Text>
+                      </View>
+                    </View>
+                    <View className="items-end">
+                      <Text className="font-bold text-blue-600">⭐️ {user.trustScore}</Text>
+                      <Text className="text-[10px] text-green-600">✅ {user.validComplaints} valid</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+
+            {/* Area Leaderboard */}
+            <View className="bg-white rounded-3xl p-5 shadow-sm">
+              <Text className="text-base font-bold text-blue-700 mb-3">📍 Local Area Contributors</Text>
+              {areaLeaderboard.length === 0 ? (
+                <Text className="text-sm text-gray-400 text-center py-4">No local contributors yet</Text>
+              ) : (
+                areaLeaderboard.map((user, idx) => (
+                  <View key={user._id} className="flex-row items-center justify-between py-3 border-b border-gray-100">
+                    <View className="flex-row items-center gap-3">
+                      <Text className="font-bold text-gray-500 w-6">#{idx + 1}</Text>
+                      <View>
+                        <Text className="font-bold text-gray-800">{user.fullName}</Text>
+                        <Text className="text-[10px] text-gray-400">{user.citizenLevel || "Beginner Citizen"}</Text>
+                      </View>
+                    </View>
+                    <View className="items-end">
+                      <Text className="font-bold text-blue-600">⭐️ {user.trustScore}</Text>
+                      <Text className="text-[10px] text-green-600">✅ {user.validComplaints} valid</Text>
+                    </View>
+                  </View>
+                ))
+              )}
+            </View>
+          </View>
+        )}
+
+        {selectedTab === "profile" && (
+          <View className="space-y-4">
+            {/* Suspended Warning & Appeal Form */}
+            {scorecard?.isSuspended && (
+              <View className="bg-red-50 rounded-3xl p-5 border border-red-200 mb-4">
+                <Text className="text-lg font-bold text-red-700 mb-2">🚨 Account Suspended</Text>
+                <Text className="text-sm text-red-900 mb-2 font-medium">
+                  Your account is suspended due to consecutive false complaints.
+                </Text>
+                <Text className="text-xs text-red-700 bg-red-100/50 p-3 rounded-xl mb-4 italic text-left">
+                  Reason: "{scorecard.suspensionReason}"
+                </Text>
+
+                {/* Appeal Form */}
+                <Text className="text-xs font-black text-gray-700 uppercase mb-2 text-left">Submit Appeal</Text>
+                <View className="space-y-3">
+                  <View className="bg-white rounded-xl p-3 border border-gray-200">
+                    <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1 text-left">Explanation / Appeal Reason *</Text>
+                    <TextInput
+                      placeholder="Explain why your account should be unsuspended..."
+                      multiline
+                      numberOfLines={3}
+                      value={appealReason}
+                      onChangeText={setAppealReason}
+                      className="text-sm text-gray-800 outline-none p-1 bg-gray-50/50 rounded-lg min-h-[60px] text-left"
+                    />
+                  </View>
+                  
+                  <View className="bg-white rounded-xl p-3 border border-gray-200 mt-2">
+                    <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1 text-left">Evidence URL / Image Reference (Optional)</Text>
+                    <TextInput
+                      placeholder="e.g. http://imgur.com/image.jpg"
+                      value={appealEvidenceUrl}
+                      onChangeText={setAppealEvidenceUrl}
+                      className="text-sm text-gray-800 outline-none p-1 bg-gray-50/50 rounded-lg text-left"
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    onPress={handleSubmitAppeal}
+                    disabled={appealSubmitting || !appealReason}
+                    className={`py-3.5 rounded-xl flex-row justify-center items-center mt-2 ${
+                      appealSubmitting || !appealReason ? "bg-gray-300" : "bg-blue-600 active:opacity-80"
+                    }`}
+                  >
+                    <Text className="text-white font-bold text-sm">
+                      {appealSubmitting ? "Submitting Appeal..." : "Submit Appeal ✅"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
+
+            {/* Scorecard Header */}
+            <View className="bg-white rounded-3xl p-6 shadow-sm items-center mb-4">
+              <View className="w-20 h-20 bg-blue-100 rounded-full flex justify-center items-center mb-3">
+                <Text className="text-4xl">👤</Text>
+              </View>
+              <Text className="text-xl font-bold text-gray-800">{scorecard?.citizenLevel || "Beginner Citizen"}</Text>
+              <Text className="text-xs text-gray-500 mt-1">Trust Score Level</Text>
+            </View>
+
+            {/* Stats Grid */}
+            <View className="flex-row flex-wrap justify-between mb-4">
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-blue-600">⭐️ {scorecard?.trustScore || 0}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">Trust Points</Text>
+              </View>
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-green-600">✅ {scorecard?.validComplaints || 0}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">Valid Complaints</Text>
+              </View>
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-red-500">❌ {scorecard?.falseComplaints || 0}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">False Complaints</Text>
+              </View>
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-purple-600">{scorecard?.successRate || "100%"}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">Accuracy Rate</Text>
+              </View>
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-amber-500">{scorecard?.areaRank || "#N/A"}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">Local Area Rank</Text>
+              </View>
+              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
+                <Text className="text-xl font-black text-amber-600">{scorecard?.cityRank || "#N/A"}</Text>
+                <Text className="text-[10px] text-gray-400 mt-1">City Rank</Text>
+              </View>
+            </View>
+
+            {/* Badges Section */}
+            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
+              <Text className="text-base font-bold text-gray-800 mb-3 text-left">🏅 Earned Badges & Recognition</Text>
+              {scorecard?.badges && scorecard.badges.length > 0 ? (
+                <View className="flex-row flex-wrap gap-2">
+                  {scorecard.badges.map((badge, idx) => (
+                    <View key={idx} className="bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 flex-row items-center gap-1.5">
+                      <Text className="text-xs">🎖️</Text>
+                      <Text className="text-xs font-bold text-blue-700">{badge}</Text>
+                    </View>
+                  ))}
+                </View>
+              ) : (
+                <Text className="text-sm text-gray-400 italic text-left">Submit genuine complaints to earn badges!</Text>
+              )}
+            </View>
+            
+            {/* Strike System Panel */}
+            <View className="bg-white rounded-3xl p-5 shadow-sm border border-amber-100">
+              <Text className="text-base font-bold text-gray-800 mb-1 text-left">⚠️ False Complaint Strikes</Text>
+              <Text className="text-xs text-gray-500 mb-3 text-left">Consecutive false reporting leads to account suspension.</Text>
+              <View className="flex-row items-center gap-3">
+                {[1, 2, 3].map((s) => {
+                  const active = scorecard?.strikeCount >= s;
+                  return (
+                    <View key={s} className={`flex-1 py-3 rounded-xl border flex justify-center items-center ${
+                      active ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
+                    }`}>
+                      <Text className={`font-black text-xs ${active ? "text-red-700" : "text-gray-400"}`}>Strike {s}</Text>
+                    </View>
+                  );
+                })}
+              </View>
+            </View>
+          </View>
         )}
       </ScrollView>
 

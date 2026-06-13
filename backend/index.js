@@ -37,6 +37,7 @@ const dustbinRoutes = require("./routes/dustbin.js");
 const StaffLogin = require("./routes/loginStaff.js")
 const predictRoutes = require("./routes/predict.routes");
 const ComplaintRoutes = require("./routes/complaint");
+const citizenSystemRoutes = require("./routes/citizenSystem");
 
 // 👇 2. ADD THIS DEBUG BLOCK (Delete later)
 // console.log("--- DEBUGGING ENV VARS ---");
@@ -175,6 +176,7 @@ app.use("/route", RouteRegister);
 app.use("/dustbin", dustbinRoutes);
 app.use("/api", predictRoutes);
 app.use("/complaint", ComplaintRoutes);
+app.use("/citizen-system", citizenSystemRoutes);
 
 // Root
 app.get("/", (_req, res) => {

@@ -163,6 +163,44 @@ router.post(
           .json({ success: false, message: "Unauthorized. Please login." });
       }
 
+      const Citizen = require("../model/CitizenModel");
+      const citizenUser = await Citizen.findById(req.user.id);
+      if (!citizenUser) {
+        return res.status(404).json({ success: false, message: "Citizen not found." });
+      }
+      if (citizenUser.isSuspended) {
+        return res.status(403).json({
+          success: false,
+          message: "Your account is suspended due to repeated false complaints. You cannot submit new complaints."
+        });
+      }
+
+      const crypto = require("crypto");
+      const fs = require("fs");
+      const fileBuffer = fs.readFileSync(req.file.path);
+      const hashSum = crypto.createHash("sha256");
+      hashSum.update(fileBuffer);
+      const imageHash = hashSum.digest("hex");
+
+      const duplicateComplaint = await Complaint.findOne({ imageHash });
+      let imageFraudFlag = false;
+      let verificationNotes = "";
+      let verificationStatus = "none";
+
+      const filenameLower = req.file.originalname.toLowerCase();
+      const isSuspiciousFilename = filenameLower.includes("screenshot") || 
+                                    filenameLower.includes("download") || 
+                                    filenameLower.includes("fake") || 
+                                    filenameLower.includes("edit");
+
+      if (duplicateComplaint) {
+        imageFraudFlag = true;
+        verificationNotes = `Flagged: Duplicate photo detected (Previously uploaded in complaint #SM${duplicateComplaint._id.toString().slice(-6).toUpperCase()})`;
+      } else if (isSuspiciousFilename) {
+        imageFraudFlag = true;
+        verificationNotes = "Flagged: Suspicious image filename metadata.";
+      }
+
       const {
         officeId,
         dustbinId,
@@ -238,6 +276,10 @@ router.post(
           coordinates: [Number(longitude), Number(latitude)],
         },
         ComimageUrl: result.secure_url,
+        imageHash,
+        imageFraudFlag,
+        verificationStatus,
+        verificationNotes,
 
         // JAES fields
         currentEscalationLevel: 1,
