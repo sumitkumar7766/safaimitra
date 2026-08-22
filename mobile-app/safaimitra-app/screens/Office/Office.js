@@ -1895,11 +1895,20 @@ export default function App({ goBack }) {
       <View
         style={[tw`bg-white px-5 py-4 flex-row justify-between items-center border-b border-gray-200 shadow-sm`, { paddingTop: 35 }]}
       >
-        <View>
-          <Text style={tw`text-xl font-bold text-gray-900`}>CleanBin AI</Text>
-          <Text style={tw`text-xs text-gray-500`}>
-            {userData?.officeName || "Admin Dashboard"}
-          </Text>
+        <View style={tw`flex-row items-center gap-3`}>
+          <View style={tw`w-10 h-10 bg-white rounded-xl items-center justify-center shadow-sm p-1 border border-gray-100`}>
+            <Image
+              source={require("../../assets/logoapp.png")}
+              style={{ width: "100%", height: "100%", borderRadius: 6 }}
+              resizeMode="contain"
+            />
+          </View>
+          <View>
+            <Text style={tw`text-xl font-bold text-gray-900`}>Safaimitra</Text>
+            <Text style={tw`text-xs text-gray-500`}>
+              {userData?.officeName || "Office Operations"}
+            </Text>
+          </View>
         </View>
         <TouchableOpacity onPress={() => setShowProfileMenu(true)}>
           <MaterialCommunityIcons

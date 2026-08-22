@@ -43,6 +43,7 @@ const StaffLogin = require("./routes/loginStaff.js");
 const predictRoutes = require("./routes/predict.routes");
 const ComplaintRoutes = require("./routes/complaint");
 const citizenSystemRoutes = require("./routes/citizenSystem");
+const eventDustbinRoutes = require("./routes/eventDustbin");
 
 // Database Connection with Caching for Serverless
 let isDbConnected = false;
@@ -216,6 +217,8 @@ app.use("/dustbin", dustbinRoutes);
 app.use("/api", predictRoutes);
 app.use("/complaint", ComplaintRoutes);
 app.use("/citizen-system", citizenSystemRoutes);
+app.use("/api", eventDustbinRoutes);
+app.use("/", eventDustbinRoutes);
 
 // Root
 app.get("/", (_req, res) => {

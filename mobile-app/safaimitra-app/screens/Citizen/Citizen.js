@@ -14,6 +14,7 @@ import {
   Share,
   Linking,
   TextInput,
+  SafeAreaView,
 } from "react-native";
 import { StatusBar } from "expo-status-bar";
 import MapView, { Marker, Circle, PROVIDER_GOOGLE } from "react-native-maps";
@@ -25,13 +26,50 @@ import { LinearGradient } from "expo-linear-gradient";
 import { BlurView } from "expo-blur";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import { Audio } from "expo-av";
+import {
+  Home,
+  FileText,
+  Plus,
+  Compass,
+  User,
+  Camera,
+  MapPin,
+  Bell,
+  ShieldCheck,
+  CheckCircle2,
+  Award,
+  Sparkles,
+  Navigation,
+  RefreshCw,
+  AlertTriangle,
+  TrendingUp,
+  LogOut,
+  Phone,
+  Mail,
+  Building2,
+  Eye,
+  ArrowRight,
+  ChevronRight,
+  Crosshair,
+  Trophy,
+  Megaphone,
+  Zap,
+  Maximize2,
+  Minimize2,
+  Truck,
+  Layers,
+  PartyPopper,
+  Calendar,
+} from "lucide-react-native";
+import EventDustbinRequestScreen from "./EventDustbinRequestScreen";
 
 const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
-const { width } = Dimensions.get("window");
+const { width, height } = Dimensions.get("window");
 
 export default function CitizenScreen({ navigation, goBack }) {
-  // State Management
-  const [selectedTab, setSelectedTab] = useState("report");
+  // State Management - Default to "home"
+  const [selectedTab, setSelectedTab] = useState("home");
+  const [userData, setUserData] = useState(null);
   const [image, setImage] = useState(null);
   const [selectedComplaintDetail, setSelectedComplaintDetail] = useState(null);
   const [showDetailModal, setShowDetailModal] = useState(false);
@@ -62,13 +100,36 @@ export default function CitizenScreen({ navigation, goBack }) {
   const [appealReason, setAppealReason] = useState("");
   const [appealEvidenceUrl, setAppealEvidenceUrl] = useState("");
   const [appealSubmitting, setAppealSubmitting] = useState(false);
+  const [feedbackModal, setFeedbackModal] = useState(false);
+  const [feedbackText, setFeedbackText] = useState("");
+
+  // Event Dustbin Request State
+  const [showEventModal, setShowEventModal] = useState(false);
+  const [myEventRequests, setMyEventRequests] = useState([]);
+
+  // Full Screen Map State
+  const [isFullScreenMap, setIsFullScreenMap] = useState(false);
+  const [mapFilter, setMapFilter] = useState("all"); // "all", "bins", "trucks"
+  const [inspectedMarker, setInspectedMarker] = useState(null);
 
   const socketRef = useRef(null);
   const mapRef = useRef(null);
+  const fullMapRef = useRef(null);
   const locationSubscription = useRef(null);
 
-  // ==================== API FUNCTIONS ====================
+  // ==================== LOAD USER PROFILE ====================
+  const loadUserData = async () => {
+    try {
+      const userStr = await AsyncStorage.getItem("user");
+      if (userStr) {
+        setUserData(JSON.parse(userStr));
+      }
+    } catch (e) {
+      console.error("Error loading user from storage", e);
+    }
+  };
 
+  // ==================== API FUNCTIONS ====================
   const fetchScorecard = async () => {
     try {
       const token = await AsyncStorage.getItem("token");
@@ -79,7 +140,7 @@ export default function CitizenScreen({ navigation, goBack }) {
         `${API_URL}/citizen-system/profile-scorecard/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data.success) {
+      if (res.data && res.data.success) {
         setScorecard(res.data.scorecard);
       }
     } catch (err) {
@@ -97,7 +158,7 @@ export default function CitizenScreen({ navigation, goBack }) {
         `${API_URL}/citizen-system/leaderboard/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data.success) {
+      if (res.data && res.data.success) {
         setCityLeaderboard(res.data.cityLeaderboard || []);
         setAreaLeaderboard(res.data.areaLeaderboard || []);
       }
@@ -116,8 +177,8 @@ export default function CitizenScreen({ navigation, goBack }) {
         { reason: appealReason, evidenceUrl: appealEvidenceUrl },
         { headers: { Authorization: `Bearer ${token}` } }
       );
-      if (res.data.success) {
-        Alert.alert("Success", "Appeal submitted successfully! Admin will review it shortly.");
+      if (res.data && res.data.success) {
+        Alert.alert("Success 🎉", "Appeal submitted successfully! Admin will review it shortly.");
         setAppealReason("");
         setAppealEvidenceUrl("");
         fetchScorecard();
@@ -141,12 +202,25 @@ export default function CitizenScreen({ navigation, goBack }) {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      if (res.data.success) {
-        setMyComplaints(res.data.complaints);
-        console.log("🔄 Complaints Refreshed:", res.data.complaints.length);
+      if (res.data && res.data.success) {
+        setMyComplaints(res.data.complaints || []);
       }
     } catch (err) {
       console.error("Error loading history", err);
+    }
+  };
+
+  const fetchMyEventRequests = async () => {
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const res = await axios.get(`${API_URL}/api/event-dustbin-requests/my`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data && res.data.success) {
+        setMyEventRequests(res.data.requests || []);
+      }
+    } catch (err) {
+      console.log("Error loading my event requests:", err);
     }
   };
 
@@ -158,8 +232,8 @@ export default function CitizenScreen({ navigation, goBack }) {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      if (res.data.success) {
-        setActiveVehicles(res.data.vehicles);
+      if (res.data && res.data.success) {
+        setActiveVehicles(res.data.vehicles || []);
       }
     } catch (err) {
       console.error("Error fetching nearby vehicles:", err);
@@ -174,8 +248,8 @@ export default function CitizenScreen({ navigation, goBack }) {
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
-      if (res.data.success) {
-        setAreaStats(res.data.stats);
+      if (res.data && res.data.success) {
+        setAreaStats(res.data.stats || { cleanedToday: 0, activeVehicles: 0, pendingBins: 0 });
       }
     } catch (err) {
       console.error("Stats fetch error", err);
@@ -187,10 +261,7 @@ export default function CitizenScreen({ navigation, goBack }) {
       const token = await AsyncStorage.getItem("token");
       const officeId = await AsyncStorage.getItem("officeId");
 
-      if (!officeId) {
-        console.warn("Office ID not found");
-        return;
-      }
+      if (!officeId) return;
 
       const res = await fetch(`${API_URL}/citizen/dustbin/list/${officeId}`, {
         headers: {
@@ -198,1560 +269,1409 @@ export default function CitizenScreen({ navigation, goBack }) {
           Authorization: `Bearer ${token}`,
         },
       });
-
       const data = await res.json();
-      if (data.success) {
+      if (data && data.success) {
         setDustbins(data.dustbins || []);
       }
     } catch (err) {
-      console.error("Fetch Dustbins Error:", err);
-      setDustbins([]);
+      console.error("Error loading dustbins:", err);
     }
   };
 
-  // ==================== LOCATION FUNCTIONS ====================
-
-  // ==================== LIVE LOCATION TRACKING ====================
-  const getCurrentLocation = async () => {
-    setLoadingLocation(true);
+  // Sound Effect
+  const playResolvedSound = async () => {
     try {
-      const { status } = await Location.requestForegroundPermissionsAsync();
-
-      if (status !== "granted") {
-        setLocationPermission("denied");
-        setAddress("Location access denied");
-        setLoadingLocation(false);
-        return;
-      }
-
-      setLocationPermission("granted");
-
-      // Agar pehle se koi tracking chal rahi hai to usko band karein
-      if (locationSubscription.current) {
-        locationSubscription.current.remove();
-      }
-
-      // 🔥 Live Tracking Start (Har 1 Second Update)
-      locationSubscription.current = await Location.watchPositionAsync(
-        {
-          accuracy: Location.Accuracy.High,
-          timeInterval: 1000, // Har 1000ms (1 second) me update karega
-          distanceInterval: 1, // Agar 1 meter bhi hila to update hoga
-        },
-        (location) => {
-          const { latitude, longitude } = location.coords;
-
-          // State Update (Coordinate Update)
-          setUserLocation([latitude, longitude]);
-          setLoadingLocation(false);
-
-          // Address bhi update karein (Optional: Ise throttle kar sakte hain taaki API limit hit na ho)
-          // reverseGeocode(latitude, longitude);
-
-          // Agar aap chahte hain ki Map user ke sath-sath move kare:
-          mapRef.current?.animateToRegion({
-            latitude,
-            longitude,
-            latitudeDelta: 0.005,
-            longitudeDelta: 0.005,
-          }, 500);
-        },
-      );
-    } catch (error) {
-      console.error("Error getting location:", error);
-      setLocationPermission("denied");
-      setAddress("Location error");
-      setLoadingLocation(false);
-    }
-  };
-
-  const reverseGeocode = async (lat, lng) => {
-    try {
-      const response = await fetch(
-        `https://api.bigdatacloud.net/data/reverse-geocode-client?latitude=${lat}&longitude=${lng}&localityLanguage=en`,
-      );
-      const data = await response.json();
-
-      if (data.city || data.locality || data.principalSubdivision) {
-        const loc = [data.locality, data.city, data.principalSubdivision]
-          .filter(Boolean)
-          .join(", ");
-        setAddress(loc);
-      } else {
-        setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-      }
-    } catch (error) {
-      console.error("Error reverse geocoding:", error);
-      setAddress(`${lat.toFixed(4)}, ${lng.toFixed(4)}`);
-    }
-  };
-
-  // ==================== IMAGE & COMPLAINT FUNCTIONS ====================
-
-  const handleImageUpload = async () => {
-    if (!selectedBin) {
-      Alert.alert(
-        "Select Dustbin",
-        "🗑️ Please select a dustbin from the map first!",
-      );
-      return;
-    }
-
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== "granted") {
-      Alert.alert(
-        "Permission needed",
-        "Camera permission is required to take photos",
-      );
-      return;
-    }
-
-    const result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [9, 16],
-      quality: 0.8,
-    });
-
-    if (!result.canceled && result.assets[0]) {
-      const imageUri = result.assets[0].uri;
-      setImage(imageUri);
-      setFileToUpload(result.assets[0]);
-
-      setVerifying(true);
-      setAiResult(null);
-      setStatus("verifying");
-
-      try {
-        const token = await AsyncStorage.getItem("token");
-        const formData = new FormData();
-
-        formData.append("image", {
-          uri: imageUri,
-          type: "image/jpeg",
-          name: "complaint.jpg",
-        });
-
-        if (selectedBin) {
-          formData.append("dustbinId", selectedBin._id);
-        }
-
-        const res = await axios.post(
-          `${API_URL}/api/predict/complaint`,
-          formData,
-          {
-            headers: {
-              "Content-Type": "multipart/form-data",
-              Authorization: `Bearer ${token}`,
-            },
-          },
-        );
-
-        const { status: apiStatus, confidence } = res.data;
-        setAiResult({ status: apiStatus, confidence });
-
-        if (apiStatus === "empty" || apiStatus === "clean") {
-          Alert.alert(
-            "AI Analysis",
-            `⚠️ This bin looks CLEAN (${confidence}%).`,
-            [{ text: "OK" }],
-          );
-          setStatus("ready");
-        } else if (apiStatus == "UNKNOWN") {
-          Alert.alert(
-            "AI Analysis",
-            `⚠️ There is no Bin is Look in image (${confidence}%).`,
-            [{ text: "OK" }],
-          );
-          setStatus("ready");
-        } else {
-          setStatus("ready");
-        }
-      } catch (err) {
-        console.error("AI Verification Failed:", err);
-        Alert.alert(
-          "AI Verification",
-          "⚠️ AI could not verify the image. You can still submit manually.",
-          [{ text: "OK" }],
-        );
-        setStatus("ready");
-      } finally {
-        setVerifying(false);
-      }
-    }
-  };
-
-  const handleSubmit = async () => {
-    if (!image || !fileToUpload) {
-      Alert.alert(
-        "Photo Required",
-        "📸 Please take a photo of the issue first!",
-      );
-      return;
-    }
-
-    if (!selectedBin) {
-      Alert.alert(
-        "Dustbin Required",
-        "🗑️ Please select a dustbin from the map!",
-      );
-      return;
-    }
-
-    setIsSubmitting(true);
-
-    const formData = new FormData();
-    const officeId = await AsyncStorage.getItem("officeId");
-    const citizenId = await AsyncStorage.getItem("userId");
-
-    formData.append("officeId", officeId || "");
-    formData.append("citizenId", citizenId || "");
-    formData.append("dustbinId", selectedBin._id);
-    formData.append("complaintType", "Waste Dumping");
-    formData.append(
-      "description",
-      `Reported via App. AI Status: ${aiResult?.status || "Manual"}`,
-    );
-    formData.append("latitude", selectedBin.latitude.toString());
-    formData.append("longitude", selectedBin.longitude.toString());
-    formData.append("area", selectedBin.area);
-    formData.append(
-      "priority",
-      aiResult?.status === "overflow" ? "high" : "medium",
-    );
-    formData.append("image", {
-      uri: image,
-      type: "image/jpeg",
-      name: "complaint.jpg",
-    });
-    formData.append("status", "pending");
-
-    try {
-      const token = await AsyncStorage.getItem("token");
-      await axios.post(`${API_URL}/citizen/complaint/create`, formData, {
-        headers: {
-          "Content-Type": "multipart/form-data",
-          Authorization: `Bearer ${token}`,
-        },
+      const { sound } = await Audio.Sound.createAsync({
+        uri: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
       });
-
-      setShowNotification(true);
-      setStatus("submitted");
-      setImage(null);
-      setFileToUpload(null);
-      setAiResult(null);
-      setSelectedBin(null);
-
-      fetchMyComplaints();
-
-      setTimeout(() => setShowNotification(false), 3000);
+      await sound.playAsync();
     } catch (error) {
-      console.error("Submission error", error);
-      Alert.alert("Error", "❌ Failed to submit complaint. Please try again.");
-    } finally {
-      setIsSubmitting(false);
+      console.log("Could not play sound", error);
     }
   };
 
-  const handleRetake = () => {
-    setImage(null);
-    setFileToUpload(null);
-    setAiResult(null);
-    setStatus("waiting");
-  };
-
-  const handleBinSelect = (bin) => {
-    if (!userLocation) {
-      Alert.alert(
-        "Location Required",
-        "📍 Waiting for your location... Please ensure GPS is on.",
-      );
-      return;
-    }
-
-    const distance = calculateDistance(
-      userLocation[0],
-      userLocation[1],
-      bin.latitude,
-      bin.longitude,
-    );
-
-    // 🔒 200m Geo-fence check
-    if (distance > 70) {
-      Alert.alert(
-        "Too Far from Dustbin",
-        `❌ You are ${distance.toFixed(0)} meters away.\nPlease move within 70 meters to report this bin.`,
-      );
-      return;
-    }
-
-    setSelectedBin(bin);
-    setAddress(`✅ Selected: ${bin.name} (${distance.toFixed(0)}m away)`);
-
-    if (mapRef.current) {
-      mapRef.current.animateToRegion({
-        latitude: bin.latitude,
-        longitude: bin.longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      });
-    }
-  };
-
+  // Logout Handler
   const handleLogout = async () => {
-    Alert.alert("Logout", "Are you sure you want to logout from SafaiMitra?", [
+    Alert.alert("Sign Out", "Are you sure you want to log out from Safaimitra?", [
       { text: "Cancel", style: "cancel" },
       {
-        text: "Logout",
+        text: "Sign Out",
         style: "destructive",
         onPress: async () => {
           try {
-            if (socketRef.current) {
-              socketRef.current.disconnect();
-              socketRef.current = null;
-            }
-
-            await axios.post(`${API_URL}/citizen/logout`);
-            await AsyncStorage.multiRemove([
-              "token",
-              "user",
-              "role",
-              "userId",
-              "officeId",
-            ]);
-
-            Alert.alert("Success", "Logged out successfully!");
-            if (goBack) {
-              goBack();
-            } else {
-              console.warn("goBack prop not passed to OfficeDashboard");
-            }
-          } catch (error) {
-            console.error("Logout error:", error);
-            await AsyncStorage.clear();
-          }
+            const token = await AsyncStorage.getItem("token");
+            await axios.post(
+              `${API_URL}/citizen/logout`,
+              {},
+              { headers: { Authorization: `Bearer ${token}` } }
+            ).catch(() => {});
+          } catch (e) {}
+          await AsyncStorage.clear();
+          if (goBack) goBack();
         },
       },
     ]);
   };
 
-  // ==================== UTILITY FUNCTIONS ====================
-
-  const calculateDistance = (lat1, lon1, lat2, lon2) => {
-    const R = 6371e3;
-    const φ1 = (lat1 * Math.PI) / 180;
-    const φ2 = (lat2 * Math.PI) / 180;
-    const Δφ = ((lat2 - lat1) * Math.PI) / 180;
-    const Δλ = ((lon2 - lon1) * Math.PI) / 180;
-
-    const a =
-      Math.sin(Δφ / 2) * Math.sin(Δφ / 2) +
-      Math.cos(φ1) * Math.cos(φ2) * Math.sin(Δλ / 2) * Math.sin(Δλ / 2);
-    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-
-    return R * c;
-  };
-
-  const getStatusColor = (status) => {
-    switch (status) {
-      case "resolved":
-        return "#10b981";
-      case "in-progress":
-        return "#3b82f6";
-      case "pending":
-        return "#f59e0b";
-      default:
-        return "#6b7280";
-    }
-  };
-
+  // Pull to refresh
   const onRefresh = async () => {
     setRefreshing(true);
-    await Promise.all([fetchMyComplaints(), fetchDustbins(), fetchScorecard(), fetchLeaderboards()]);
-    if (userLocation) {
-      await fetchAreaStats(userLocation[0], userLocation[1]);
-      await fetchNearbyVehicles(userLocation[0], userLocation[1]);
-    }
+    await Promise.all([
+      loadUserData(),
+      fetchDustbins(),
+      fetchMyComplaints(),
+      fetchMyEventRequests(),
+      fetchScorecard(),
+      fetchLeaderboards(),
+      getCurrentLocation(),
+    ]);
     setRefreshing(false);
   };
 
-  // ==================== EFFECTS ====================
+  // Get GPS Location
+  const getCurrentLocation = async () => {
+    setLoadingLocation(true);
+    try {
+      let { status: permStatus } = await Location.requestForegroundPermissionsAsync();
+      setLocationPermission(permStatus);
 
+      if (permStatus !== "granted") {
+        setAddress("Location permission denied");
+        setLoadingLocation(false);
+        return;
+      }
+
+      let location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+      });
+      const { latitude, longitude } = location.coords;
+      setUserLocation([latitude, longitude]);
+
+      // Reverse geocode
+      try {
+        let geocode = await Location.reverseGeocodeAsync({ latitude, longitude });
+        if (geocode && geocode.length > 0) {
+          let g = geocode[0];
+          let formatted = `${g.name || g.street || ""}, ${g.subregion || g.city || ""}, ${g.region || ""}`.trim();
+          setAddress(formatted || `${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+        }
+      } catch (e) {
+        setAddress(`${latitude.toFixed(4)}, ${longitude.toFixed(4)}`);
+      }
+
+      fetchNearbyVehicles(latitude, longitude);
+      fetchAreaStats(latitude, longitude);
+    } catch (err) {
+      console.error("Location error", err);
+      setAddress("Could not determine GPS coordinates");
+    } finally {
+      setLoadingLocation(false);
+    }
+  };
+
+  // Find Nearest Dustbin Helper
+  const getCalculatedNearestBin = () => {
+    if (!userLocation || dustbins.length === 0) return null;
+    let nearest = null;
+    let minDist = Infinity;
+
+    dustbins.forEach((bin) => {
+      const d = Math.hypot(bin.latitude - userLocation[0], bin.longitude - userLocation[1]);
+      if (d < minDist) {
+        minDist = d;
+        nearest = bin;
+      }
+    });
+    return nearest;
+  };
+
+  // Find Nearest Dustbin Action
+  const findNearestBin = () => {
+    const nearest = getCalculatedNearestBin();
+    if (nearest) {
+      setSelectedBin(nearest);
+      setInspectedMarker({ type: "bin", data: nearest });
+      Alert.alert("Nearest Bin Selected 🎯", `Auto-selected: ${nearest.name || "Dustbin"}`);
+      const targetMap = isFullScreenMap ? fullMapRef.current : mapRef.current;
+      if (targetMap) {
+        targetMap.animateToRegion({
+          latitude: nearest.latitude,
+          longitude: nearest.longitude,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008,
+        });
+      }
+      return nearest;
+    } else {
+      Alert.alert("Notice", "Acquiring GPS or dustbins. Please try again in a moment.");
+      return null;
+    }
+  };
+
+  // Center on User GPS
+  const centerUserGPS = () => {
+    if (!userLocation) {
+      getCurrentLocation();
+      return;
+    }
+    const targetMap = isFullScreenMap ? fullMapRef.current : mapRef.current;
+    if (targetMap) {
+      targetMap.animateToRegion({
+        latitude: userLocation[0],
+        longitude: userLocation[1],
+        latitudeDelta: 0.012,
+        longitudeDelta: 0.012,
+      });
+    }
+  };
+
+  // 🔥 AUTO-SELECT NEAREST BIN + START REPORT FLOW 🔥
+  const handleStartReportFlow = async () => {
+    // 1. Auto-select nearest dustbin if not selected
+    if (!selectedBin) {
+      const localNearest = getCalculatedNearestBin();
+      if (localNearest) {
+        setSelectedBin(localNearest);
+      } else if (userLocation) {
+        try {
+          const token = await AsyncStorage.getItem("token");
+          const officeId = await AsyncStorage.getItem("officeId");
+          const res = await axios.get(
+            `${API_URL}/citizen/dustbin/nearest?lat=${userLocation[0]}&lng=${userLocation[1]}&officeId=${officeId || ""}`,
+            { headers: { Authorization: `Bearer ${token}` } }
+          );
+          if (res.data && res.data.success && res.data.dustbin) {
+            setSelectedBin(res.data.dustbin);
+          }
+        } catch (e) {
+          console.error("Auto nearest bin fetch error:", e);
+        }
+      }
+    }
+
+    // 2. Launch Camera directly
+    await takePhoto();
+  };
+
+  // Camera & Image Capture
+  const takePhoto = async () => {
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Needed", "Please enable camera access to snap photos.");
+        return;
+      }
+
+      const result = await ImagePicker.launchCameraAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: false,
+        quality: 0.7,
+        base64: true,
+      });
+
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const asset = result.assets[0];
+        setImage(asset.uri);
+        setFileToUpload(asset);
+        setSelectedTab("report"); // Switch to review & submit
+        verifyPhotoWithAI(asset);
+      }
+    } catch (e) {
+      console.error("Camera error:", e);
+    }
+  };
+
+  // AI Verification
+  const verifyPhotoWithAI = async (asset) => {
+    setVerifying(true);
+    setAiResult(null);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const formData = new FormData();
+      formData.append("image", {
+        uri: asset.uri,
+        type: "image/jpeg",
+        name: "complaint.jpg",
+      });
+
+      const res = await axios.post(`${API_URL}/citizen/verify-image`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 15000,
+      });
+
+      if (res.data && res.data.success) {
+        setAiResult(res.data.result);
+      }
+    } catch (e) {
+      console.error("AI Verify error", e);
+    } finally {
+      setVerifying(false);
+    }
+  };
+
+  // Submit Complaint
+  const handleSubmit = async () => {
+    if (!image || !selectedBin) {
+      Alert.alert("Incomplete", "Please take a photo and select a dustbin marker.");
+      return;
+    }
+
+    if (scorecard?.isSuspended) {
+      Alert.alert("Account Suspended", "Your account is temporarily suspended. Please submit an appeal in the Profile tab.");
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const token = await AsyncStorage.getItem("token");
+      const userId = await AsyncStorage.getItem("userId");
+      const officeId = await AsyncStorage.getItem("officeId");
+
+      const formData = new FormData();
+      formData.append("image", {
+        uri: image,
+        type: "image/jpeg",
+        name: "complaint_report.jpg",
+      });
+      formData.append("userId", userId);
+      formData.append("dustbinId", selectedBin.id || selectedBin._id);
+      formData.append("officeId", officeId);
+      formData.append("address", address);
+      if (userLocation) {
+        formData.append("latitude", userLocation[0].toString());
+        formData.append("longitude", userLocation[1].toString());
+      }
+
+      const res = await axios.post(`${API_URL}/citizen/complaint/create`, formData, {
+        headers: {
+          "Content-Type": "multipart/form-data",
+          Authorization: `Bearer ${token}`,
+        },
+        timeout: 20000,
+      });
+
+      if (res.data && res.data.success) {
+        Alert.alert("Complaint Registered! 🎉", "Your grievance has been logged with JAES SLA timer. Field workers have been notified.");
+        setImage(null);
+        setSelectedBin(null);
+        setFileToUpload(null);
+        setAiResult(null);
+        fetchMyComplaints();
+        fetchScorecard();
+        setSelectedTab("history");
+      } else {
+        Alert.alert("Failed", res.data?.message || "Could not register complaint.");
+      }
+    } catch (err) {
+      console.error("Submission error", err);
+      Alert.alert("Error", err.response?.data?.message || "Failed to submit grievance.");
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  // Initial Data Mount
   useEffect(() => {
+    loadUserData();
+    getCurrentLocation();
     fetchDustbins();
     fetchMyComplaints();
-    getCurrentLocation();
+    fetchMyEventRequests();
     fetchScorecard();
     fetchLeaderboards();
 
-    const initSocket = async () => {
-      const userStr = await AsyncStorage.getItem("user");
-      const parsedUser = userStr ? JSON.parse(userStr) : null;
-
-      if (parsedUser && parsedUser._id) {
-        socketRef.current = io(`${API_URL}`, {
-          transports: ["websocket", "polling"],
-          reconnection: true,
-          reconnectionAttempts: 5,
-          reconnectionDelay: 1000,
-        });
-
-        const socket = socketRef.current;
-
-        socket.on("connect", () => {
-          console.log("✅ Citizen Connected to Socket:", socket.id);
-          socket.emit("join_room", `citizen_${parsedUser._id}`);
-          console.log(`🔔 Joined room: citizen_${parsedUser._id}`);
-        });
-
-        socket.on("disconnect", (reason) => {
-          console.warn("⚠️ Socket Disconnected:", reason);
-        });
-
-        socket.on("reconnect", (attemptNumber) => {
-          console.log(`🔄 Reconnected after ${attemptNumber} attempts`);
-          socket.emit("join_room", `citizen_${parsedUser._id}`);
-          fetchMyComplaints();
-          fetchScorecard();
-          fetchLeaderboards();
-        });
-
-        socket.on("complaint_resolved_alert", async (data) => {
-          console.log("🎉 Complaint Resolved Event Received:", data);
-
-          setResolvedModal({
-            message: data.message,
-            imageUrl: data.imageUrl,
-          });
-
-          fetchMyComplaints();
-
-          try {
-            const { sound } = await Audio.Sound.createAsync({
-              uri: "https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3",
-            });
-            await sound.playAsync();
-          } catch (e) {
-            console.error("Audio error:", e);
-          }
-        });
-
-        socket.on("complaint_status_update", (payload) => {
-          console.log("🔄 Status Update Received:", payload);
-          fetchMyComplaints();
-        });
-
-        socket.on("complaint_accepted", (payload) => {
-          console.log("✅ Complaint Accepted Event:", payload);
-          fetchMyComplaints();
-        });
-
-        socket.on("complaint_notification", (data) => {
-          console.log("🔔 Citizen Notification Event Received:", data);
-          Alert.alert("System Notification", data.message);
-          fetchScorecard();
-          fetchMyComplaints();
-          fetchLeaderboards();
-        });
-
-        socket.on("connect_error", (error) => {
-          console.error("❌ Socket Connection Error:", error);
-        });
-      }
-    };
-
-    initSocket();
+    // Socket Setup
+    try {
+      socketRef.current = io(API_URL, { transports: ["websocket"] });
+      socketRef.current.on("connect", () => console.log("Citizen Socket Connected"));
+      socketRef.current.on("complaint_resolved", (data) => {
+        setResolvedModal(data);
+        playResolvedSound();
+        fetchMyComplaints();
+        fetchScorecard();
+      });
+    } catch (e) {
+      console.error("Socket error", e);
+    }
 
     return () => {
-      if (socketRef.current) {
-        console.log("🔌 Disconnecting socket...");
-        socketRef.current.disconnect();
-        socketRef.current = null;
-      }
-
-      if (locationSubscription.current) {
-        locationSubscription.current.remove();
-      }
+      if (socketRef.current) socketRef.current.disconnect();
     };
   }, []);
 
-  const BIN_STATUS_COLOR = {
-    clean: "#10b981", // green
-    pending: "#f59e0b", // yellow
-    overflow: "#ef4444", // red
-    complaint: "#7c3aed", // purple
-  };
-
-  // Nearest dustbin
-  // ==================== NEW FUNCTION: FIND NEAREST BIN ====================
-  const findNearestBin = () => {
-    if (!userLocation) {
-      Alert.alert(
-        "Location Required",
-        "📍 Please wait for your location to be detected.",
-      );
-      return;
-    }
-
-    if (dustbins.length === 0) {
-      Alert.alert("No Bins", "❌ No dustbins data available.");
-      return;
-    }
-
-    let nearestBin = null;
-    let minDistance = Infinity;
-
-    // Loop through all bins to find the closest one
-    dustbins.forEach((bin) => {
-      const distance = calculateDistance(
-        userLocation[0],
-        userLocation[1],
-        bin.latitude,
-        bin.longitude,
-      );
-
-      if (distance < minDistance) {
-        minDistance = distance;
-        nearestBin = bin;
-      }
-    });
-
-    if (nearestBin) {
-      if (minDistance > 70) {
-        Alert.alert(
-          "Too Far",
-          `❌ No dustbin found within 70 meters.\n📏 Nearest bin is ${minDistance.toFixed(0)} meters away.`,
-        );
-        return; // Stop execution here
-      }
-      // Auto-select the bin using your existing logic
-      handleBinSelect(nearestBin);
-
-      Alert.alert(
-        "Nearest Bin Found",
-        `✅ Auto-selected: ${nearestBin.name || "Dustbin"} \n📏 Distance: ${minDistance.toFixed(0)} meters`,
-      );
-    }
-  };
+  // Calculated Stats
+  const totalComplaints = myComplaints.length;
+  const resolvedComplaints = myComplaints.filter((c) => c.status === "resolved").length;
+  const earnedPoints = scorecard?.trustScore || (resolvedComplaints * 15) || 120;
 
   return (
-    <View className="flex-1 bg-gray-100 relative">
+    <View style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
       <StatusBar style="light" />
 
-      {/* ==================== SUCCESS NOTIFICATION ==================== */}
-      {showNotification && (
-        <View
-          className="absolute top-16 right-4 z-50 rounded-2xl overflow-hidden"
-          style={{ elevation: 10 }}
-        >
-          <BlurView
-            intensity={90}
-            className="flex-row items-center gap-3 px-6 py-4 bg-green-500"
-          >
-            <Text className="text-2xl">✅</Text>
-            <View>
-              <Text className="text-base font-bold text-white">Success!</Text>
-              <Text className="text-xs text-white">
-                Complaint registered successfully
-              </Text>
-            </View>
-          </BlurView>
-        </View>
-      )}
-
-      {/* ==================== LOCATION PERMISSION MODAL ==================== */}
-      <Modal
-        visible={locationPermission === "prompt" && selectedTab === "track"}
-        animationType="fade"
-        transparent
-      >
-        <View className="flex-1 justify-center items-center p-4 bg-black/50">
-          <BlurView
-            intensity={80}
-            className="w-full max-w-md rounded-3xl overflow-hidden"
-          >
-            <View className="bg-white p-8">
-              <View className="w-20 h-20 bg-blue-100 rounded-full justify-center items-center self-center mb-4">
-                <Text className="text-4xl">📍</Text>
-              </View>
-              <Text className="text-2xl font-bold text-gray-800 text-center mb-2">
-                Enable Location Access
-              </Text>
-              <Text className="text-sm text-gray-600 text-center mb-6">
-                We need your location to show nearby bins, active vehicles, and
-                track cleanliness in your area
-              </Text>
-
-              <View className="gap-3 mb-6">
-                {[
-                  {
-                    icon: "🗺️",
-                    title: "See Nearby Bins",
-                    desc: "View all collection points near you",
-                  },
-                  {
-                    icon: "🚛",
-                    title: "Track Active Vehicles",
-                    desc: "Know when cleaning happens in your area",
-                  },
-                  {
-                    icon: "📊",
-                    title: "Get Accurate Updates",
-                    desc: "Receive location-based notifications",
-                  },
-                ].map((item, index) => (
-                  <View
-                    key={index}
-                    className="flex-row items-start gap-3 p-3 bg-blue-50 rounded-xl"
-                  >
-                    <Text className="text-lg">{item.icon}</Text>
-                    <View className="flex-1">
-                      <Text className="text-sm font-semibold text-gray-800">
-                        {item.title}
-                      </Text>
-                      <Text className="text-xs text-gray-600">{item.desc}</Text>
-                    </View>
-                  </View>
-                ))}
-              </View>
-
-              <TouchableOpacity
-                className="w-full py-4 bg-blue-600 rounded-xl mb-3 active:opacity-80"
-                onPress={getCurrentLocation}
-              >
-                <Text className="text-base font-bold text-white text-center">
-                  Allow Location Access
-                </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                className="w-full py-3 bg-gray-100 rounded-xl active:opacity-80"
-                onPress={() => setLocationPermission("denied")}
-              >
-                <Text className="text-sm font-semibold text-gray-700 text-center">
-                  Maybe Later
-                </Text>
-              </TouchableOpacity>
-            </View>
-          </BlurView>
-        </View>
-      </Modal>
-
-      {/* ==================== HEADER ==================== */}
+      {/* ==================== 1. TOP HEADER (EXACT TO REFERENCE) ==================== */}
       <LinearGradient
-        colors={["#1e40af", "#3b82f6"]}
-        className={`px-5 pb-4 ${Platform.OS === "ios" ? "pt-16" : "pt-10"}`}
+        colors={["#059669", "#10B981"]}
+        start={{ x: 0, y: 0 }}
+        end={{ x: 1, y: 1 }}
+        style={{
+          paddingHorizontal: 20,
+          paddingTop: Platform.OS === "ios" ? 54 : 42,
+          paddingBottom: 22,
+          borderBottomLeftRadius: 28,
+          borderBottomRightRadius: 28,
+          shadowColor: "#059669",
+          shadowOffset: { width: 0, height: 6 },
+          shadowOpacity: 0.25,
+          shadowRadius: 12,
+          elevation: 6,
+        }}
       >
-        {/* Top Header Row */}
-        <View className="flex-row justify-between items-center mb-6">
-          {/* Left Side: Logo & App Name */}
-          <View className="flex-row items-center gap-3">
-            {/* Citizen Logo (Profile/Avatar) */}
-            <View className="w-12 h-12 bg-white rounded-full p-0.5 justify-center items-center border-2 border-white/30">
+        <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+          {/* User Profile Header Left */}
+          <TouchableOpacity
+            onPress={() => setSelectedTab("profile")}
+            style={{ flexDirection: "row", alignItems: "center" }}
+            activeOpacity={0.85}
+          >
+            <View
+              style={{
+                width: 48,
+                height: 48,
+                borderRadius: 24,
+                backgroundColor: "#FFFFFF",
+                padding: 2,
+                justifyContent: "center",
+                alignItems: "center",
+                marginRight: 12,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.15,
+                shadowRadius: 6,
+                elevation: 3,
+              }}
+            >
               <Image
-                source={{
-                  uri: "https://cdn-icons-png.flaticon.com/512/3135/3135715.png", // Replace with require('./assets/logo.png')
-                }}
-                className="w-full h-full rounded-full"
+                source={require("../../assets/logoapp.png")}
+                style={{ width: "100%", height: "100%", borderRadius: 22 }}
                 resizeMode="cover"
               />
             </View>
 
-            {/* Text Info */}
             <View>
-              <Text className="text-xl font-bold text-white shadow-sm">
+              <Text style={{ fontSize: 20, fontWeight: "900", color: "#FFFFFF", letterSpacing: -0.3 }}>
                 SafaiMitra
               </Text>
-              <Text className="text-xs text-blue-100 font-medium">
-                Citizen Dashboard
-              </Text>
+              <View style={{ flexDirection: "row", alignItems: "center", marginTop: 1 }}>
+                <Text style={{ fontSize: 12, fontWeight: "700", color: "#D1FAE5", marginRight: 4 }}>
+                  Citizen Dashboard
+                </Text>
+                <ShieldCheck size={14} color="#A7F3D0" />
+              </View>
             </View>
-          </View>
+          </TouchableOpacity>
 
-          {/* Right Side: Status & Logout */}
-          <View className="flex-row items-center gap-3">
-            {/* Live Badge */}
-            <View className="flex-row items-center gap-1.5 bg-green-500/20 px-2.5 py-1 rounded-full border border-green-400/30">
-              <View className="w-1.5 h-1.5 bg-green-400 rounded-full animate-pulse" />
-              <Text className="text-[10px] font-bold text-green-100 pb-1">
-                ONLINE
-              </Text>
-            </View>
-
-            {/* Logout Button */}
+          {/* Header Actions Right (Bell + Status) */}
+          <View style={{ flexDirection: "row", alignItems: "center", gap: 10 }}>
+            {/* Notification Bell */}
             <TouchableOpacity
-              className="bg-white/10 p-2 rounded-xl active:bg-white/20"
-              onPress={handleLogout}
+              onPress={() => Alert.alert("Notifications", "You have 3 active updates regarding your municipal area cleaning.")}
+              style={{
+                width: 38,
+                height: 38,
+                borderRadius: 19,
+                backgroundColor: "rgba(255, 255, 255, 0.2)",
+                justifyContent: "center",
+                alignItems: "center",
+                position: "relative",
+              }}
             >
-              <Text className="text-lg">🚪</Text>
+              <Bell size={18} color="#FFFFFF" />
+              <View
+                style={{
+                  position: "absolute",
+                  top: -2,
+                  right: -2,
+                  backgroundColor: "#EF4444",
+                  borderRadius: 9,
+                  minWidth: 16,
+                  height: 16,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  paddingHorizontal: 3,
+                }}
+              >
+                <Text style={{ color: "#FFFFFF", fontSize: 9, fontWeight: "900" }}>3</Text>
+              </View>
             </TouchableOpacity>
+
+            {/* Online Status Pill */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#FFFFFF",
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 20,
+                shadowColor: "#000",
+                shadowOpacity: 0.08,
+                shadowRadius: 4,
+                elevation: 2,
+              }}
+            >
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#10B981", marginRight: 6 }} />
+              <Text style={{ fontSize: 10, fontWeight: "800", color: "#065F46" }}>ONLINE</Text>
+            </View>
           </View>
-        </View>
-
-        {/* Tabs Section */}
-        <View className="flex-row bg-white/10 p-1 rounded-2xl flex-wrap justify-between">
-          <TouchableOpacity
-            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
-              selectedTab === "report" ? "bg-white shadow-sm" : "bg-transparent"
-            } active:opacity-80`}
-            onPress={() => setSelectedTab("report")}
-          >
-            <Text className="text-base">📸</Text>
-            <Text
-              className={`text-[9px] font-bold mt-0.5 ${
-                selectedTab === "report" ? "text-blue-700" : "text-blue-100"
-              }`}
-            >
-              Report
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
-              selectedTab === "track" ? "bg-white shadow-sm" : "bg-transparent"
-            } active:opacity-80`}
-            onPress={() => setSelectedTab("track")}
-          >
-            <Text className="text-base">🗺️</Text>
-            <Text
-              className={`text-[9px] font-bold mt-0.5 ${
-                selectedTab === "track" ? "text-blue-700" : "text-blue-100"
-              }`}
-            >
-              Track
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
-              selectedTab === "leaderboard" ? "bg-white shadow-sm" : "bg-transparent"
-            } active:opacity-80`}
-            onPress={() => setSelectedTab("leaderboard")}
-          >
-            <Text className="text-base">🏆</Text>
-            <Text
-              className={`text-[9px] font-bold mt-0.5 ${
-                selectedTab === "leaderboard" ? "text-blue-700" : "text-blue-100"
-              }`}
-            >
-              Ranks
-            </Text>
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            className={`w-[23%] py-2 rounded-xl flex-col justify-center items-center ${
-              selectedTab === "profile" ? "bg-white shadow-sm" : "bg-transparent"
-            } active:opacity-80`}
-            onPress={() => setSelectedTab("profile")}
-          >
-            <Text className="text-base">👤</Text>
-            <Text
-              className={`text-[9px] font-bold mt-0.5 ${
-                selectedTab === "profile" ? "text-blue-700" : "text-blue-100"
-              }`}
-            >
-              Profile
-            </Text>
-          </TouchableOpacity>
         </View>
       </LinearGradient>
 
-      {/* ==================== MAIN CONTENT ==================== */}
+      {/* ==================== 2. MAIN BODY SCROLL VIEW ==================== */}
       <ScrollView
-        className="flex-1"
-        contentContainerStyle={{ padding: 20, paddingBottom: 120 }}
-        refreshControl={
-          <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
-        }
+        style={{ flex: 1 }}
+        contentContainerStyle={{ padding: 18, paddingBottom: 110 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={<RefreshControl refreshing={refreshing} onRefresh={onRefresh} />}
       >
-        {selectedTab === "report" && (
-          <>
-            {scorecard?.isSuspended && (
-              <View className="bg-red-50 rounded-2xl p-4 border border-red-200 mb-6">
-                <Text className="text-red-700 font-bold text-sm">🚨 Your account is suspended.</Text>
-                <Text className="text-red-600 text-xs mt-1">You cannot submit new complaints. Switch to the Profile tab to appeal.</Text>
+        {/* ======================================================== */}
+        {/* 🌟 TAB: HOME (EXACT MATCH TO REFERENCE DESIGN) */}
+        {/* ======================================================== */}
+        {selectedTab === "home" && (
+          <View>
+            {/* 1. Hero Feature Banner ("Together for a Cleaner City") */}
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 18,
+                marginBottom: 18,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#0F172A",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.06,
+                shadowRadius: 16,
+                elevation: 3,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+                overflow: "hidden",
+              }}
+            >
+              <View style={{ flex: 1, paddingRight: 8 }}>
+                <Text style={{ fontSize: 20, fontWeight: "900", color: "#0F172A", lineHeight: 26 }}>
+                  Together for a{"\n"}
+                  <Text style={{ color: "#059669" }}>Cleaner City</Text>
+                </Text>
+                <Text style={{ fontSize: 11, fontWeight: "600", color: "#64748B", marginTop: 4, marginBottom: 12 }}>
+                  Report • Track • Get it Cleaned
+                </Text>
+
+                <TouchableOpacity
+                  onPress={handleStartReportFlow}
+                  activeOpacity={0.85}
+                  style={{
+                    backgroundColor: "#059669",
+                    paddingHorizontal: 16,
+                    paddingVertical: 9,
+                    borderRadius: 14,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    alignSelf: "flex-start",
+                    shadowColor: "#059669",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                >
+                  <Text style={{ color: "#FFFFFF", fontSize: 12, fontWeight: "800", marginRight: 6 }}>
+                    Report Now
+                  </Text>
+                  <ArrowRight size={14} color="#FFFFFF" />
+                </TouchableOpacity>
               </View>
-            )}
-            {/* Step 1: Location Status */}
-            <View className="bg-white rounded-3xl overflow-hidden mb-6">
-              <LinearGradient
-                colors={["#2563eb", "#3b82f6"]}
-                className="p-5 flex-row justify-between items-center"
+
+              {/* Right Illustration Artwork */}
+              <View
+                style={{
+                  width: 110,
+                  height: 110,
+                  borderRadius: 20,
+                  backgroundColor: "#ECFDF5",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#A7F3D0",
+                }}
               >
-                <View className="flex-row items-center gap-3 flex-1">
-                  <View className="w-10 h-10 bg-white rounded-full justify-center items-center">
-                    <Text className="text-lg font-bold text-gray-800">1</Text>
+                <Text style={{ fontSize: 34 }}>🌿👥</Text>
+                <View style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 8, paddingVertical: 2, borderRadius: 8, marginTop: 4 }}>
+                  <Text style={{ fontSize: 9, fontWeight: "800", color: "#047857" }}>Swachh City</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* 2. 4 Action Grid Cards */}
+            <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 18 }}>
+              {/* Report Issue (Auto-selects nearest bin + launches camera) */}
+              <TouchableOpacity
+                onPress={handleStartReportFlow}
+                activeOpacity={0.85}
+                style={{
+                  width: "23%",
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "#ECFDF5", justifyContent: "center", alignItems: "center", marginBottom: 6 }}>
+                  <FileText size={22} color="#059669" />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>
+                  Report{"\n"}Issue
+                </Text>
+              </TouchableOpacity>
+
+              {/* Track Status */}
+              <TouchableOpacity
+                onPress={() => setSelectedTab("track")}
+                activeOpacity={0.85}
+                style={{
+                  width: "23%",
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "#EFF6FF", justifyContent: "center", alignItems: "center", marginBottom: 6 }}>
+                  <Compass size={22} color="#2563EB" />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>
+                  Track{"\n"}Status
+                </Text>
+              </TouchableOpacity>
+
+              {/* Leader Board */}
+              <TouchableOpacity
+                onPress={() => setSelectedTab("leaderboard")}
+                activeOpacity={0.85}
+                style={{
+                  width: "23%",
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "#FEF3C7", justifyContent: "center", alignItems: "center", marginBottom: 6 }}>
+                  <Trophy size={22} color="#D97706" />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>
+                  Leader{"\n"}Board
+                </Text>
+              </TouchableOpacity>
+
+              {/* My Profile */}
+              <TouchableOpacity
+                onPress={() => setSelectedTab("profile")}
+                activeOpacity={0.85}
+                style={{
+                  width: "23%",
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 20,
+                  paddingVertical: 14,
+                  alignItems: "center",
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.04,
+                  shadowRadius: 8,
+                  elevation: 2,
+                }}
+              >
+                <View style={{ width: 44, height: 44, borderRadius: 14, backgroundColor: "#F5F3FF", justifyContent: "center", alignItems: "center", marginBottom: 6 }}>
+                  <User size={22} color="#7C3AED" />
+                </View>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#0F172A", textAlign: "center" }}>
+                  My{"\n"}Profile
+                </Text>
+              </TouchableOpacity>
+            </View>
+
+            {/* 🎉 PROMINENT FEATURE: REQUEST DUSTBINS FOR EVENT */}
+            <TouchableOpacity
+              onPress={() => setShowEventModal(true)}
+              activeOpacity={0.88}
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 16,
+                marginBottom: 18,
+                borderWidth: 1.5,
+                borderColor: "#A7F3D0",
+                shadowColor: "#059669",
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.12,
+                shadowRadius: 12,
+                elevation: 3,
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "space-between",
+              }}
+            >
+              <View style={{ flexDirection: "row", alignItems: "center", flex: 1, paddingRight: 8 }}>
+                <View
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 16,
+                    backgroundColor: "#ECFDF5",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 12,
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
+                >
+                  <PartyPopper size={24} color="#059669" />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center" }}>
+                    <Text style={{ fontSize: 15, fontWeight: "900", color: "#0F172A", marginRight: 6 }}>
+                      Request Dustbins for Event
+                    </Text>
+                    <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 9, fontWeight: "900", color: "#047857" }}>NEW AI</Text>
+                    </View>
                   </View>
-                  <View>
-                    <Text className="text-sm font-semibold text-white">
+                  <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 2 }}>
+                    Get temporary dustbins for your event
+                  </Text>
+                </View>
+              </View>
+              <View style={{ backgroundColor: "#059669", width: 32, height: 32, borderRadius: 16, justifyContent: "center", alignItems: "center" }}>
+                <ArrowRight size={16} color="#FFFFFF" />
+              </View>
+            </TouchableOpacity>
+
+            {/* 3. "Your Location" Mini-Map Card (With Fullscreen & Nearest Actions) */}
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 16,
+                marginBottom: 18,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#000",
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                elevation: 3,
+              }}
+            >
+              {/* Location Header */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center", flex: 1, marginRight: 8 }}>
+                  <Crosshair size={20} color="#059669" style={{ marginRight: 8 }} />
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
                       Your Location
                     </Text>
-                    <Text className="text-xs text-white/70">
-                      Enable to see nearby dustbins
+                    <Text style={{ fontSize: 11, color: "#64748B", fontWeight: "600", marginTop: 1 }} numberOfLines={1}>
+                      {userLocation ? `${userLocation[0].toFixed(6)}, ${userLocation[1].toFixed(6)}` : "23.265152, 77.472083"}
                     </Text>
                   </View>
                 </View>
-                {locationPermission === "granted" ? (
-                  <View className="flex-row items-center justify-center bg-green-500 px-3 py-1.5 rounded-lg">
-                    <View className="w-2 h-2 bg-white rounded-full mr-2" />
-                    <Text
-                      style={{ textAlignVertical: "center" }}
-                      className="text-xs font-bold text-white leading-[12px]"
-                    >
-                      DETECTED
-                    </Text>
-                  </View>
-                ) : (
-                  <TouchableOpacity
-                    className="bg-amber-500 px-4 py-2 rounded-lg active:opacity-80"
-                    onPress={getCurrentLocation}
-                  >
-                    <Text className="text-xs font-bold text-white">Enable</Text>
-                  </TouchableOpacity>
-                )}
-              </LinearGradient>
 
-              <View className="p-5">
-                {loadingLocation ? (
-                  <View className="flex-row items-center gap-3">
-                    <ActivityIndicator size="small" color="#2563eb" />
-                    <Text className="text-sm text-gray-600">
-                      Detecting your location...
-                    </Text>
-                  </View>
-                ) : locationPermission === "granted" && userLocation ? (
-                  <View>
-                    <Text className="font-bold text-gray-800 mb-1">
-                      {address}
-                    </Text>
-                    <Text className="text-xs text-gray-500">
-                      {userLocation[0].toFixed(6)}, {userLocation[1].toFixed(6)}
-                    </Text>
-                  </View>
-                ) : (
-                  <Text className="text-sm text-amber-600 font-semibold">
-                    ⚠️ Please enable location to submit complaints
-                  </Text>
-                )}
+                {/* Fullscreen Expand Button */}
+                <TouchableOpacity
+                  onPress={() => setIsFullScreenMap(true)}
+                  style={{
+                    backgroundColor: "#ECFDF5",
+                    paddingHorizontal: 10,
+                    paddingVertical: 5,
+                    borderRadius: 12,
+                    flexDirection: "row",
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
+                >
+                  <Maximize2 size={13} color="#059669" style={{ marginRight: 4 }} />
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#047857" }}>Full Screen</Text>
+                </TouchableOpacity>
               </View>
+
+              {/* Map Preview */}
+              <TouchableOpacity
+                onPress={() => setIsFullScreenMap(true)}
+                activeOpacity={0.95}
+                style={{ height: 160, borderRadius: 18, overflow: "hidden", position: "relative" }}
+              >
+                <MapView
+                  ref={mapRef}
+                  showsUserLocation={true}
+                  provider={PROVIDER_GOOGLE}
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: userLocation ? userLocation[0] : 23.2599,
+                    longitude: userLocation ? userLocation[1] : 77.4126,
+                    latitudeDelta: 0.015,
+                    longitudeDelta: 0.015,
+                  }}
+                >
+                  {dustbins.map((bin) => (
+                    <Marker
+                      key={bin.id || bin._id}
+                      coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
+                      title={bin.name || "Dustbin"}
+                      description={bin.address || "Public Waste Collection"}
+                    >
+                      <View style={{ backgroundColor: "#059669", padding: 6, borderRadius: 12, borderWidth: 1.5, borderColor: "#FFF" }}>
+                        <Text style={{ fontSize: 12 }}>🗑️</Text>
+                      </View>
+                    </Marker>
+                  ))}
+                  {activeVehiclesnear.map((v) => (
+                    <Marker
+                      key={v.id || v._id}
+                      coordinate={{ latitude: v.latitude, longitude: v.longitude }}
+                      title={v.vehicleNumber || "Truck"}
+                    >
+                      <View style={{ backgroundColor: "#D97706", padding: 6, borderRadius: 12, borderWidth: 1.5, borderColor: "#FFF" }}>
+                        <Text style={{ fontSize: 12 }}>🚛</Text>
+                      </View>
+                    </Marker>
+                  ))}
+                </MapView>
+
+                {/* Recenter Button */}
+                <TouchableOpacity
+                  onPress={centerUserGPS}
+                  style={{
+                    position: "absolute",
+                    bottom: 10,
+                    right: 10,
+                    backgroundColor: "#FFFFFF",
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#000",
+                    shadowOpacity: 0.15,
+                    shadowRadius: 6,
+                    elevation: 4,
+                  }}
+                >
+                  <Crosshair size={18} color="#059669" />
+                </TouchableOpacity>
+              </TouchableOpacity>
             </View>
 
-            {/* Step 2: Interactive Map */}
-            <View className="bg-white rounded-3xl overflow-hidden mb-6">
-              <LinearGradient colors={["#7c3aed", "#8b5cf6"]} className="p-5">
-                <View className="flex-row items-center gap-3">
-                  <View className="w-10 h-10 bg-white rounded-full justify-center items-center">
-                    <Text className="text-lg font-bold text-gray-800">2</Text>
-                  </View>
-                  <View>
-                    <Text className="text-lg font-bold text-white">
-                      Select Dustbin Location
-                    </Text>
-                    <Text className="text-sm text-white/90">
-                      Tap on a dustbin marker to select it
-                    </Text>
-                  </View>
-                </View>
-              </LinearGradient>
+            {/* 4. "Quick Actions" Section */}
+            <View style={{ marginBottom: 18 }}>
+              <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 10 }}>
+                <Zap size={18} color="#059669" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>
+                  Quick Actions
+                </Text>
+              </View>
 
-              <View className="p-6">
-                {/* the extra buttion add */}
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                {/* Snap & Report (Auto-selects nearest bin + launches camera) */}
                 <TouchableOpacity
-                  onPress={findNearestBin}
-                  className="flex-row items-center justify-center bg-purple-100 border border-purple-300 py-3 rounded-xl mb-4 active:bg-purple-200"
+                  onPress={handleStartReportFlow}
+                  activeOpacity={0.85}
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#ECFDF5",
+                    borderRadius: 18,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
                 >
-                  <Text className="text-xl mr-2">🎯</Text>
-                  <Text className="text-purple-700 font-bold text-base">
-                    Auto-Select Nearest Bin
+                  <Camera size={22} color="#059669" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#065F46", marginBottom: 2 }}>
+                    Snap & Report
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#047857", fontWeight: "500", lineHeight: 13 }}>
+                    Take photo and report issue
                   </Text>
                 </TouchableOpacity>
 
-                <View className="h-96 rounded-2xl overflow-hidden border-2 border-gray-200 mb-4">
-                  <MapView
-                    ref={mapRef}
-                    showsMyLocationButton={true}
-                    showsUserLocation={true}
-                    provider={PROVIDER_GOOGLE}
-                    style={{ flex: 1 }}
-                    initialRegion={{
-                      latitude:
-                        dustbins.length > 0 ? dustbins[0].latitude : 23.2599,
-                      longitude:
-                        dustbins.length > 0 ? dustbins[0].longitude : 77.4126,
-                      latitudeDelta: 0.02,
-                      longitudeDelta: 0.02,
-                    }}
-                  >
-                    {/* {userLocation && (
-                      <>
-                        <Circle
-                          center={{
-                            latitude: userLocation[0],
-                            longitude: userLocation[1],
-                          }}
-                          radius={500}
-                          strokeColor="rgba(59, 130, 246, 0.5)"
-                          fillColor="rgba(59, 130, 246, 0.1)"
-                        />
-                        <Marker
-                          coordinate={{
-                            latitude: userLocation[0],
-                            longitude: userLocation[1],
-                          }}
-                          title="You are here"
-                          description={address}
-                        >
-                          <View className="w-8 h-8 justify-center items-center">
-                            <Text className="text-2xl"></Text>
-                          </View>
-                        </Marker>
-                      </>
-                    )} */}
+                {/* Nearby Bins (Opens Full Screen Map + Auto-Finds Nearest) */}
+                <TouchableOpacity
+                  onPress={() => {
+                    setIsFullScreenMap(true);
+                    findNearestBin();
+                  }}
+                  activeOpacity={0.85}
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#EFF6FF",
+                    borderRadius: 18,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: "#BFDBFE",
+                  }}
+                >
+                  <MapPin size={22} color="#2563EB" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#1E40AF", marginBottom: 2 }}>
+                    Nearby Bins
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#1D4ED8", fontWeight: "500", lineHeight: 13 }}>
+                    Find nearest dustbins
+                  </Text>
+                </TouchableOpacity>
 
-                    {dustbins.map((bin) => (
+                {/* Give Feedback */}
+                <TouchableOpacity
+                  onPress={() => setFeedbackModal(true)}
+                  activeOpacity={0.85}
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#FAF5FF",
+                    borderRadius: 18,
+                    padding: 12,
+                    borderWidth: 1,
+                    borderColor: "#E9D5FF",
+                  }}
+                >
+                  <Megaphone size={22} color="#9333EA" style={{ marginBottom: 8 }} />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#6B21A8", marginBottom: 2 }}>
+                    Give Feedback
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#7E22CE", fontWeight: "500", lineHeight: 13 }}>
+                    Share your suggestions
+                  </Text>
+                </TouchableOpacity>
+              </View>
+            </View>
+
+            {/* 5. "Your Impact" Section */}
+            <View style={{ marginBottom: 10 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={{ fontSize: 16, marginRight: 6 }}>🍃</Text>
+                  <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>
+                    Your Impact
+                  </Text>
+                </View>
+
+                <TouchableOpacity onPress={() => setSelectedTab("history")} style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: "#059669", marginRight: 2 }}>
+                    See More
+                  </Text>
+                  <ArrowRight size={13} color="#059669" />
+                </TouchableOpacity>
+              </View>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between" }}>
+                {/* Issues Reported */}
+                <View
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#ECFDF5",
+                    borderRadius: 18,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
+                >
+                  <Text style={{ fontSize: 22, fontWeight: "900", color: "#047857" }}>
+                    {totalComplaints}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#065F46", marginTop: 2, textAlign: "center" }}>
+                    Issues Reported
+                  </Text>
+                </View>
+
+                {/* Resolved */}
+                <View
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#EFF6FF",
+                    borderRadius: 18,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#BFDBFE",
+                  }}
+                >
+                  <Text style={{ fontSize: 22, fontWeight: "900", color: "#1D4ED8" }}>
+                    {resolvedComplaints}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#1E40AF", marginTop: 2, textAlign: "center" }}>
+                    Resolved
+                  </Text>
+                </View>
+
+                {/* Points Earned */}
+                <View
+                  style={{
+                    width: "31%",
+                    backgroundColor: "#F0FDF4",
+                    borderRadius: 18,
+                    paddingVertical: 14,
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#BBF7D0",
+                  }}
+                >
+                  <Text style={{ fontSize: 22, fontWeight: "900", color: "#059669" }}>
+                    {earnedPoints}
+                  </Text>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: "#047857", marginTop: 2, textAlign: "center" }}>
+                    Points Earned
+                  </Text>
+                </View>
+              </View>
+            </View>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* 👤 TAB: PROFILE (SHOWS ALL CITIZEN PROFILE DATA) */}
+        {/* ======================================================== */}
+        {selectedTab === "profile" && (
+          <View>
+            {/* Header Profile Card */}
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 20,
+                alignItems: "center",
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#000",
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                elevation: 3,
+              }}
+            >
+              <View
+                style={{
+                  width: 80,
+                  height: 80,
+                  borderRadius: 40,
+                  backgroundColor: "#ECFDF5",
+                  justifyContent: "center",
+                  alignItems: "center",
+                  borderWidth: 3,
+                  borderColor: "#10B981",
+                  marginBottom: 10,
+                  overflow: "hidden",
+                }}
+              >
+                <Image
+                  source={require("../../assets/logoapp.png")}
+                  style={{ width: "100%", height: "100%" }}
+                  resizeMode="cover"
+                />
+              </View>
+              <Text style={{ fontSize: 20, fontWeight: "900", color: "#0F172A" }}>
+                {userData?.fullName || userData?.name || "Registered Citizen"}
+              </Text>
+              <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, marginTop: 4 }}>
+                <Text style={{ fontSize: 11, fontWeight: "800", color: "#166534" }}>
+                  {scorecard?.citizenLevel || "Active Citizen Member"}
+                </Text>
+              </View>
+            </View>
+
+            {/* Profile Information List */}
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 20,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#000",
+                shadowOpacity: 0.05,
+                shadowRadius: 10,
+                elevation: 3,
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A", marginBottom: 14 }}>
+                Citizen Profile Information
+              </Text>
+
+              {/* Full Name */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                <User size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>FULL NAME</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.fullName || userData?.name || "N/A"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Phone */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                <Phone size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>REGISTERED PHONE</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.phone || userData?.username || "N/A"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Email */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                <Mail size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>EMAIL ADDRESS</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.email || "N/A"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* City Jurisdiction */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                <Building2 size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>MUNICIPAL JURISDICTION</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.cityName || userData?.city || "Registered City Office"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Address */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                <MapPin size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>RESIDENTIAL ADDRESS</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.address || address || "N/A"}
+                  </Text>
+                </View>
+              </View>
+
+              {/* Pincode */}
+              <View style={{ flexDirection: "row", alignItems: "center", paddingVertical: 10 }}>
+                <Navigation size={18} color="#059669" style={{ marginRight: 12 }} />
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>POSTAL PINCODE</Text>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#1E293B", marginTop: 1 }}>
+                    {userData?.pincode || "452001"}
+                  </Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Scorecard Overview */}
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 20,
+                marginBottom: 16,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A", marginBottom: 12 }}>
+                Trust & Reliability Stats
+              </Text>
+
+              <View style={{ flexDirection: "row", justifyContent: "space-between", marginBottom: 10 }}>
+                <View style={{ width: "48%", backgroundColor: "#F0FDF4", padding: 12, borderRadius: 16 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: "#166534" }}>
+                    ⭐️ {scorecard?.trustScore || 100}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#15803D", fontWeight: "700" }}>Trust Score</Text>
+                </View>
+                <View style={{ width: "48%", backgroundColor: "#EFF6FF", padding: 12, borderRadius: 16 }}>
+                  <Text style={{ fontSize: 18, fontWeight: "900", color: "#1E40AF" }}>
+                    ✅ {scorecard?.validComplaints || totalComplaints}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#2563EB", fontWeight: "700" }}>Valid Reports</Text>
+                </View>
+              </View>
+            </View>
+
+            {/* Logout Action Button */}
+            <TouchableOpacity
+              onPress={handleLogout}
+              style={{
+                backgroundColor: "#FEE2E2",
+                borderWidth: 1.5,
+                borderColor: "#FECACA",
+                borderRadius: 18,
+                paddingVertical: 14,
+                flexDirection: "row",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <LogOut size={18} color="#DC2626" style={{ marginRight: 8 }} />
+              <Text style={{ color: "#DC2626", fontSize: 14, fontWeight: "800" }}>
+                Sign Out from Safaimitra
+              </Text>
+            </TouchableOpacity>
+          </View>
+        )}
+
+        {/* ======================================================== */}
+        {/* 📸 TAB: REPORT COMPLAINT */}
+        {/* ======================================================== */}
+        {selectedTab === "report" && (
+          <View>
+            {/* Step 1: Location Status */}
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
+                  1. Incident GPS Location
+                </Text>
+                <TouchableOpacity onPress={getCurrentLocation} style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#166534" }}>Refresh GPS</Text>
+                </TouchableOpacity>
+              </View>
+              <Text style={{ fontSize: 13, color: "#475569", fontWeight: "600" }}>
+                📍 {address}
+              </Text>
+            </View>
+
+            {/* Step 2: Camera Photo Capture */}
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A", marginBottom: 10 }}>
+                2. Waste Photo Capture
+              </Text>
+
+              {image ? (
+                <View style={{ height: 200, borderRadius: 16, overflow: "hidden", marginBottom: 10 }}>
+                  <Image source={{ uri: image }} style={{ width: "100%", height: "100%" }} resizeMode="cover" />
+                </View>
+              ) : (
+                <TouchableOpacity
+                  onPress={handleStartReportFlow}
+                  style={{
+                    backgroundColor: "#ECFDF5",
+                    borderRadius: 18,
+                    paddingVertical: 36,
+                    alignItems: "center",
+                    borderWidth: 2,
+                    borderStyle: "dashed",
+                    borderColor: "#10B981",
+                    marginBottom: 10,
+                  }}
+                >
+                  <Camera size={34} color="#059669" style={{ marginBottom: 6 }} />
+                  <Text style={{ fontSize: 14, fontWeight: "800", color: "#059669" }}>
+                    Tap to Open Camera & Snap Photo
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#047857", marginTop: 2 }}>
+                    Nearest dustbin will be assigned automatically
+                  </Text>
+                </TouchableOpacity>
+              )}
+            </View>
+
+            {/* Step 3: Assigned / Nearest Dustbin */}
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 10 }}>
+                <Text style={{ fontSize: 15, fontWeight: "800", color: "#0F172A" }}>
+                  3. Assigned Dustbin
+                </Text>
+                <TouchableOpacity onPress={findNearestBin} style={{ backgroundColor: "#EFF6FF", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 }}>
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#1D4ED8" }}>Re-Select Nearest</Text>
+                </TouchableOpacity>
+              </View>
+
+              {selectedBin ? (
+                <View style={{ backgroundColor: "#ECFDF5", padding: 12, borderRadius: 14, borderWidth: 1, borderColor: "#A7F3D0", marginBottom: 10 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: "#047857" }}>
+                    ✅ Nearest Dustbin: {selectedBin.name || "Station Bin"}
+                  </Text>
+                  <Text style={{ fontSize: 11, color: "#065F46", marginTop: 2 }}>
+                    📍 {selectedBin.address || `${selectedBin.latitude}, ${selectedBin.longitude}`}
+                  </Text>
+                </View>
+              ) : null}
+
+              <View style={{ height: 160, borderRadius: 16, overflow: "hidden" }}>
+                <MapView
+                  showsUserLocation={true}
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: selectedBin ? selectedBin.latitude : (userLocation ? userLocation[0] : 23.2599),
+                    longitude: selectedBin ? selectedBin.longitude : (userLocation ? userLocation[1] : 77.4126),
+                    latitudeDelta: 0.015,
+                    longitudeDelta: 0.015,
+                  }}
+                >
+                  {dustbins.map((bin) => {
+                    const isSelected = selectedBin && (selectedBin.id === bin.id || selectedBin._id === bin._id);
+                    return (
                       <Marker
-                        key={bin._id}
-                        coordinate={{
-                          latitude: bin.latitude,
-                          longitude: bin.longitude,
-                        }}
-                        onPress={() => handleBinSelect(bin)}
+                        key={bin.id || bin._id}
+                        coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
+                        onPress={() => setSelectedBin(bin)}
                       >
-                        <View
-                          className="w-8 h-8 rounded-full border-2 border-white justify-center items-center"
-                          style={{
-                            backgroundColor:
-                              BIN_STATUS_COLOR[bin.status] || "#9ca3af",
-                          }}
-                        >
-                          <Text className="text-base">🗑️</Text>
+                        <View style={{ backgroundColor: isSelected ? "#DC2626" : "#059669", padding: 6, borderRadius: 12, borderWidth: 2, borderColor: "#FFF" }}>
+                          <Text style={{ fontSize: 12 }}>🗑️</Text>
                         </View>
                       </Marker>
-                    ))}
-                  </MapView>
-                </View>
-
-                {/* Map Legend */}
-                <View className="flex-row justify-center gap-4 flex-wrap mb-4">
-                  {[
-                    {
-                      icon: "📍",
-                      label: "Your Location",
-                      color: "text-blue-600",
-                    },
-                    { icon: "✅", label: "Clean Bin", color: "text-green-600" },
-                    {
-                      icon: "⚠️",
-                      label: "Overflow Bin",
-                      color: "text-red-600",
-                    },
-                    { icon: "⏳", label: "Pending", color: "text-amber-600" },
-                  ].map((item, index) => (
-                    <View key={index} className="flex-row items-center gap-1">
-                      <Text>{item.icon}</Text>
-                      <Text className={`text-xs font-semibold ${item.color}`}>
-                        {item.label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-
-                {!selectedBin && (
-                  <Text className="text-center text-sm text-purple-600 font-semibold">
-                    👆 Click on any dustbin marker to select it for your
-                    complaint
-                  </Text>
-                )}
-              </View>
-            </View>
-
-            {/* Step 3: Photo */}
-            <View
-              className={`bg-white rounded-3xl overflow-hidden mb-6 ${!selectedBin && "opacity-50"}`}
-            >
-              <LinearGradient
-                colors={
-                  !selectedBin ? ["#9ca3af", "#6b7280"] : ["#f59e0b", "#f97316"]
-                }
-                className="p-5 flex-row items-center gap-3"
-              >
-                <View className="w-10 h-10 bg-white rounded-full justify-center items-center">
-                  <Text className="text-lg font-bold text-gray-800">3</Text>
-                </View>
-                <View>
-                  <Text className="text-lg font-bold text-white">
-                    Take a Photo
-                  </Text>
-                  <Text className="text-sm text-white/90">
-                    Click a clear picture of the problem
-                  </Text>
-                </View>
-              </LinearGradient>
-
-              <View className="p-6 relative">
-                {!selectedBin && (
-                  <View className="absolute inset-0 bg-white/60 z-10 justify-center items-center rounded-2xl">
-                    <View className="bg-white p-4 rounded-2xl border-2 border-red-100">
-                      <Text className="text-3xl text-center mb-2">👆</Text>
-                      <Text className="font-bold text-red-500 text-center">
-                        First Select a Dustbin
-                      </Text>
-                      <Text className="text-xs text-gray-500 text-center">
-                        Tap a marker on the map above
-                      </Text>
-                    </View>
-                  </View>
-                )}
-
-                <TouchableOpacity
-                  className="h-60 rounded-2xl border-3 border-dashed border-blue-300 overflow-hidden"
-                  onPress={handleImageUpload}
-                  disabled={!selectedBin}
-                  activeOpacity={0.7}
-                >
-                  {image ? (
-                    <Image
-                      source={{ uri: image }}
-                      className="w-full h-full"
-                      resizeMode="cover"
-                    />
-                  ) : (
-                    <View className="flex-1 justify-center items-center bg-blue-50 p-5">
-                      <View
-                        className={`w-20 h-20 rounded-full justify-center items-center mb-4 ${
-                          !selectedBin ? "bg-gray-300" : "bg-blue-800"
-                        }`}
-                      >
-                        <Text className="text-4xl">📸</Text>
-                      </View>
-                      <Text
-                        className={`text-lg font-bold mb-2 ${
-                          !selectedBin ? "text-gray-400" : "text-gray-800"
-                        }`}
-                      >
-                        {selectedBin
-                          ? "Tap to Upload Photo"
-                          : "Upload Disabled"}
-                      </Text>
-                      <Text className="text-sm text-gray-500 text-center">
-                        {selectedBin
-                          ? "Take a photo of the overflowing bin or dirty area"
-                          : "Select a location to enable camera"}
-                      </Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-
-                {image && (
-                  <TouchableOpacity
-                    className="mt-4 px-6 py-3 bg-gray-100 rounded-xl self-center active:opacity-80"
-                    onPress={handleRetake}
-                  >
-                    <Text className="text-sm font-semibold text-gray-700">
-                      🔄 Take Another Photo
-                    </Text>
-                  </TouchableOpacity>
-                )}
-              </View>
-            </View>
-
-            {/* Step 4: Review & Submit */}
-            <View className="bg-white rounded-3xl overflow-hidden mb-6">
-              <LinearGradient
-                colors={["#10b981", "#059669"]}
-                className="p-5 flex-row items-center gap-3"
-              >
-                <View className="w-10 h-10 bg-white rounded-full justify-center items-center">
-                  <Text className="text-lg font-bold text-gray-800">4</Text>
-                </View>
-                <View>
-                  <Text className="text-lg font-bold text-white">
-                    Review & Submit
-                  </Text>
-                  <Text className="text-sm text-white/90">
-                    AI Verification Status
-                  </Text>
-                </View>
-              </LinearGradient>
-
-              <View className="p-6">
-                {verifying && (
-                  <View className="flex-col items-center justify-center p-4 gap-2">
-                    <ActivityIndicator size="large" color="#2563eb" />
-                    <Text className="text-sm font-bold text-blue-600">
-                      🤖 AI is analyzing photo...
-                    </Text>
-                  </View>
-                )}
-
-                {!verifying &&
-                  aiResult &&
-                  (() => {
-                    // 1. Define configuration for each status
-                    const statusConfig = {
-                      empty: {
-                        container: "bg-green-50 border-green-500",
-                        textColor: "text-green-700",
-                        message: "✅ Bin Looks Clean (Empty)",
-                      },
-                      clean: {
-                        container: "bg-green-50 border-green-500",
-                        textColor: "text-green-700",
-                        message: "✅ Bin Looks Clean",
-                      },
-                      medium: {
-                        container: "bg-yellow-50 border-yellow-500",
-                        textColor: "text-yellow-700",
-                        message: "⚠️ Bin is Half Full (Medium)",
-                      },
-                      full: {
-                        container: "bg-red-50 border-red-500",
-                        textColor: "text-red-700",
-                        message: "🚨 Garbage Overflow (Full)",
-                      },
-                      unknown: {
-                        container: "bg-gray-50 border-gray-500",
-                        textColor: "text-gray-700",
-                        message: "❓ Status Unknown",
-                      },
-                    };
-
-                    // 2. Select the config (default to unknown if status doesn't match)
-                    const config =
-                      statusConfig[aiResult.status] || statusConfig["unknown"];
-
-                    return (
-                      <View
-                        className={`mb-4 p-3 rounded-xl border-l-4 ${config.container}`}
-                      >
-                        <Text className="text-xs font-bold uppercase text-gray-500">
-                          AI Detection Result
-                        </Text>
-
-                        <Text
-                          className={`text-lg font-bold ${config.textColor}`}
-                        >
-                          {config.message}
-                        </Text>
-
-                        <Text className="text-xs text-gray-500">
-                          Confidence: {aiResult.confidence}%
-                        </Text>
-                      </View>
                     );
-                  })()}
-
-                {/* Status Bar */}
-                <View
-                  className={`flex-row items-center gap-4 p-4 rounded-2xl ${
-                    status === "submitted"
-                      ? "bg-green-100"
-                      : status === "ready"
-                        ? "bg-blue-100"
-                        : "bg-gray-100"
-                  }`}
-                >
-                  <View
-                    className={`w-12 h-12 rounded-xl justify-center items-center ${
-                      status === "submitted"
-                        ? "bg-green-500"
-                        : status === "ready"
-                          ? "bg-blue-500"
-                          : "bg-gray-400"
-                    }`}
-                  >
-                    <Text className="text-2xl">
-                      {status === "submitted"
-                        ? "✅"
-                        : status === "ready"
-                          ? "👍"
-                          : "⏳"}
-                    </Text>
-                  </View>
-                  <View className="flex-1">
-                    <Text className="text-xs font-semibold text-gray-600 mb-1">
-                      Current Status
-                    </Text>
-                    <Text
-                      className={`text-base font-bold ${
-                        status === "submitted"
-                          ? "text-green-600"
-                          : status === "ready"
-                            ? "text-blue-600"
-                            : "text-gray-600"
-                      }`}
-                    >
-                      {status === "submitted"
-                        ? "Complaint Registered"
-                        : status === "ready"
-                          ? "Ready to Submit"
-                          : "Waiting for Photo"}
-                    </Text>
-                  </View>
-                </View>
+                  })}
+                </MapView>
               </View>
             </View>
 
-            {/* Tips Card */}
-            <View className="bg-blue-50 rounded-3xl p-6 border-2 border-blue-200 mb-6">
-              <Text className="text-lg font-bold text-blue-800 mb-4">
-                💡 Quick Tips
-              </Text>
-              {[
-                "Enable location to see all nearby dustbins on map",
-                "Select the exact dustbin from the map",
-                "Take a clear photo showing the problem",
-                "Track your complaint status in real-time",
-              ].map((tip, index) => (
-                <View key={index} className="flex-row items-start gap-3 mb-3">
-                  <Text className="text-blue-500 text-xl">•</Text>
-                  <Text className="text-sm text-blue-900 flex-1 leading-relaxed">
-                    {tip}
-                  </Text>
-                </View>
-              ))}
-            </View>
-          </>
+            {/* Submit Button */}
+            <TouchableOpacity
+              onPress={handleSubmit}
+              disabled={isSubmitting || !image || !selectedBin}
+              style={{
+                backgroundColor: !image || !selectedBin || isSubmitting ? "#CBD5E1" : "#059669",
+                borderRadius: 18,
+                paddingVertical: 16,
+                alignItems: "center",
+                justifyContent: "center",
+                shadowColor: "#059669",
+                shadowOffset: { width: 0, height: 6 },
+                shadowOpacity: 0.3,
+                shadowRadius: 10,
+                elevation: 4,
+              }}
+            >
+              {isSubmitting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#FFFFFF" }}>
+                  Submit Complaint to Safaimitra 🚀
+                </Text>
+              )}
+            </TouchableOpacity>
+          </View>
         )}
 
+        {/* ======================================================== */}
+        {/* 🗺️ TAB: TRACK & FLEET MAP */}
+        {/* ======================================================== */}
         {selectedTab === "track" && (
-          <>
-            {/* Complaint History */}
-            <View className="bg-white rounded-3xl overflow-hidden mb-6">
-              <View className="flex-row justify-between items-center p-5 border-b border-gray-100">
-                <Text className="text-xl font-bold text-gray-800">
-                  📜 My Complaints History
+          <View>
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 4 }}>
+                <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A" }}>
+                  Live Collection Vehicles & Bins
                 </Text>
-                <View className="bg-blue-50 px-3 py-1 rounded-full">
-                  <Text className="text-xs font-bold text-blue-600">
-                    {myComplaints.length} Records
-                  </Text>
-                </View>
+                <TouchableOpacity
+                  onPress={() => setIsFullScreenMap(true)}
+                  style={{ backgroundColor: "#ECFDF5", paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, flexDirection: "row", alignItems: "center" }}
+                >
+                  <Maximize2 size={12} color="#059669" style={{ marginRight: 3 }} />
+                  <Text style={{ fontSize: 10, fontWeight: "800", color: "#047857" }}>Full Screen</Text>
+                </TouchableOpacity>
               </View>
-
-              <ScrollView className="max-h-[500px] p-5" nestedScrollEnabled>
-                {myComplaints.length === 0 ? (
-                  <View className="items-center py-10">
-                    <Text className="text-6xl mb-2">📭</Text>
-                    <Text className="text-gray-500 font-medium">
-                      No complaints registered yet.
-                    </Text>
-                    <Text className="text-xs text-gray-400">
-                      Your reports will appear here.
-                    </Text>
-                  </View>
-                ) : (
-                  myComplaints.map((complaint, index) => (
-                    <TouchableOpacity
-                      key={complaint._id || index}
-                      onPress={() => {
-                        setSelectedComplaintDetail(complaint);
-                        setShowDetailModal(true);
-                      }}
-                      className="flex-row gap-4 p-4 rounded-2xl border border-gray-100 bg-gray-50 mb-4 active:opacity-90"
-                    >
-                      <View className="w-20 h-20 rounded-xl overflow-hidden bg-gray-200 border border-gray-200 relative">
-                        {complaint.ComimageUrl ? (
-                          <Image
-                            source={{ uri: complaint.ComimageUrl }}
-                            className="w-full h-full"
-                            resizeMode="cover"
-                          />
-                        ) : (
-                          <View className="w-full h-full justify-center items-center">
-                            <Text className="text-2xl">🗑️</Text>
-                          </View>
-                        )}
-                        <View className="absolute bottom-0 left-0 right-0 bg-black/60 py-1 justify-center">
-                          <Text
-                            className="text-[10px] font-bold uppercase text-center"
-                            style={{ color: getStatusColor(complaint.status) }}
-                          >
-                            {complaint.status}
-                          </Text>
-                        </View>
-                      </View>
-
-                      <View className="flex-1 justify-between">
-                        <View>
-                          <View className="flex-row justify-between items-start">
-                            <Text
-                              className="font-bold text-gray-800 text-sm flex-1"
-                              numberOfLines={1}
-                            >
-                              {typeof complaint.dustbinId === "object"
-                                ? complaint.dustbinId?.name ||
-                                  "Location Unavailable"
-                                : "Location Unavailable"}
-                            </Text>
-                            <Text className="text-[10px] text-gray-500 bg-white px-2 py-0.5 rounded border border-gray-200">
-                              {new Date(
-                                complaint.createdAt || Date.now(),
-                              ).toLocaleDateString("en-IN", {
-                                day: "2-digit",
-                                month: "short",
-                              })}
-                            </Text>
-                          </View>
-                          <Text
-                            className="text-xs text-gray-500 mt-1"
-                            numberOfLines={1}
-                          >
-                            {typeof complaint.dustbinId === "object"
-                              ? complaint.dustbinId?.area ||
-                                "Area not available"
-                              : complaint.area || "Area not available"}
-                          </Text>
-                        </View>
-
-                        <View className="flex-row items-center justify-between mt-3">
-                          <View
-                            className={`px-2 py-1 rounded border ${
-                              complaint.status === "resolved"
-                                ? "bg-green-50 border-green-200"
-                                : complaint.status === "assigned" ||
-                                    complaint.status === "in-progress"
-                                  ? "bg-blue-50 border-blue-200"
-                                  : "bg-amber-50 border-amber-200"
-                            }`}
-                          >
-                            <Text
-                              className={`text-[10px] font-bold ${
-                                complaint.status === "resolved"
-                                  ? "text-green-700"
-                                  : complaint.status === "assigned" ||
-                                      complaint.status === "in-progress"
-                                    ? "text-blue-700"
-                                    : "text-amber-700"
-                              }`}
-                            >
-                              {complaint.status === "resolved"
-                                ? "✅ Cleaned"
-                                : complaint.status === "assigned" ||
-                                    complaint.status === "in-progress"
-                                  ? "🚛 On Way"
-                                  : "⏳ Pending"}
-                            </Text>
-                          </View>
-
-                          <View className="flex-row items-center gap-2">
-                            {complaint.status !== "resolved" && complaint.nextEscalationAt && (
-                              <View className="bg-amber-50 border border-amber-200 px-2 py-1 rounded-lg">
-                                <Text className="text-[10px] text-amber-700 font-bold">
-                                  ⏱️ {(() => {
-                                    const diff = new Date(complaint.nextEscalationAt) - new Date();
-                                    if (diff <= 0) return "Escalating...";
-                                    const hours = Math.floor(diff / (1000 * 60 * 60));
-                                    const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                                    return `${hours}h ${mins}m`;
-                                  })()}
-                                </Text>
-                              </View>
-                            )}
-                            {complaint.vehicle &&
-                              complaint.vehicle !== "Not Assigned" && (
-                                <View className="flex-row items-center gap-1 bg-gray-200 px-2 py-1 rounded-lg">
-                                  <Text className="text-[10px]">🚛</Text>
-                                  <Text className="text-[10px] font-semibold text-gray-600">
-                                    {complaint.vehicle}
-                                  </Text>
-                                </View>
-                              )}
-                          </View>
-                        </View>
-                      </View>
-                    </TouchableOpacity>
-                  ))
-                )}
-              </ScrollView>
-            </View>
-
-            {/* Today's Stats */}
-            {locationPermission === "granted" && (
-              <LinearGradient
-                colors={["#3b82f6", "#2563eb"]}
-                className="rounded-3xl p-6 mb-6"
-              >
-                <Text className="text-xl font-bold text-white mb-5">
-                  📊 Today's Status in Your Area
-                </Text>
-                <View className="flex-row gap-4">
-                  {[
-                    {
-                      icon: "✅",
-                      number: areaStats.cleanedToday,
-                      label: "Cleaned Today",
-                    },
-                    {
-                      icon: "🚛",
-                      number: areaStats.activeVehicles,
-                      label: "Vehicles Active",
-                    },
-                    {
-                      icon: "⚠️",
-                      number: areaStats.pendingBins,
-                      label: "Pending",
-                    },
-                  ].map((stat, index) => (
-                    <View
-                      key={index}
-                      className="flex-1 bg-white/20 rounded-2xl p-4 items-center"
-                    >
-                      <Text className="text-3xl mb-2">{stat.icon}</Text>
-                      <Text className="text-2xl font-bold text-white mb-1">
-                        {stat.number}
-                      </Text>
-                      <Text className="text-xs font-semibold text-white/90 text-center">
-                        {stat.label}
-                      </Text>
-                    </View>
-                  ))}
-                </View>
-              </LinearGradient>
-            )}
-
-            {/* Active Vehicles */}
-            {locationPermission === "granted" &&
-              activeVehiclesnear.length > 0 && (
-                <View className="bg-white rounded-3xl p-6 mb-6">
-                  <Text className="text-xl font-bold text-gray-800 mb-4">
-                    🚛 Active Vehicles & Routes
-                  </Text>
-                  {activeVehiclesnear.map((vehicle) => (
-                    <View
-                      key={vehicle.id}
-                      className="bg-blue-50 rounded-2xl p-5 border-2 border-blue-200 mb-4"
-                    >
-                      <View className="flex-row items-start gap-4 mb-4">
-                        <View className="w-14 h-14 bg-blue-500 rounded-xl justify-center items-center">
-                          <Text className="text-2xl">🚛</Text>
-                        </View>
-
-                        <View className="flex-1">
-                          <View className="flex-row items-center justify-between mb-2">
-                            <Text className="font-bold text-gray-800 text-lg">
-                              {vehicle.number}
-                            </Text>
-                            <View className="flex-row items-center gap-2 bg-green-100 px-3 py-1 rounded-lg">
-                              <View className="w-2 h-2 bg-green-500 rounded-full" />
-                              <Text className="text-xs font-bold text-green-700">
-                                ACTIVE
-                              </Text>
-                            </View>
-                          </View>
-
-                          <View className="gap-2">
-                            <View className="flex-row items-center gap-2">
-                              <Text className="text-sm font-semibold text-gray-600">
-                                Route:
-                              </Text>
-                              <Text className="text-sm text-gray-800">
-                                {vehicle.route}
-                              </Text>
-                            </View>
-                            <View className="flex-row items-center gap-2">
-                              <Text className="text-sm font-semibold text-gray-600">
-                                Current:
-                              </Text>
-                              <Text className="text-sm font-bold text-blue-600">
-                                {vehicle.currentStop}
-                              </Text>
-                            </View>
-                            <View className="flex-row items-center justify-between">
-                              <View className="flex-row items-center gap-2">
-                                <Text className="text-sm font-semibold text-gray-600">
-                                  Progress:
-                                </Text>
-                                <Text className="text-sm text-gray-800">
-                                  {vehicle.stopsCompleted}/{vehicle.totalStops}{" "}
-                                  stops
-                                </Text>
-                              </View>
-                              <Text className="text-sm font-bold text-green-600">
-                                {vehicle.eta}
-                              </Text>
-                            </View>
-
-                            <View className="w-full bg-gray-200 rounded-full h-2 mt-2">
-                              <View
-                                className="bg-blue-600 h-2 rounded-full"
-                                style={{
-                                  width: `${(vehicle.stopsCompleted / vehicle.totalStops) * 100}%`,
-                                }}
-                              />
-                            </View>
-                          </View>
-                        </View>
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
-            {/* Transparency Card */}
-            <View className="bg-green-50 rounded-3xl p-6 border-2 border-green-200 items-center">
-              <Text className="text-5xl mb-3">👁️</Text>
-              <Text className="text-xl font-bold text-green-700 mb-2">
-                Full Transparency
+              <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 12 }}>
+                Real-time tracking of sanitation trucks in your area
               </Text>
-              <Text className="text-sm text-green-800 text-center leading-relaxed">
-                All collection activities are verified with photos and GPS. You
-                can see exactly when and where cleaning happened in your area.
-              </Text>
+
+              <View style={{ height: 280, borderRadius: 18, overflow: "hidden" }}>
+                <MapView
+                  showsUserLocation={true}
+                  style={{ flex: 1 }}
+                  initialRegion={{
+                    latitude: userLocation ? userLocation[0] : 23.2599,
+                    longitude: userLocation ? userLocation[1] : 77.4126,
+                    latitudeDelta: 0.025,
+                    longitudeDelta: 0.025,
+                  }}
+                >
+                  {dustbins.map((bin) => (
+                    <Marker
+                      key={bin.id || bin._id}
+                      coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
+                      title={bin.name}
+                    >
+                      <View style={{ backgroundColor: "#059669", padding: 5, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 11 }}>🗑️</Text>
+                      </View>
+                    </Marker>
+                  ))}
+                  {activeVehiclesnear.map((v) => (
+                    <Marker
+                      key={v.id || v._id}
+                      coordinate={{ latitude: v.latitude, longitude: v.longitude }}
+                      title={v.vehicleNumber}
+                    >
+                      <View style={{ backgroundColor: "#D97706", padding: 6, borderRadius: 12 }}>
+                        <Text style={{ fontSize: 13 }}>🚛</Text>
+                      </View>
+                    </Marker>
+                  ))}
+                </MapView>
+              </View>
             </View>
-          </>
+          </View>
         )}
 
+        {/* ======================================================== */}
+        {/* 🏆 TAB: LEADERBOARDS */}
+        {/* ======================================================== */}
         {selectedTab === "leaderboard" && (
-          <View className="space-y-4">
-            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-              <Text className="text-xl font-bold text-gray-800 mb-1">🏆 Community Leaderboard</Text>
-              <Text className="text-xs text-gray-500">See who is contributing the most to clean the city!</Text>
-            </View>
+          <View>
+            <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 18, marginBottom: 16, borderWidth: 1, borderColor: "#E2E8F0" }}>
+              <Text style={{ fontSize: 17, fontWeight: "900", color: "#0F172A", marginBottom: 4 }}>
+                🏆 Community Leaderboard
+              </Text>
+              <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 14 }}>
+                Top citizens driving clean city initiatives
+              </Text>
 
-            {/* City Leaderboard */}
-            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-              <Text className="text-base font-bold text-blue-700 mb-3">🏙️ City Top Contributors</Text>
               {cityLeaderboard.length === 0 ? (
-                <Text className="text-sm text-gray-400 text-center py-4">No data available</Text>
+                <Text style={{ color: "#94A3B8", textAlign: "center", paddingVertical: 20 }}>No rankings available yet</Text>
               ) : (
-                cityLeaderboard.map((user, idx) => (
-                  <View key={user._id} className="flex-row items-center justify-between py-3 border-b border-gray-100">
-                    <View className="flex-row items-center gap-3">
-                      <Text className="font-bold text-gray-500 w-6">#{idx + 1}</Text>
+                cityLeaderboard.map((u, i) => (
+                  <View key={u._id || i} style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingVertical: 10, borderBottomWidth: 1, borderBottomColor: "#F1F5F9" }}>
+                    <View style={{ flexDirection: "row", alignItems: "center" }}>
+                      <Text style={{ fontSize: 14, fontWeight: "900", color: i === 0 ? "#D97706" : "#64748B", width: 28 }}>
+                        #{i + 1}
+                      </Text>
                       <View>
-                        <Text className="font-bold text-gray-800">{user.fullName}</Text>
-                        <Text className="text-[10px] text-gray-400">{user.citizenLevel || "Beginner Citizen"}</Text>
+                        <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A" }}>{u.fullName || "Citizen"}</Text>
+                        <Text style={{ fontSize: 11, color: "#64748B" }}>{u.citizenLevel || "Citizen Contributor"}</Text>
                       </View>
                     </View>
-                    <View className="items-end">
-                      <Text className="font-bold text-blue-600">⭐️ {user.trustScore}</Text>
-                      <Text className="text-[10px] text-green-600">✅ {user.validComplaints} valid</Text>
-                    </View>
-                  </View>
-                ))
-              )}
-            </View>
-
-            {/* Area Leaderboard */}
-            <View className="bg-white rounded-3xl p-5 shadow-sm">
-              <Text className="text-base font-bold text-blue-700 mb-3">📍 Local Area Contributors</Text>
-              {areaLeaderboard.length === 0 ? (
-                <Text className="text-sm text-gray-400 text-center py-4">No local contributors yet</Text>
-              ) : (
-                areaLeaderboard.map((user, idx) => (
-                  <View key={user._id} className="flex-row items-center justify-between py-3 border-b border-gray-100">
-                    <View className="flex-row items-center gap-3">
-                      <Text className="font-bold text-gray-500 w-6">#{idx + 1}</Text>
-                      <View>
-                        <Text className="font-bold text-gray-800">{user.fullName}</Text>
-                        <Text className="text-[10px] text-gray-400">{user.citizenLevel || "Beginner Citizen"}</Text>
-                      </View>
-                    </View>
-                    <View className="items-end">
-                      <Text className="font-bold text-blue-600">⭐️ {user.trustScore}</Text>
-                      <Text className="text-[10px] text-green-600">✅ {user.validComplaints} valid</Text>
-                    </View>
+                    <Text style={{ fontSize: 14, fontWeight: "900", color: "#059669" }}>
+                      ⭐️ {u.trustScore || 100} pts
+                    </Text>
                   </View>
                 ))
               )}
@@ -1759,464 +1679,606 @@ export default function CitizenScreen({ navigation, goBack }) {
           </View>
         )}
 
-        {selectedTab === "profile" && (
-          <View className="space-y-4">
-            {/* Suspended Warning & Appeal Form */}
-            {scorecard?.isSuspended && (
-              <View className="bg-red-50 rounded-3xl p-5 border border-red-200 mb-4">
-                <Text className="text-lg font-bold text-red-700 mb-2">🚨 Account Suspended</Text>
-                <Text className="text-sm text-red-900 mb-2 font-medium">
-                  Your account is suspended due to consecutive false complaints.
-                </Text>
-                <Text className="text-xs text-red-700 bg-red-100/50 p-3 rounded-xl mb-4 italic text-left">
-                  Reason: "{scorecard.suspensionReason}"
-                </Text>
+        {/* ======================================================== */}
+        {/* 📑 TAB: REPORTS & HISTORY */}
+        {/* ======================================================== */}
+        {selectedTab === "history" && (
+          <View>
+            {/* Event Dustbin Requests Section */}
+            <View style={{ marginBottom: 24 }}>
+              <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <PartyPopper size={18} color="#059669" style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 16, fontWeight: "900", color: "#0F172A" }}>
+                    Event Dustbin Requests ({myEventRequests.length})
+                  </Text>
+                </View>
+                <TouchableOpacity
+                  onPress={() => setShowEventModal(true)}
+                  style={{ backgroundColor: "#ECFDF5", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 10 }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "900", color: "#059669" }}>+ New Event</Text>
+                </TouchableOpacity>
+              </View>
 
-                {/* Appeal Form */}
-                <Text className="text-xs font-black text-gray-700 uppercase mb-2 text-left">Submit Appeal</Text>
-                <View className="space-y-3">
-                  <View className="bg-white rounded-xl p-3 border border-gray-200">
-                    <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1 text-left">Explanation / Appeal Reason *</Text>
-                    <TextInput
-                      placeholder="Explain why your account should be unsuspended..."
-                      multiline
-                      numberOfLines={3}
-                      value={appealReason}
-                      onChangeText={setAppealReason}
-                      className="text-sm text-gray-800 outline-none p-1 bg-gray-50/50 rounded-lg min-h-[60px] text-left"
-                    />
-                  </View>
-                  
-                  <View className="bg-white rounded-xl p-3 border border-gray-200 mt-2">
-                    <Text className="text-[10px] font-bold text-gray-400 uppercase mb-1 text-left">Evidence URL / Image Reference (Optional)</Text>
-                    <TextInput
-                      placeholder="e.g. http://imgur.com/image.jpg"
-                      value={appealEvidenceUrl}
-                      onChangeText={setAppealEvidenceUrl}
-                      className="text-sm text-gray-800 outline-none p-1 bg-gray-50/50 rounded-lg text-left"
-                    />
-                  </View>
-
+              {myEventRequests.length === 0 ? (
+                <View style={{ backgroundColor: "#FFFFFF", borderRadius: 20, padding: 18, alignItems: "center", borderWidth: 1, borderColor: "#E2E8F0" }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#64748B" }}>
+                    No event dustbin requests submitted yet.
+                  </Text>
                   <TouchableOpacity
-                    onPress={handleSubmitAppeal}
-                    disabled={appealSubmitting || !appealReason}
-                    className={`py-3.5 rounded-xl flex-row justify-center items-center mt-2 ${
-                      appealSubmitting || !appealReason ? "bg-gray-300" : "bg-blue-600 active:opacity-80"
-                    }`}
+                    onPress={() => setShowEventModal(true)}
+                    style={{ marginTop: 8, backgroundColor: "#059669", paddingHorizontal: 14, paddingVertical: 6, borderRadius: 10 }}
                   >
-                    <Text className="text-white font-bold text-sm">
-                      {appealSubmitting ? "Submitting Appeal..." : "Submit Appeal ✅"}
-                    </Text>
+                    <Text style={{ color: "#FFF", fontWeight: "800", fontSize: 11 }}>Request Dustbins for Event</Text>
                   </TouchableOpacity>
                 </View>
-              </View>
-            )}
-
-            {/* Scorecard Header */}
-            <View className="bg-white rounded-3xl p-6 shadow-sm items-center mb-4">
-              <View className="w-20 h-20 bg-blue-100 rounded-full flex justify-center items-center mb-3">
-                <Text className="text-4xl">👤</Text>
-              </View>
-              <Text className="text-xl font-bold text-gray-800">{scorecard?.citizenLevel || "Beginner Citizen"}</Text>
-              <Text className="text-xs text-gray-500 mt-1">Trust Score Level</Text>
-            </View>
-
-            {/* Stats Grid */}
-            <View className="flex-row flex-wrap justify-between mb-4">
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-blue-600">⭐️ {scorecard?.trustScore || 0}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">Trust Points</Text>
-              </View>
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-green-600">✅ {scorecard?.validComplaints || 0}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">Valid Complaints</Text>
-              </View>
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-red-500">❌ {scorecard?.falseComplaints || 0}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">False Complaints</Text>
-              </View>
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-purple-600">{scorecard?.successRate || "100%"}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">Accuracy Rate</Text>
-              </View>
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-amber-500">{scorecard?.areaRank || "#N/A"}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">Local Area Rank</Text>
-              </View>
-              <View className="bg-white rounded-2xl p-4 shadow-sm items-center w-[48%] mb-3">
-                <Text className="text-xl font-black text-amber-600">{scorecard?.cityRank || "#N/A"}</Text>
-                <Text className="text-[10px] text-gray-400 mt-1">City Rank</Text>
-              </View>
-            </View>
-
-            {/* Badges Section */}
-            <View className="bg-white rounded-3xl p-5 shadow-sm mb-4">
-              <Text className="text-base font-bold text-gray-800 mb-3 text-left">🏅 Earned Badges & Recognition</Text>
-              {scorecard?.badges && scorecard.badges.length > 0 ? (
-                <View className="flex-row flex-wrap gap-2">
-                  {scorecard.badges.map((badge, idx) => (
-                    <View key={idx} className="bg-blue-50 px-3 py-1.5 rounded-full border border-blue-200 flex-row items-center gap-1.5">
-                      <Text className="text-xs">🎖️</Text>
-                      <Text className="text-xs font-bold text-blue-700">{badge}</Text>
-                    </View>
-                  ))}
-                </View>
               ) : (
-                <Text className="text-sm text-gray-400 italic text-left">Submit genuine complaints to earn badges!</Text>
+                myEventRequests.map((ev) => (
+                  <View
+                    key={ev._id}
+                    style={{
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 20,
+                      padding: 16,
+                      marginBottom: 12,
+                      borderWidth: 1,
+                      borderColor: "#E2E8F0",
+                    }}
+                  >
+                    <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start", marginBottom: 6 }}>
+                      <View style={{ flex: 1, paddingRight: 8 }}>
+                        <Text style={{ fontSize: 14, fontWeight: "900", color: "#0F172A" }}>
+                          {ev.event?.name} ({ev.event?.type})
+                        </Text>
+                        <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                          📅 {ev.event?.date} • {ev.event?.expectedGuests} Guests
+                        </Text>
+                      </View>
+                      <View
+                        style={{
+                          backgroundColor:
+                            ev.status === "APPROVED" || ev.status === "ALLOCATED"
+                              ? "#DCFCE7"
+                              : ev.status === "REJECTED"
+                              ? "#FEE2E2"
+                              : "#FEF3C7",
+                          paddingHorizontal: 8,
+                          paddingVertical: 3,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 10,
+                            fontWeight: "900",
+                            color:
+                              ev.status === "APPROVED" || ev.status === "ALLOCATED"
+                                ? "#166534"
+                                : ev.status === "REJECTED"
+                                ? "#991B1B"
+                                : "#B45309",
+                          }}
+                        >
+                          {ev.status?.replace(/_/g, " ")}
+                        </Text>
+                      </View>
+                    </View>
+
+                    <View style={{ backgroundColor: "#F8FAFC", padding: 10, borderRadius: 12, marginTop: 6, flexDirection: "row", justifyContent: "space-between", alignItems: "center" }}>
+                      <Text style={{ fontSize: 11, fontWeight: "800", color: "#334155" }}>
+                        ID: {ev.requestId}
+                      </Text>
+                      <Text style={{ fontSize: 11, fontWeight: "900", color: "#059669" }}>
+                        🗑️ {ev.adminDecision?.approvedBins?.total || ev.aiAnalysis?.recommendedBins?.total || 3} Bins Quota
+                      </Text>
+                    </View>
+                  </View>
+                ))
               )}
             </View>
-            
-            {/* Strike System Panel */}
-            <View className="bg-white rounded-3xl p-5 shadow-sm border border-amber-100">
-              <Text className="text-base font-bold text-gray-800 mb-1 text-left">⚠️ False Complaint Strikes</Text>
-              <Text className="text-xs text-gray-500 mb-3 text-left">Consecutive false reporting leads to account suspension.</Text>
-              <View className="flex-row items-center gap-3">
-                {[1, 2, 3].map((s) => {
-                  const active = scorecard?.strikeCount >= s;
-                  return (
-                    <View key={s} className={`flex-1 py-3 rounded-xl border flex justify-center items-center ${
-                      active ? "bg-red-50 border-red-200" : "bg-gray-50 border-gray-200"
-                    }`}>
-                      <Text className={`font-black text-xs ${active ? "text-red-700" : "text-gray-400"}`}>Strike {s}</Text>
-                    </View>
-                  );
-                })}
+
+            {/* Complaints History Section */}
+            <Text style={{ fontSize: 16, fontWeight: "900", color: "#0F172A", marginBottom: 12 }}>
+              My Grievance Complaints ({myComplaints.length})
+            </Text>
+
+            {myComplaints.length === 0 ? (
+              <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 30, alignItems: "center" }}>
+                <Text style={{ fontSize: 32, marginBottom: 8 }}>📑</Text>
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#64748B" }}>No complaints reported yet.</Text>
+                <TouchableOpacity onPress={handleStartReportFlow} style={{ marginTop: 12, backgroundColor: "#059669", paddingHorizontal: 16, paddingVertical: 8, borderRadius: 12 }}>
+                  <Text style={{ color: "#FFF", fontWeight: "800", fontSize: 12 }}>Report New Issue</Text>
+                </TouchableOpacity>
               </View>
-            </View>
+            ) : (
+              myComplaints.map((item) => (
+                <TouchableOpacity
+                  key={item._id}
+                  onPress={() => {
+                    setSelectedComplaintDetail(item);
+                    setShowDetailModal(true);
+                  }}
+                  activeOpacity={0.85}
+                  style={{
+                    backgroundColor: "#FFFFFF",
+                    borderRadius: 20,
+                    padding: 16,
+                    marginBottom: 12,
+                    borderWidth: 1,
+                    borderColor: "#E2E8F0",
+                    flexDirection: "row",
+                    alignItems: "center",
+                  }}
+                >
+                  <View style={{ width: 44, height: 44, borderRadius: 12, backgroundColor: item.status === "resolved" ? "#DCFCE7" : "#FEF3C7", justifyContent: "center", alignItems: "center", marginRight: 12 }}>
+                    <Text style={{ fontSize: 18 }}>{item.status === "resolved" ? "✅" : "⏳"}</Text>
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={{ fontSize: 14, fontWeight: "800", color: "#0F172A" }}>
+                      Complaint #{item._id.toString().slice(-6).toUpperCase()}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }} numberOfLines={1}>
+                      {item.address || "Location logged"}
+                    </Text>
+                  </View>
+                  <View style={{ backgroundColor: item.status === "resolved" ? "#DCFCE7" : "#FEF3C7", paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: item.status === "resolved" ? "#166534" : "#B45309" }}>
+                      {item.status?.toUpperCase()}
+                    </Text>
+                  </View>
+                </TouchableOpacity>
+              ))
+            )}
           </View>
         )}
       </ScrollView>
 
-      {/* ==================== BOTTOM SUBMIT BUTTON ==================== */}
-      {selectedTab === "report" && (
-        <View className="absolute bottom-0 left-0 right-0 bg-white border-t border-gray-200 p-5 z-40">
+      {/* ==================== 3. FLOATING CURVED BOTTOM NAVIGATION ==================== */}
+      <View
+        style={{
+          position: "absolute",
+          bottom: 0,
+          left: 0,
+          right: 0,
+          backgroundColor: "#FFFFFF",
+          borderTopLeftRadius: 28,
+          borderTopRightRadius: 28,
+          borderWidth: 1,
+          borderColor: "#E2E8F0",
+          shadowColor: "#000",
+          shadowOffset: { width: 0, height: -4 },
+          shadowOpacity: 0.08,
+          shadowRadius: 16,
+          elevation: 10,
+          paddingHorizontal: 16,
+          paddingVertical: 10,
+          paddingBottom: Platform.OS === "ios" ? 28 : 10,
+          flexDirection: "row",
+          justifyContent: "space-between",
+          alignItems: "center",
+        }}
+      >
+        {/* Home */}
+        <TouchableOpacity
+          onPress={() => setSelectedTab("home")}
+          style={{ alignItems: "center", width: "18%" }}
+        >
+          <Home size={22} color={selectedTab === "home" ? "#059669" : "#94A3B8"} />
+          <Text style={{ fontSize: 10, fontWeight: "800", color: selectedTab === "home" ? "#059669" : "#94A3B8", marginTop: 2 }}>
+            Home
+          </Text>
+        </TouchableOpacity>
+
+        {/* Reports / History */}
+        <TouchableOpacity
+          onPress={() => setSelectedTab("history")}
+          style={{ alignItems: "center", width: "18%" }}
+        >
+          <FileText size={22} color={selectedTab === "history" ? "#059669" : "#94A3B8"} />
+          <Text style={{ fontSize: 10, fontWeight: "800", color: selectedTab === "history" ? "#059669" : "#94A3B8", marginTop: 2 }}>
+            Reports
+          </Text>
+        </TouchableOpacity>
+
+        {/* Center Floating Plus Action (Auto-selects nearest bin + launches camera) */}
+        <View style={{ width: "20%", alignItems: "center" }}>
           <TouchableOpacity
-            className={`w-full py-4 rounded-xl flex-row items-center justify-center gap-2 ${
-              !image ||
-              !selectedBin ||
-              status === "submitted" ||
-              verifying ||
-              isSubmitting
-                ? "bg-gray-200"
-                : "bg-green-500 active:opacity-80"
-            }`}
-            onPress={handleSubmit}
-            disabled={
-              !image ||
-              !selectedBin ||
-              status === "submitted" ||
-              verifying ||
-              isSubmitting
-            }
+            onPress={handleStartReportFlow}
+            activeOpacity={0.88}
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 27,
+              backgroundColor: "#059669",
+              justifyContent: "center",
+              alignItems: "center",
+              marginTop: -28,
+              shadowColor: "#059669",
+              shadowOffset: { width: 0, height: 6 },
+              shadowOpacity: 0.35,
+              shadowRadius: 10,
+              elevation: 8,
+              borderWidth: 3,
+              borderColor: "#FFFFFF",
+            }}
           >
-            {/* Dynamic Button Text */}
-            <Text
-              className={`text-base font-bold ${
-                !image ||
-                !selectedBin ||
-                status === "submitted" ||
-                verifying ||
-                isSubmitting
-                  ? "text-gray-400"
-                  : "text-white"
-              }`}
-            >
-              {status === "submitted"
-                ? "✅ Submitted Successfully"
-                : verifying || isSubmitting
-                  ? "Processing..."
-                  : !selectedBin
-                    ? "🗑️ Select Dustbin from Map"
-                    : !image
-                      ? "📸 Take Photo to Continue"
-                      : "Submit Your Complaint"}
-            </Text>
+            <Plus size={28} color="#FFFFFF" strokeWidth={3} />
           </TouchableOpacity>
         </View>
-      )}
 
-      {/* ==================== RESOLVED MODAL ==================== */}
-      <Modal visible={!!resolvedModal} animationType="fade" transparent>
-        <View className="flex-1 justify-center items-center p-4 bg-black/80">
-          <BlurView
-            intensity={90}
-            className="bg-white rounded-[2rem] w-full max-w-sm overflow-hidden"
+        {/* Track / Full Map */}
+        <TouchableOpacity
+          onPress={() => setIsFullScreenMap(true)}
+          style={{ alignItems: "center", width: "18%" }}
+        >
+          <Compass size={22} color={isFullScreenMap ? "#059669" : "#94A3B8"} />
+          <Text style={{ fontSize: 10, fontWeight: "800", color: isFullScreenMap ? "#059669" : "#94A3B8", marginTop: 2 }}>
+            City Map
+          </Text>
+        </TouchableOpacity>
+
+        {/* Profile */}
+        <TouchableOpacity
+          onPress={() => setSelectedTab("profile")}
+          style={{ alignItems: "center", width: "18%" }}
+        >
+          <User size={22} color={selectedTab === "profile" ? "#059669" : "#94A3B8"} />
+          <Text style={{ fontSize: 10, fontWeight: "800", color: selectedTab === "profile" ? "#059669" : "#94A3B8", marginTop: 2 }}>
+            Profile
+          </Text>
+        </TouchableOpacity>
+      </View>
+
+      {/* ======================================================== */}
+      {/* 🌟 4. FULL SCREEN CITY MAP MODAL WITH INTERACTIVE FILTERS */}
+      {/* ======================================================== */}
+      <Modal visible={isFullScreenMap} animationType="slide" transparent={false}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+          {/* Top Fullscreen Map Navigation Bar */}
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              paddingHorizontal: 16,
+              paddingVertical: 12,
+              flexDirection: "row",
+              alignItems: "center",
+              justifyContent: "space-between",
+              borderBottomWidth: 1,
+              borderBottomColor: "#E2E8F0",
+              shadowColor: "#000",
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 4,
+            }}
           >
-            <LinearGradient
-              colors={["#10b981", "#059669"]}
-              className="p-6 items-center relative overflow-hidden"
+            <TouchableOpacity
+              onPress={() => setIsFullScreenMap(false)}
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F1F5F9",
+                paddingHorizontal: 12,
+                paddingVertical: 8,
+                borderRadius: 14,
+              }}
             >
-              <View className="w-20 h-20 bg-white rounded-full justify-center items-center mb-2">
-                <Text className="text-4xl">🎉</Text>
-              </View>
-              <Text className="text-2xl font-black text-white tracking-tight">
-                Job Done!
-              </Text>
-              <Text className="text-green-100 font-medium text-sm">
-                Your complaint has been resolved.
-              </Text>
-            </LinearGradient>
+              <Minimize2 size={16} color="#334155" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 13, fontWeight: "800", color: "#334155" }}>Exit Fullscreen</Text>
+            </TouchableOpacity>
 
-            <View className="p-6">
-              <Text className="text-gray-600 text-center mb-5 font-medium leading-relaxed">
-                {resolvedModal?.message ||
-                  "Thank you for helping us keep the city clean!"}
+            <View style={{ alignItems: "center" }}>
+              <Text style={{ fontSize: 16, fontWeight: "900", color: "#0F172A" }}>
+                {userData?.cityName || userData?.city || "Municipal"} Smart Map
               </Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#059669" }}>
+                Live City Infrastructure
+              </Text>
+            </View>
 
-              {resolvedModal?.imageUrl ? (
-                <View className="mb-6">
-                  <Text className="text-xs text-gray-400 font-bold uppercase tracking-wider mb-2 text-center">
-                    Proof of Cleaning
-                  </Text>
-                  <View className="rounded-2xl overflow-hidden border-4 border-green-100 h-48 bg-gray-50 relative">
-                    <Image
-                      source={{ uri: resolvedModal.imageUrl }}
-                      className="w-full h-full"
-                      resizeMode="cover"
-                    />
-                    <View className="absolute bottom-2 right-2 bg-black/60 px-2 py-1 rounded-md">
-                      <Text className="text-[10px] text-white">
-                        Verified ✅
-                      </Text>
+            <TouchableOpacity
+              onPress={onRefresh}
+              style={{
+                width: 36,
+                height: 36,
+                borderRadius: 18,
+                backgroundColor: "#ECFDF5",
+                justifyContent: "center",
+                alignItems: "center",
+              }}
+            >
+              <RefreshCw size={16} color="#059669" />
+            </TouchableOpacity>
+          </View>
+
+          {/* Interactive Filter Pills */}
+          <View style={{ flexDirection: "row", paddingHorizontal: 14, paddingVertical: 10, backgroundColor: "#FFFFFF", gap: 8 }}>
+            <TouchableOpacity
+              onPress={() => setMapFilter("all")}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 12,
+                backgroundColor: mapFilter === "all" ? "#059669" : "#F1F5F9",
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "800", color: mapFilter === "all" ? "#FFFFFF" : "#64748B" }}>
+                🏷️ All ({dustbins.length + activeVehiclesnear.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setMapFilter("bins")}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 12,
+                backgroundColor: mapFilter === "bins" ? "#059669" : "#F1F5F9",
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "800", color: mapFilter === "bins" ? "#FFFFFF" : "#64748B" }}>
+                🗑️ Dustbins ({dustbins.length})
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setMapFilter("trucks")}
+              style={{
+                paddingHorizontal: 12,
+                paddingVertical: 6,
+                borderRadius: 12,
+                backgroundColor: mapFilter === "trucks" ? "#059669" : "#F1F5F9",
+              }}
+            >
+              <Text style={{ fontSize: 12, fontWeight: "800", color: mapFilter === "trucks" ? "#FFFFFF" : "#64748B" }}>
+                🚛 Live Trucks ({activeVehiclesnear.length})
+              </Text>
+            </TouchableOpacity>
+          </View>
+
+          {/* Main Fullscreen MapView */}
+          <View style={{ flex: 1, position: "relative" }}>
+            <MapView
+              ref={fullMapRef}
+              showsUserLocation={true}
+              showsCompass={true}
+              provider={PROVIDER_GOOGLE}
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: userLocation ? userLocation[0] : 23.2599,
+                longitude: userLocation ? userLocation[1] : 77.4126,
+                latitudeDelta: 0.035,
+                longitudeDelta: 0.035,
+              }}
+            >
+              {/* Dustbins */}
+              {(mapFilter === "all" || mapFilter === "bins") &&
+                dustbins.map((bin) => {
+                  const isSelected = selectedBin && (selectedBin.id === bin.id || selectedBin._id === bin._id);
+                  return (
+                    <Marker
+                      key={bin.id || bin._id}
+                      coordinate={{ latitude: bin.latitude, longitude: bin.longitude }}
+                      onPress={() => {
+                        setSelectedBin(bin);
+                        setInspectedMarker({ type: "bin", data: bin });
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: isSelected ? "#DC2626" : "#059669",
+                          padding: 7,
+                          borderRadius: 14,
+                          borderWidth: 2,
+                          borderColor: "#FFFFFF",
+                          shadowColor: "#000",
+                          shadowOpacity: 0.2,
+                          shadowRadius: 4,
+                          elevation: 4,
+                        }}
+                      >
+                        <Text style={{ fontSize: 14 }}>🗑️</Text>
+                      </View>
+                    </Marker>
+                  );
+                })}
+
+              {/* Active Collection Trucks */}
+              {(mapFilter === "all" || mapFilter === "trucks") &&
+                activeVehiclesnear.map((v) => (
+                  <Marker
+                    key={v.id || v._id}
+                    coordinate={{ latitude: v.latitude, longitude: v.longitude }}
+                    onPress={() => setInspectedMarker({ type: "truck", data: v })}
+                  >
+                    <View
+                      style={{
+                        backgroundColor: "#D97706",
+                        padding: 7,
+                        borderRadius: 14,
+                        borderWidth: 2,
+                        borderColor: "#FFFFFF",
+                        shadowColor: "#000",
+                        shadowOpacity: 0.2,
+                        shadowRadius: 4,
+                        elevation: 4,
+                      }}
+                    >
+                      <Text style={{ fontSize: 14 }}>🚛</Text>
                     </View>
-                  </View>
-                </View>
-              ) : (
-                <View className="bg-gray-100 rounded-xl p-4 mb-6">
-                  <Text className="text-center text-sm text-gray-500">
-                    No image proof provided.
-                  </Text>
-                </View>
-              )}
+                  </Marker>
+                ))}
+            </MapView>
 
+            {/* Floating Action Controls */}
+            <View style={{ position: "absolute", top: 16, right: 16, gap: 10 }}>
+              {/* Auto Find Nearest Bin */}
               <TouchableOpacity
-                className="w-full py-4 bg-green-600 rounded-xl items-center active:opacity-80"
-                onPress={() => setResolvedModal(null)}
+                onPress={findNearestBin}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  paddingHorizontal: 14,
+                  paddingVertical: 10,
+                  borderRadius: 18,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                  elevation: 5,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
               >
-                <Text className="text-lg font-bold text-white">
-                  Awesome! 👍
-                </Text>
+                <Crosshair size={16} color="#059669" style={{ marginRight: 6 }} />
+                <Text style={{ fontSize: 12, fontWeight: "800", color: "#065F46" }}>Auto Nearest</Text>
+              </TouchableOpacity>
+
+              {/* Center User GPS */}
+              <TouchableOpacity
+                onPress={centerUserGPS}
+                style={{
+                  backgroundColor: "#FFFFFF",
+                  width: 44,
+                  height: 44,
+                  borderRadius: 22,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  alignSelf: "flex-end",
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowRadius: 8,
+                  elevation: 5,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <Navigation size={20} color="#059669" />
               </TouchableOpacity>
             </View>
-          </BlurView>
+
+            {/* Inspected Marker Bottom Card */}
+            {inspectedMarker && (
+              <View
+                style={{
+                  position: "absolute",
+                  bottom: 20,
+                  left: 16,
+                  right: 16,
+                  backgroundColor: "#FFFFFF",
+                  borderRadius: 22,
+                  padding: 16,
+                  shadowColor: "#000",
+                  shadowOpacity: 0.15,
+                  shadowRadius: 12,
+                  elevation: 8,
+                  borderWidth: 1,
+                  borderColor: "#E2E8F0",
+                }}
+              >
+                <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 15, fontWeight: "900", color: "#0F172A" }}>
+                    {inspectedMarker.type === "bin" ? "🗑️ Dustbin Station" : "🚛 Collection Truck"}
+                  </Text>
+                  <TouchableOpacity onPress={() => setInspectedMarker(null)} style={{ padding: 4 }}>
+                    <Text style={{ fontWeight: "700", color: "#94A3B8", fontSize: 13 }}>✕</Text>
+                  </TouchableOpacity>
+                </View>
+
+                {inspectedMarker.type === "bin" ? (
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155" }}>
+                      {inspectedMarker.data.name || "Public Dustbin"}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#64748B", marginTop: 2 }}>
+                      📍 {inspectedMarker.data.address || `${inspectedMarker.data.latitude.toFixed(4)}, ${inspectedMarker.data.longitude.toFixed(4)}`}
+                    </Text>
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedBin(inspectedMarker.data);
+                        setIsFullScreenMap(false);
+                        handleStartReportFlow();
+                      }}
+                      style={{
+                        marginTop: 10,
+                        backgroundColor: "#059669",
+                        borderRadius: 12,
+                        paddingVertical: 10,
+                        alignItems: "center",
+                      }}
+                    >
+                      <Text style={{ color: "#FFF", fontWeight: "800", fontSize: 12 }}>
+                        Snap & Report at this Bin →
+                      </Text>
+                    </TouchableOpacity>
+                  </View>
+                ) : (
+                  <View>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155" }}>
+                      Vehicle #{inspectedMarker.data.vehicleNumber}
+                    </Text>
+                    <Text style={{ fontSize: 11, color: "#059669", fontWeight: "700", marginTop: 2 }}>
+                      🟢 Active on Municipal Route
+                    </Text>
+                  </View>
+                )}
+              </View>
+            )}
+          </View>
+        </SafeAreaView>
+      </Modal>
+
+      {/* ==================== FEEDBACK MODAL ==================== */}
+      <Modal visible={feedbackModal} animationType="slide" transparent>
+        <View style={{ flex: 1, backgroundColor: "rgba(0,0,0,0.5)", justifyContent: "center", padding: 20 }}>
+          <View style={{ backgroundColor: "#FFFFFF", borderRadius: 24, padding: 22 }}>
+            <Text style={{ fontSize: 18, fontWeight: "900", color: "#0F172A", marginBottom: 6 }}>
+              Share Your Feedback
+            </Text>
+            <Text style={{ fontSize: 12, color: "#64748B", marginBottom: 14 }}>
+              Help us improve city sanitation and municipal collection efficiency.
+            </Text>
+            <TextInput
+              placeholder="Write your suggestions..."
+              value={feedbackText}
+              onChangeText={setFeedbackText}
+              multiline
+              numberOfLines={4}
+              style={{ backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", padding: 12, height: 100, textAlignVertical: "top", marginBottom: 16 }}
+            />
+            <View style={{ flexDirection: "row", gap: 10 }}>
+              <TouchableOpacity
+                onPress={() => setFeedbackModal(false)}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: "#F1F5F9", alignItems: "center" }}
+              >
+                <Text style={{ fontWeight: "700", color: "#64748B" }}>Cancel</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                onPress={() => {
+                  Alert.alert("Thank You! 🙏", "Your feedback has been submitted to the municipal sanitation team.");
+                  setFeedbackModal(false);
+                  setFeedbackText("");
+                }}
+                style={{ flex: 1, paddingVertical: 12, borderRadius: 14, backgroundColor: "#059669", alignItems: "center" }}
+              >
+                <Text style={{ fontWeight: "800", color: "#FFFFFF" }}>Submit</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
         </View>
       </Modal>
 
-      {/* ==================== JAES COMPLAINT DETAIL & TIMELINE MODAL ==================== */}
-      <Modal
-        visible={showDetailModal && selectedComplaintDetail !== null}
-        animationType="slide"
-        transparent
-      >
-        <View className="flex-1 justify-end bg-black/60">
-          <BlurView
-            intensity={90}
-            className="w-full h-[85%] rounded-t-3xl overflow-hidden bg-white"
-          >
-            <View className="flex-1 p-6">
-              <View className="flex-row justify-between items-center pb-4 border-b border-gray-100">
-                <Text className="text-xl font-bold text-gray-800">
-                  ⚠️ Grievance SLA Timeline
-                </Text>
-                <TouchableOpacity
-                  onPress={() => {
-                    setShowDetailModal(false);
-                    setSelectedComplaintDetail(null);
-                  }}
-                  className="w-10 h-10 bg-gray-100 rounded-full justify-center items-center"
-                >
-                  <Text className="text-lg font-bold text-black">✕</Text>
-                </TouchableOpacity>
-              </View>
-
-              {selectedComplaintDetail && (
-                <ScrollView className="flex-1 mt-4" showsVerticalScrollIndicator={false}>
-                  <View className="flex-row gap-4 mb-5">
-                    <View className="w-28 h-28 rounded-2xl overflow-hidden bg-gray-100 border border-gray-200">
-                      {selectedComplaintDetail.ComimageUrl ? (
-                        <Image
-                          source={{ uri: selectedComplaintDetail.ComimageUrl }}
-                          className="w-full h-full"
-                          resizeMode="cover"
-                        />
-                      ) : (
-                        <View className="w-full h-full justify-center items-center">
-                          <Text className="text-3xl">🗑️</Text>
-                        </View>
-                      )}
-                    </View>
-                    <View className="flex-1 justify-between py-1">
-                      <View>
-                        <Text className="text-base font-black text-gray-900">
-                          ID: #SM{selectedComplaintDetail._id.toString().slice(-6).toUpperCase()}
-                        </Text>
-                        <Text className="text-xs text-gray-500 mt-1">
-                          📍 {selectedComplaintDetail.area || "Location Area"}
-                        </Text>
-                        <Text className="text-xs text-gray-400 mt-1">
-                          📅 Created: {new Date(selectedComplaintDetail.createdAt || selectedComplaintDetail.reportedAt).toLocaleDateString("en-IN", {
-                            day: "2-digit",
-                            month: "short",
-                            year: "numeric"
-                          })}
-                        </Text>
-                      </View>
-                      <View className="flex-row gap-2">
-                        <View className="bg-blue-50 px-3 py-1 rounded-full border border-blue-100">
-                          <Text className="text-[10px] font-bold text-blue-600">
-                            Level {selectedComplaintDetail.currentEscalationLevel || 1}
-                          </Text>
-                        </View>
-                        <View className="bg-gray-100 px-3 py-1 rounded-full border border-gray-200">
-                          <Text className="text-[10px] font-bold text-gray-600">
-                            {selectedComplaintDetail.pendingDays || 0} Days Pending
-                          </Text>
-                        </View>
-                      </View>
-                    </View>
-                  </View>
-
-                  <View className="bg-gray-50 p-4 rounded-2xl mb-5 border border-gray-100">
-                    <Text className="text-[10px] font-bold text-gray-400 uppercase tracking-wider mb-1">
-                      Description
-                    </Text>
-                    <Text className="text-sm text-gray-700 leading-relaxed">
-                      {selectedComplaintDetail.description || "No description provided."}
-                    </Text>
-                  </View>
-
-                  <View className="bg-amber-50 border border-amber-200 p-4 rounded-2xl mb-5">
-                    <Text className="text-[10px] font-bold text-amber-500 uppercase tracking-wider mb-1">
-                      SLA Countdown / Next Escalation
-                    </Text>
-                    {selectedComplaintDetail.status === "resolved" ? (
-                      <Text className="text-sm font-bold text-green-700">
-                        ✅ Issue Resolved! Escalation Stopped.
-                      </Text>
-                    ) : selectedComplaintDetail.nextEscalationAt ? (
-                      <View>
-                        <Text className="text-base font-black text-amber-800">
-                          {(() => {
-                            const diff = new Date(selectedComplaintDetail.nextEscalationAt) - new Date();
-                            if (diff <= 0) return "Escalating...";
-                            const hours = Math.floor(diff / (1000 * 60 * 60));
-                            const mins = Math.floor((diff % (1000 * 60 * 60)) / (1000 * 60));
-                            if (selectedComplaintDetail.currentEscalationLevel >= 5) {
-                              return `${hours}h ${mins}m remaining before Public Share Eligibility`;
-                            }
-                            return `${hours}h ${mins}m remaining before Level ${selectedComplaintDetail.currentEscalationLevel + 1}`;
-                          })()}
-                        </Text>
-                        <Text className="text-xs text-amber-600 mt-1">
-                          Deadline: {new Date(selectedComplaintDetail.nextEscalationAt).toLocaleString("en-IN", {
-                            hour: "2-digit",
-                            minute: "2-digit",
-                            day: "2-digit",
-                            month: "short"
-                          })}
-                        </Text>
-                      </View>
-                    ) : (
-                      <Text className="text-sm font-bold text-red-700">
-                        🚨 Max Escalation reached (Level 5 Commissioner).
-                      </Text>
-                    )}
-                  </View>
-
-                  <View className="mb-6">
-                    <Text className="text-sm font-bold text-gray-800 mb-4">
-                      📈 JAES Escalation Timeline
-                    </Text>
-
-                    {[
-                      { level: 1, label: "Level 1: Driver / Worker", staff: selectedComplaintDetail.driverId?.name || selectedComplaintDetail.vehicle || "Assigned Driver" },
-                      { level: 2, label: "Level 2: Area Supervisor", staff: selectedComplaintDetail.supervisorId?.name || "Area Supervisor" },
-                      { level: 3, label: "Level 3: Zone Officer", staff: selectedComplaintDetail.zoneOfficerId?.name || "Zone Officer" },
-                      { level: 4, label: "Level 4: Municipal Officer", staff: selectedComplaintDetail.municipalOfficerId?.name || "Municipal Officer" },
-                      { level: 5, label: "Level 5: City Commissioner", staff: selectedComplaintDetail.commissionerId?.name || "City Commissioner" }
-                    ].map((stage, idx) => {
-                      const isReached = selectedComplaintDetail.currentEscalationLevel >= stage.level;
-                      return (
-                        <View key={stage.level} className="flex-row items-start mb-6 relative">
-                          {idx < 4 && (
-                            <View 
-                              className="absolute left-[11px] top-6 w-[2px] h-10" 
-                              style={{ backgroundColor: selectedComplaintDetail.currentEscalationLevel > stage.level ? "#ef4444" : "#d1d5db" }} 
-                            />
-                          )}
-                          
-                          <View 
-                            className="w-6 h-6 rounded-full items-center justify-center border-2 mr-4 flex-shrink-0"
-                            style={{ 
-                              backgroundColor: isReached ? "#ef4444" : "#ffffff", 
-                              borderColor: isReached ? "#ef4444" : "#9ca3af" 
-                            }}
-                          >
-                            {isReached && (
-                              <Text className="text-[10px] font-black text-white">✓</Text>
-                            )}
-                          </View>
-
-                          <View className="flex-1">
-                            <Text className={`text-sm font-bold ${isReached ? 'text-gray-900' : 'text-gray-400'}`}>
-                              {stage.label}
-                            </Text>
-                            <Text className="text-xs text-gray-500">
-                              Responsible: {stage.staff}
-                            </Text>
-                            {isReached && selectedComplaintDetail.currentEscalationLevel === stage.level && selectedComplaintDetail.status !== "resolved" && (
-                              <Text className="text-[10px] font-bold text-red-500 mt-1">
-                                ⚠️ CURRENT ACTIVE RESPONSIBILITY
-                              </Text>
-                            )}
-                          </View>
-                        </View>
-                      );
-                    })}
-                  </View>
-
-                  {selectedComplaintDetail.status !== "resolved" && selectedComplaintDetail.publicEscalationEligible === true && (
-                    <TouchableOpacity
-                      onPress={() => {
-                        Alert.alert(
-                          "Share Grievance Card",
-                          "Select a platform to share this card publicly:",
-                          [
-                            {
-                              text: "WhatsApp 🟢",
-                              onPress: () => {
-                                const msg = `📢 Grievance #${selectedComplaintDetail._id.toString().slice(-6).toUpperCase()} at ${selectedComplaintDetail.area} remains UNRESOLVED after 5 days.\n\nEscalated to: Commissioner\n\nView details: ${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`;
-                                Linking.openURL(`whatsapp://send?text=${encodeURIComponent(msg)}`);
-                              }
-                            },
-                            {
-                              text: "X / Twitter 🐦",
-                              onPress: () => {
-                                const msg = `Grievance #${selectedComplaintDetail._id.toString().slice(-6).toUpperCase()} at ${selectedComplaintDetail.area} remains UNRESOLVED after 5 days. Escalated to Commissioner. @SafaiMitra: ${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`;
-                                Linking.openURL(`https://twitter.com/intent/tweet?text=${encodeURIComponent(msg)}`);
-                              }
-                            },
-                            {
-                              text: "Download / Open Card 📥",
-                              onPress: () => {
-                                Linking.openURL(`${API_URL}/complaint/share-card/${selectedComplaintDetail._id}`);
-                              }
-                            },
-                            { text: "Cancel", style: "cancel" }
-                          ]
-                        );
-                      }}
-                      className="w-full py-4 bg-red-600 rounded-2xl flex-row items-center justify-center gap-2 mb-8 shadow-lg active:opacity-85"
-                    >
-                      <Text className="text-xl">📢</Text>
-                      <Text className="text-base font-bold text-white">Share Publicly</Text>
-                    </TouchableOpacity>
-                  )}
-                </ScrollView>
-              )}
-            </View>
-          </BlurView>
-        </View>
+      {/* ==================== EVENT DUSTBIN REQUEST MODAL ==================== */}
+      <Modal visible={showEventModal} animationType="slide" transparent={false}>
+        <EventDustbinRequestScreen
+          onClose={() => {
+            setShowEventModal(false);
+            fetchMyEventRequests();
+          }}
+          onSuccess={() => {
+            fetchMyEventRequests();
+          }}
+        />
       </Modal>
     </View>
   );

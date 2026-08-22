@@ -1018,13 +1018,17 @@ export default function VehiclePage({ goBack }) {
         <View style={tw`flex-row justify-between items-center mb-4`}>
           <View style={tw`flex-row items-center gap-3`}>
             <View
-              style={tw`w-12 h-12 bg-blue-600 rounded-xl items-center justify-center`}
+              style={tw`w-12 h-12 bg-white rounded-xl items-center justify-center shadow-sm p-1 border border-gray-100`}
             >
-              <Text style={{ fontSize: 24 }}>🚛</Text>
+              <Image
+                source={require("../../assets/logoapp.png")}
+                style={{ width: "100%", height: "100%", borderRadius: 8 }}
+                resizeMode="contain"
+              />
             </View>
             <View>
               <Text style={tw`text-lg font-bold text-gray-800`}>
-                SafaiMitra
+                Safaimitra
               </Text>
               <Text style={tw`text-xs text-gray-600`}>
                 {staff ? staff.assignedVehicleId?.vehicleNumber : "No Vehicle"}

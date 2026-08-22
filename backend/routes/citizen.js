@@ -129,6 +129,49 @@ router.get("/dustbin/list/:officeId", citizenAuth, async (req, res) => {
   }
 });
 
+// GET NEAREST DUSTBIN TO COORDINATES
+router.get("/dustbin/nearest", citizenAuth, async (req, res) => {
+  try {
+    const { lat, lng, officeId } = req.query;
+    if (!lat || !lng) {
+      return res.status(400).json({ success: false, message: "Latitude and longitude are required." });
+    }
+    const latitude = parseFloat(lat);
+    const longitude = parseFloat(lng);
+
+    const query = {};
+    if (officeId && mongoose.Types.ObjectId.isValid(officeId)) {
+      query.officeId = new mongoose.Types.ObjectId(officeId);
+    }
+
+    const dustbins = await Dustbin.find(query).select(
+      "name area latitude longitude location status routeId binCode"
+    );
+    if (!dustbins || dustbins.length === 0) {
+      return res.status(404).json({ success: false, message: "No dustbins found." });
+    }
+
+    let nearest = null;
+    let minDist = Infinity;
+
+    dustbins.forEach((bin) => {
+      const d = Math.hypot(bin.latitude - latitude, bin.longitude - longitude);
+      if (d < minDist) {
+        minDist = d;
+        nearest = bin;
+      }
+    });
+
+    return res.json({
+      success: true,
+      dustbin: nearest,
+    });
+  } catch (err) {
+    console.error("Nearest Dustbin Error:", err);
+    return res.status(500).json({ success: false, message: err.message });
+  }
+});
+
 // Configure Multer
 const citizenUploadDir = process.env.VERCEL ? os.tmpdir() : "./uploads/";
 if (!process.env.VERCEL && !fs.existsSync("./uploads/")) {

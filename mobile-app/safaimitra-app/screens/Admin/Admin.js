@@ -11,7 +11,8 @@ import {
   Switch,
   ActivityIndicator,
   StatusBar,
-  SafeAreaView
+  SafeAreaView,
+  Image,
 } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import axios from 'axios';
@@ -29,7 +30,6 @@ import {
   User,
   Save
 } from 'lucide-react-native';
-import AdminPage from '../../App';
 import NewOffice from "./newoffice"; // Path check kar lena apne hisaab se
 import NewAdmin from "./newadmin"; // Path check kar lena apne hisaab se
 
@@ -222,8 +222,10 @@ export default function OfficeDashboard({ goBack }) {
     );
   };
 
-  if (screen === "adminPage") return <AdminPage goBack={() => setScreen("home")} />;
-  // ... existing navigation logic ...
+  if (screen === "adminPage") {
+    if (goBack) goBack();
+    return null;
+  }
   if (screen === "newOfficeScreen") return <NewOffice goBack={() => setScreen("home")} />;
   if (screen === "newAdminScreen") return <NewAdmin goBack={() => setScreen("home")} />;
 
@@ -560,9 +562,15 @@ export default function OfficeDashboard({ goBack }) {
       {/* Header */}
       <View className="bg-gradient-to-r from-green-700 to-green-900 p-4 flex-row items-center justify-between shadow-lg">
 
-        <View className="flex-row items-center gap-2">
-          <Shield size={28} color="#fff" />
-          <Text className="text-xl font-bold text-white">SafaiMitra</Text>
+        <View className="flex-row items-center gap-3">
+          <View className="w-9 h-9 bg-white rounded-xl p-1 items-center justify-center shadow-sm">
+            <Image
+              source={require("../../assets/logoapp.png")}
+              className="w-full h-full rounded"
+              resizeMode="contain"
+            />
+          </View>
+          <Text className="text-xl font-bold text-white">Safaimitra</Text>
         </View>
 
         <TouchableOpacity onPress={() => setShowProfileMenu(!showProfileMenu)} className="p-2">

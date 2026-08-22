@@ -524,6 +524,26 @@ function OfficeDashboard() {
   const [vNotes, setVNotes] = useState("");
   const [vEvidenceUrl, setVEvidenceUrl] = useState("");
   const [vLegalReview, setVLegalReview] = useState(false);
+
+  // Event Dustbin Requirement System State
+  const [eventRequests, setEventRequests] = useState([]);
+  const [eventMetrics, setEventMetrics] = useState({ total: 0, pending: 0, approved: 0, allocated: 0, rejected: 0, highRisk: 0 });
+  const [selectedEventRequest, setSelectedEventRequest] = useState(null);
+  const [showEventDecisionModal, setShowEventDecisionModal] = useState(false);
+  const [eventDecisionType, setEventDecisionType] = useState("approve"); // "approve", "modify", "reject", "allocate"
+  const [modWetBins, setModWetBins] = useState(0);
+  const [modDryBins, setModDryBins] = useState(0);
+  const [modGeneralBins, setModGeneralBins] = useState(0);
+  const [modFrequency, setModFrequency] = useState(1);
+  const [decisionReason, setDecisionReason] = useState("");
+  const [allocVehicleId, setAllocVehicleId] = useState("");
+  const [allocStaffId, setAllocStaffId] = useState("");
+  const [allocSchedule, setAllocSchedule] = useState("Morning 08:00 AM & Evening 06:00 PM");
+  const [decisionSubmitting, setDecisionSubmitting] = useState(false);
+  const [eventFilterStatus, setEventFilterStatus] = useState("ALL");
+  const [eventFilterType, setEventFilterType] = useState("ALL");
+  const [eventFilterRisk, setEventFilterRisk] = useState("ALL");
+  const [eventSearch, setEventSearch] = useState("");
   const [reviews, setReviews] = useState([
     {
       id: 1,
@@ -747,6 +767,126 @@ function OfficeDashboard() {
     }
   };
 
+  const fetchEventRequests = async () => {
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.get(`${API_BASE_URL}/api/admin/event-dustbin-requests`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+      if (res.data.success) {
+        setEventRequests(res.data.requests || []);
+        if (res.data.metrics) setEventMetrics(res.data.metrics);
+      }
+    } catch (err) {
+      console.error("Fetch Event Requests Error:", err);
+    }
+  };
+
+  const handleApproveEvent = async (requestId) => {
+    setDecisionSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/approve`,
+        { comment: decisionReason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        alert("🎉 Event dustbin quota approved successfully!");
+        setShowEventDecisionModal(false);
+        setDecisionReason("");
+        fetchEventRequests();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to approve request.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  };
+
+  const handleModifyEvent = async (requestId) => {
+    if (!decisionReason || decisionReason.trim().length === 0) {
+      alert("Please provide an admin modification justification note.");
+      return;
+    }
+    setDecisionSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/modify`,
+        {
+          wetBins: modWetBins,
+          dryBins: modDryBins,
+          generalBins: modGeneralBins,
+          collectionFrequency: modFrequency,
+          reason: decisionReason,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        alert("✅ Event dustbin quota modified and approved!");
+        setShowEventDecisionModal(false);
+        setDecisionReason("");
+        fetchEventRequests();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to modify request.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  };
+
+  const handleRejectEvent = async (requestId) => {
+    if (!decisionReason || decisionReason.trim().length === 0) {
+      alert("A rejection reason is mandatory.");
+      return;
+    }
+    setDecisionSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/reject`,
+        { reason: decisionReason },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        alert("Event request rejected.");
+        setShowEventDecisionModal(false);
+        setDecisionReason("");
+        fetchEventRequests();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to reject request.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  };
+
+  const handleAllocateEvent = async (requestId) => {
+    setDecisionSubmitting(true);
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(
+        `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/allocate`,
+        {
+          vehicleId: allocVehicleId,
+          staffId: allocStaffId,
+          collectionSchedule: allocSchedule,
+        },
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (res.data.success) {
+        alert("🚚 Resources allocated! Vehicle and staff deployed for the event.");
+        setShowEventDecisionModal(false);
+        fetchEventRequests();
+      }
+    } catch (err) {
+      alert(err.response?.data?.message || "Failed to allocate resources.");
+    } finally {
+      setDecisionSubmitting(false);
+    }
+  };
+
   // 2. Main Socket & Initial Load Effect
   useEffect(() => {
     const fetchUserData = async () => {
@@ -782,9 +922,18 @@ function OfficeDashboard() {
     fetchAppeals();
     fetchAuditLogs();
     fetchCitizens();
+    fetchEventRequests();
 
     // 🔥 Connect to Socket.io Server
     const socket = io(API_BASE_URL);
+
+    // Event Request Sockets
+    socket.on("new_event_request", () => {
+      fetchEventRequests();
+    });
+    socket.on("event_request_updated", () => {
+      fetchEventRequests();
+    });
 
     // --- Socket Listeners ---
 
@@ -2033,7 +2182,13 @@ function OfficeDashboard() {
               <h3 className="text-2xl font-bold text-gray-800 font-black tracking-tight">🛡️ Citizen Moderation Panel</h3>
               <p className="text-sm text-gray-600 mt-1">Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs.</p>
             </div>
-            <div className="flex bg-gray-100 p-1.5 rounded-xl gap-2">
+            <div className="flex bg-gray-100 p-1.5 rounded-xl gap-2 flex-wrap">
+              <button
+                onClick={() => setModerationTab("eventRequests")}
+                className={`px-4 py-2 rounded-lg text-xs font-bold transition-all flex items-center gap-1.5 ${moderationTab === "eventRequests" ? "bg-emerald-600 text-white shadow-md" : "text-gray-600 hover:text-gray-900"}`}
+              >
+                🎉 Event Dustbins ({eventMetrics.pending || 0})
+              </button>
               <button
                 onClick={() => setModerationTab("leaderboard")}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${moderationTab === "leaderboard" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
@@ -2277,6 +2432,751 @@ function OfficeDashboard() {
                   )}
                 </tbody>
               </table>
+            </div>
+          </div>
+        )}
+
+        {/* Tab Content: 🎉 Event Dustbin Requests Management */}
+        {moderationTab === "eventRequests" && (
+          <div className="space-y-6">
+            {/* 1. Summary Metrics Cards */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-4">
+              <div className="bg-white p-5 rounded-2xl border border-gray-100 shadow-sm hover:shadow-md transition-all">
+                <div className="flex justify-between items-center text-gray-500 text-xs font-bold uppercase">
+                  <span>Total Requests</span>
+                  <span className="text-lg">🎪</span>
+                </div>
+                <div className="text-2xl font-black text-gray-900 mt-2">{eventMetrics.total || 0}</div>
+                <div className="text-[11px] text-gray-400 mt-1">All temporary event bookings</div>
+              </div>
+
+              <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md transition-all">
+                <div className="flex justify-between items-center text-amber-700 text-xs font-bold uppercase">
+                  <span>Pending Review</span>
+                  <span className="text-lg animate-bounce">⏳</span>
+                </div>
+                <div className="text-2xl font-black text-amber-900 mt-2">{eventMetrics.pending || 0}</div>
+                <div className="text-[11px] text-amber-600 mt-1 font-semibold">Requires Admin Decision</div>
+              </div>
+
+              <div className="bg-emerald-50/60 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-all">
+                <div className="flex justify-between items-center text-emerald-700 text-xs font-bold uppercase">
+                  <span>Approved Events</span>
+                  <span className="text-lg">✅</span>
+                </div>
+                <div className="text-2xl font-black text-emerald-900 mt-2">{eventMetrics.approved || 0}</div>
+                <div className="text-[11px] text-emerald-600 mt-1">Dustbins quota granted</div>
+              </div>
+
+              <div className="bg-blue-50/60 p-5 rounded-2xl border border-blue-200 shadow-sm hover:shadow-md transition-all">
+                <div className="flex justify-between items-center text-blue-700 text-xs font-bold uppercase">
+                  <span>Allocated Fleet</span>
+                  <span className="text-lg">🚚</span>
+                </div>
+                <div className="text-2xl font-black text-blue-900 mt-2">{eventMetrics.allocated || 0}</div>
+                <div className="text-[11px] text-blue-600 mt-1">Vehicles & staff assigned</div>
+              </div>
+
+              <div className="bg-red-50/60 p-5 rounded-2xl border border-red-200 shadow-sm hover:shadow-md transition-all">
+                <div className="flex justify-between items-center text-red-700 text-xs font-bold uppercase">
+                  <span>High Waste Risk</span>
+                  <span className="text-lg">🔥</span>
+                </div>
+                <div className="text-2xl font-black text-red-900 mt-2">{eventMetrics.highRisk || 0}</div>
+                <div className="text-[11px] text-red-600 mt-1 font-semibold">&gt;400 kg expected waste</div>
+              </div>
+            </div>
+
+            {/* 2. Filter & Search Bar */}
+            <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm flex flex-col md:flex-row items-center justify-between gap-4">
+              <div className="flex items-center gap-3 w-full md:w-auto flex-1">
+                <div className="relative flex-1 max-w-md">
+                  <input
+                    type="text"
+                    placeholder="Search by Request ID, Event Name, Organizer..."
+                    value={eventSearch}
+                    onChange={(e) => setEventSearch(e.target.value)}
+                    className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:bg-white focus:border-emerald-500 outline-none transition-all"
+                  />
+                  <span className="absolute left-3 top-3 text-gray-400 text-xs">🔍</span>
+                </div>
+
+                {/* Status Filter */}
+                <select
+                  value={eventFilterStatus}
+                  onChange={(e) => setEventFilterStatus(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">All Statuses</option>
+                  <option value="PENDING_ADMIN_REVIEW">⏳ Pending Review</option>
+                  <option value="APPROVED">✅ Approved</option>
+                  <option value="MODIFIED">✏️ Modified</option>
+                  <option value="ALLOCATED">🚚 Allocated</option>
+                  <option value="REJECTED">❌ Rejected</option>
+                  <option value="COMPLETED">🏁 Completed</option>
+                </select>
+
+                {/* Event Type Filter */}
+                <select
+                  value={eventFilterType}
+                  onChange={(e) => setEventFilterType(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">All Event Types</option>
+                  <option value="Marriage">💍 Marriage</option>
+                  <option value="Birthday">🎂 Birthday</option>
+                  <option value="Religious">🪔 Religious</option>
+                  <option value="Political">🏛️ Political</option>
+                  <option value="Festival">🎆 Festival</option>
+                  <option value="Community">👥 Community</option>
+                  <option value="School/College">🎓 School/College</option>
+                  <option value="Corporate">💼 Corporate</option>
+                  <option value="Other">🎪 Other</option>
+                </select>
+
+                {/* Risk Filter */}
+                <select
+                  value={eventFilterRisk}
+                  onChange={(e) => setEventFilterRisk(e.target.value)}
+                  className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-emerald-500"
+                >
+                  <option value="ALL">All Risk Levels</option>
+                  <option value="LOW">🟢 Low Risk</option>
+                  <option value="MEDIUM">🟡 Medium Risk</option>
+                  <option value="HIGH">🟠 High Risk</option>
+                  <option value="CRITICAL">🔴 Critical Risk</option>
+                </select>
+              </div>
+
+              <button
+                onClick={fetchEventRequests}
+                className="px-4 py-2.5 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-xl text-xs font-black transition-all flex items-center gap-1.5"
+              >
+                🔄 Refresh
+              </button>
+            </div>
+
+            {/* 3. Requests Table */}
+            <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
+              <div className="p-5 border-b border-gray-100 flex items-center justify-between">
+                <div>
+                  <h4 className="text-base font-black text-gray-900">Event Dustbin Requirements Queue</h4>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Municipal temporary dustbin allocation powered by deterministic waste engine &amp; AI Document Verification.
+                  </p>
+                </div>
+                <span className="text-xs font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200">
+                  {eventRequests.length} Total Submissions
+                </span>
+              </div>
+
+              <div className="overflow-x-auto">
+                <table className="w-full text-left text-sm text-gray-600">
+                  <thead className="bg-gray-50/70 border-b border-gray-200 text-xs font-black text-gray-500 uppercase tracking-wider">
+                    <tr>
+                      <th className="px-5 py-3.5">Request ID</th>
+                      <th className="px-5 py-3.5">Event &amp; Organizer</th>
+                      <th className="px-5 py-3.5">Date &amp; Venue</th>
+                      <th className="px-5 py-3.5">Guests &amp; Food</th>
+                      <th className="px-5 py-3.5">AI Bin Recommendation</th>
+                      <th className="px-5 py-3.5">Waste Risk</th>
+                      <th className="px-5 py-3.5">Status</th>
+                      <th className="px-5 py-3.5 text-right">Actions</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-gray-100 bg-white">
+                    {eventRequests
+                      .filter((req) => {
+                        if (eventFilterStatus !== "ALL" && req.status !== eventFilterStatus) return false;
+                        if (eventFilterType !== "ALL" && req.event?.type !== eventFilterType) return false;
+                        if (eventFilterRisk !== "ALL" && req.aiAnalysis?.wasteRisk !== eventFilterRisk) return false;
+                        if (eventSearch.trim()) {
+                          const q = eventSearch.toLowerCase();
+                          const matchId = req.requestId?.toLowerCase().includes(q);
+                          const matchName = req.event?.name?.toLowerCase().includes(q);
+                          const matchCitizen = req.citizenName?.toLowerCase().includes(q);
+                          const matchAddr = req.location?.address?.toLowerCase().includes(q);
+                          if (!matchId && !matchName && !matchCitizen && !matchAddr) return false;
+                        }
+                        return true;
+                      })
+                      .map((req) => (
+                        <tr key={req._id} className="hover:bg-gray-50/80 transition-colors">
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
+                              {req.requestId}
+                            </span>
+                            <div className="text-[11px] text-gray-400 mt-1">
+                              {new Date(req.createdAt).toLocaleDateString("en-IN", {
+                                month: "short",
+                                day: "numeric",
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="font-bold text-gray-900 text-sm">{req.event?.name}</div>
+                            <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
+                              <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
+                                {req.event?.type}
+                              </span>
+                              <span>👤 {req.citizenName} ({req.citizenPhone})</span>
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4">
+                            <div className="font-semibold text-gray-800 text-xs">
+                              📅 {req.event?.date} ({req.event?.startTime} - {req.event?.endTime})
+                            </div>
+                            <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs" title={req.location?.address}>
+                              📍 {req.location?.address}
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="font-black text-gray-800 text-xs">👥 {req.event?.expectedGuests} Guests</div>
+                            <div className="text-[11px] text-gray-500 mt-0.5">
+                              {req.event?.foodService ? `🍽️ ${req.event?.foodType || "Meals"}` : "🚫 No Catering"}
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <div className="flex items-center gap-1.5">
+                              <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                                {req.adminDecision?.approvedBins?.total || req.aiAnalysis?.recommendedBins?.total || 3} Bins
+                              </span>
+                              <span className="text-[10px] text-gray-500 font-semibold">
+                                ({req.aiAnalysis?.recommendedBins?.wet || 1}W / {req.aiAnalysis?.recommendedBins?.dry || 1}D / {req.aiAnalysis?.recommendedBins?.general || 1}G)
+                              </span>
+                            </div>
+                            <div className="text-[10px] text-gray-400 mt-1">
+                              ~{req.aiAnalysis?.estimatedWasteKg || 0} kg waste • {req.aiAnalysis?.collectionFrequency || 1}x/day
+                            </div>
+                          </td>
+
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2.5 py-1 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                                req.aiAnalysis?.wasteRisk === "CRITICAL"
+                                  ? "bg-red-100 text-red-800 border-red-200 animate-pulse"
+                                  : req.aiAnalysis?.wasteRisk === "HIGH"
+                                  ? "bg-orange-100 text-orange-800 border-orange-200"
+                                  : req.aiAnalysis?.wasteRisk === "MEDIUM"
+                                  ? "bg-amber-100 text-amber-800 border-amber-200"
+                                  : "bg-green-100 text-green-800 border-green-200"
+                              }`}
+                            >
+                              {req.aiAnalysis?.wasteRisk || "MEDIUM"} RISK
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 whitespace-nowrap">
+                            <span
+                              className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
+                                req.status === "APPROVED" || req.status === "ALLOCATED"
+                                  ? "bg-emerald-100 text-emerald-800 border-emerald-200"
+                                  : req.status === "MODIFIED"
+                                  ? "bg-blue-100 text-blue-800 border-blue-200"
+                                  : req.status === "REJECTED"
+                                  ? "bg-red-100 text-red-800 border-red-200"
+                                  : req.status === "COMPLETED"
+                                  ? "bg-purple-100 text-purple-800 border-purple-200"
+                                  : "bg-amber-100 text-amber-800 border-amber-200 animate-pulse"
+                              }`}
+                            >
+                              {req.status?.replace(/_/g, " ")}
+                            </span>
+                          </td>
+
+                          <td className="px-5 py-4 whitespace-nowrap text-right">
+                            <button
+                              onClick={() => {
+                                setSelectedEventRequest(req);
+                                setModWetBins(req.aiAnalysis?.recommendedBins?.wet || 2);
+                                setModDryBins(req.aiAnalysis?.recommendedBins?.dry || 2);
+                                setModGeneralBins(req.aiAnalysis?.recommendedBins?.general || 1);
+                                setModFrequency(req.aiAnalysis?.collectionFrequency || 1);
+                                setDecisionReason("");
+                                setEventDecisionType(req.status === "APPROVED" ? "allocate" : "approve");
+                                setShowEventDecisionModal(true);
+                              }}
+                              className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-sm flex items-center gap-1 ml-auto"
+                            >
+                              <span>Review &amp; Decide</span>
+                              <span>→</span>
+                            </button>
+                          </td>
+                        </tr>
+                      ))}
+                    {eventRequests.length === 0 && (
+                      <tr>
+                        <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                          No event dustbin requests received yet.
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                </table>
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* Modal: Event Request Review & Decision */}
+        {showEventDecisionModal && selectedEventRequest && (
+          <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
+            <div className="bg-white rounded-3xl p-6 w-full max-w-5xl shadow-2xl relative animate-in zoom-in duration-300 max-h-[90vh] overflow-y-auto">
+              <button
+                onClick={() => setShowEventDecisionModal(false)}
+                className="absolute top-5 right-5 w-8 h-8 bg-gray-100 rounded-full flex items-center justify-center hover:bg-gray-200 text-gray-700 font-bold border-none cursor-pointer"
+              >
+                ✕
+              </button>
+
+              {/* Header */}
+              <div className="flex items-center gap-3 border-b pb-4 mb-6">
+                <div className="p-2.5 bg-emerald-50 rounded-2xl border border-emerald-200 text-2xl">
+                  🎪
+                </div>
+                <div>
+                  <div className="flex items-center gap-2">
+                    <h3 className="text-xl font-black text-gray-900">
+                      {selectedEventRequest.event?.name}
+                    </h3>
+                    <span className="font-mono text-xs font-bold text-emerald-700 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
+                      {selectedEventRequest.requestId}
+                    </span>
+                  </div>
+                  <p className="text-xs text-gray-500 mt-0.5">
+                    Submitted by {selectedEventRequest.citizenName} ({selectedEventRequest.citizenPhone}) • Status:{" "}
+                    <span className="font-bold text-gray-700">{selectedEventRequest.status}</span>
+                  </p>
+                </div>
+              </div>
+
+              {/* 2-Column Grid */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                {/* Left Column: Event & Document Proof Details */}
+                <div className="space-y-4">
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                    <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3">
+                      1. Event &amp; Venue Details
+                    </h4>
+                    <div className="grid grid-cols-2 gap-3 text-xs">
+                      <div>
+                        <span className="text-gray-400">Event Type:</span>
+                        <p className="font-bold text-gray-800">{selectedEventRequest.event?.type}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Expected Guests:</span>
+                        <p className="font-bold text-gray-800">👥 {selectedEventRequest.event?.expectedGuests} Persons</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Date:</span>
+                        <p className="font-bold text-gray-800">📅 {selectedEventRequest.event?.date}</p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Time &amp; Duration:</span>
+                        <p className="font-bold text-gray-800">
+                          ⏰ {selectedEventRequest.event?.startTime} - {selectedEventRequest.event?.endTime} ({selectedEventRequest.event?.durationHours} hrs)
+                        </p>
+                      </div>
+                      <div className="col-span-2">
+                        <span className="text-gray-400">Venue Address:</span>
+                        <p className="font-bold text-gray-800">
+                          📍 {selectedEventRequest.location?.address} ({selectedEventRequest.event?.venueType})
+                        </p>
+                        <p className="text-[11px] text-gray-400 mt-0.5">
+                          GPS: {selectedEventRequest.location?.latitude?.toFixed(6)}, {selectedEventRequest.location?.longitude?.toFixed(6)}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Food Catering:</span>
+                        <p className="font-bold text-gray-800">
+                          {selectedEventRequest.event?.foodService
+                            ? `🍽️ ${selectedEventRequest.event?.foodType} (${selectedEventRequest.event?.foodPlates} plates)`
+                            : "🚫 No Food"}
+                        </p>
+                      </div>
+                      <div>
+                        <span className="text-gray-400">Waste Types:</span>
+                        <p className="font-bold text-gray-800">
+                          {selectedEventRequest.event?.wasteTypes?.join(", ") || "Wet, Dry"}
+                        </p>
+                      </div>
+                    </div>
+                  </div>
+
+                  {/* Document Proofs */}
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                    <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-3">
+                      2. Supporting Verification Documents
+                    </h4>
+                    <div className="space-y-3">
+                      {/* Event Proof */}
+                      <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200">
+                        <div className="flex items-center gap-3">
+                          <span className="text-xl">📄</span>
+                          <div>
+                            <p className="text-xs font-bold text-gray-800">Event Proof / Invitation Card</p>
+                            <p className="text-[10px] text-emerald-600 font-semibold">
+                              Status: {selectedEventRequest.documents?.eventProof?.verificationStatus || "VERIFIED"}
+                            </p>
+                          </div>
+                        </div>
+                        {selectedEventRequest.documents?.eventProof?.url && (
+                          <a
+                            href={selectedEventRequest.documents.eventProof.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 bg-emerald-50 text-emerald-700 hover:bg-emerald-100 rounded-lg text-xs font-black transition-all"
+                          >
+                            View Document ↗
+                          </a>
+                        )}
+                      </div>
+
+                      {/* Identity Proof */}
+                      {selectedEventRequest.documents?.identityProof?.url && (
+                        <div className="flex items-center justify-between bg-white p-3 rounded-xl border border-gray-200">
+                          <div className="flex items-center gap-3">
+                            <span className="text-xl">🪪</span>
+                            <div>
+                              <p className="text-xs font-bold text-gray-800">Identity Proof (Aadhaar / ID)</p>
+                              <p className="text-[10px] text-emerald-600 font-semibold">Attached by citizen</p>
+                            </div>
+                          </div>
+                          <a
+                            href={selectedEventRequest.documents.identityProof.url}
+                            target="_blank"
+                            rel="noopener noreferrer"
+                            className="px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-black transition-all"
+                          >
+                            View ID ↗
+                          </a>
+                        </div>
+                      )}
+                    </div>
+                  </div>
+
+                  {/* Audit Trail */}
+                  <div className="bg-gray-50 p-4 rounded-2xl border border-gray-200">
+                    <h4 className="text-xs font-black text-gray-500 uppercase tracking-wider mb-2">
+                      3. Audit Log History
+                    </h4>
+                    <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
+                      {selectedEventRequest.auditLog?.map((log, i) => (
+                        <div key={i} className="text-[11px] bg-white p-2 rounded-lg border border-gray-100">
+                          <div className="flex justify-between text-gray-400">
+                            <span className="font-bold text-gray-700">{log.user || "System"} • {log.action}</span>
+                            <span>{new Date(log.timestamp).toLocaleString("en-IN")}</span>
+                          </div>
+                          <p className="text-gray-600 mt-0.5">{log.reason || log.newValue}</p>
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* Right Column: AI Analysis & Admin Actions */}
+                <div className="space-y-4">
+                  {/* AI Recommendation Engine Card */}
+                  <div className="bg-gradient-to-br from-emerald-900 to-teal-950 p-5 rounded-2xl text-white shadow-lg">
+                    <div className="flex justify-between items-center mb-3">
+                      <div className="flex items-center gap-2">
+                        <span className="text-lg">✨</span>
+                        <h4 className="text-sm font-black text-emerald-200 uppercase tracking-wider">
+                          SafaiMitra AI Waste Engine
+                        </h4>
+                      </div>
+                      <span
+                        className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
+                          selectedEventRequest.aiAnalysis?.wasteRisk === "CRITICAL"
+                            ? "bg-red-500 text-white border-red-400"
+                            : selectedEventRequest.aiAnalysis?.wasteRisk === "HIGH"
+                            ? "bg-orange-500 text-white border-orange-400"
+                            : "bg-emerald-500 text-white border-emerald-400"
+                        }`}
+                      >
+                        {selectedEventRequest.aiAnalysis?.wasteRisk} RISK
+                      </span>
+                    </div>
+
+                    <div className="text-2xl font-black text-white mb-1">
+                      ~{selectedEventRequest.aiAnalysis?.estimatedWasteKg} kg Expected Waste
+                    </div>
+                    <p className="text-xs text-emerald-300 font-medium mb-4">
+                      {selectedEventRequest.aiAnalysis?.reasoning}
+                    </p>
+
+                    {/* Bins Allocation Metric */}
+                    <div className="grid grid-cols-4 gap-2 bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/15 text-center">
+                      <div>
+                        <div className="text-base font-black text-emerald-300">
+                          {selectedEventRequest.aiAnalysis?.recommendedBins?.wet || 1}
+                        </div>
+                        <div className="text-[10px] font-bold text-emerald-200">Wet Bins</div>
+                      </div>
+                      <div>
+                        <div className="text-base font-black text-blue-300">
+                          {selectedEventRequest.aiAnalysis?.recommendedBins?.dry || 1}
+                        </div>
+                        <div className="text-[10px] font-bold text-blue-200">Dry Bins</div>
+                      </div>
+                      <div>
+                        <div className="text-base font-black text-amber-300">
+                          {selectedEventRequest.aiAnalysis?.recommendedBins?.general || 1}
+                        </div>
+                        <div className="text-[10px] font-bold text-amber-200">General</div>
+                      </div>
+                      <div className="border-l border-white/20 pl-2">
+                        <div className="text-base font-black text-yellow-300">
+                          {selectedEventRequest.aiAnalysis?.recommendedBins?.total || 3}
+                        </div>
+                        <div className="text-[10px] font-black text-yellow-200">Total Bins</div>
+                      </div>
+                    </div>
+
+                    <div className="flex justify-between items-center mt-3 text-[11px] text-emerald-200">
+                      <span>Collection Frequency: <strong className="text-white">{selectedEventRequest.aiAnalysis?.collectionFrequency || 1}x daily</strong></span>
+                      <span>Confidence: <strong className="text-white">{selectedEventRequest.aiAnalysis?.confidenceScore} ({selectedEventRequest.aiAnalysis?.confidenceScoreNumeric}%)</strong></span>
+                    </div>
+
+                    {selectedEventRequest.aiAnalysis?.warnings?.length > 0 && (
+                      <div className="mt-3 bg-red-500/20 border border-red-500/30 p-2.5 rounded-xl text-[11px] text-red-200">
+                        <strong className="text-red-100">⚠️ Operational Alerts:</strong>
+                        <ul className="list-disc list-inside mt-0.5 space-y-0.5">
+                          {selectedEventRequest.aiAnalysis.warnings.map((w, i) => (
+                            <li key={i}>{w}</li>
+                          ))}
+                        </ul>
+                      </div>
+                    )}
+                  </div>
+
+                  {/* Admin Decision Action Box */}
+                  <div className="bg-white p-5 rounded-2xl border border-gray-200 shadow-sm">
+                    <div className="flex bg-gray-100 p-1 rounded-xl gap-1 mb-4">
+                      <button
+                        onClick={() => setEventDecisionType("approve")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          eventDecisionType === "approve"
+                            ? "bg-emerald-600 text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        ✅ Approve AI Quota
+                      </button>
+                      <button
+                        onClick={() => setEventDecisionType("modify")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          eventDecisionType === "modify"
+                            ? "bg-blue-600 text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        ✏️ Modify Quota
+                      </button>
+                      <button
+                        onClick={() => setEventDecisionType("allocate")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          eventDecisionType === "allocate"
+                            ? "bg-purple-600 text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        🚚 Allocate Fleet
+                      </button>
+                      <button
+                        onClick={() => setEventDecisionType("reject")}
+                        className={`flex-1 py-1.5 rounded-lg text-xs font-black transition-all ${
+                          eventDecisionType === "reject"
+                            ? "bg-red-600 text-white shadow-sm"
+                            : "text-gray-600 hover:text-gray-900"
+                        }`}
+                      >
+                        ❌ Reject
+                      </button>
+                    </div>
+
+                    {/* Action 1: Approve Form */}
+                    {eventDecisionType === "approve" && (
+                      <div className="space-y-3">
+                        <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-xs text-emerald-800 font-medium">
+                          Approving will authorize <strong>{selectedEventRequest.aiAnalysis?.recommendedBins?.total || 3} dustbins</strong> with {selectedEventRequest.aiAnalysis?.collectionFrequency || 1}x daily municipal collection.
+                        </div>
+                        <input
+                          type="text"
+                          placeholder="Optional admin approval comment..."
+                          value={decisionReason}
+                          onChange={(e) => setDecisionReason(e.target.value)}
+                          className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-emerald-500"
+                        />
+                        <button
+                          disabled={decisionSubmitting}
+                          onClick={() => handleApproveEvent(selectedEventRequest._id)}
+                          className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
+                        >
+                          {decisionSubmitting ? "Approving..." : "Confirm & Approve Event Request 🚀"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action 2: Modify Form */}
+                    {eventDecisionType === "modify" && (
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-3 gap-2">
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Wet Bins</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={modWetBins}
+                              onChange={(e) => setModWetBins(Number(e.target.value))}
+                              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Dry Bins</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={modDryBins}
+                              onChange={(e) => setModDryBins(Number(e.target.value))}
+                              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">General Bins</label>
+                            <input
+                              type="number"
+                              min="0"
+                              value={modGeneralBins}
+                              onChange={(e) => setModGeneralBins(Number(e.target.value))}
+                              className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                            />
+                          </div>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Daily Collection Frequency</label>
+                          <select
+                            value={modFrequency}
+                            onChange={(e) => setModFrequency(Number(e.target.value))}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                          >
+                            <option value={1}>1 time / day</option>
+                            <option value={2}>2 times / day</option>
+                            <option value={3}>3 times / day</option>
+                            <option value={4}>4 times / day (Continuous pickup)</option>
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Modification Reason (Mandatory) *</label>
+                          <textarea
+                            required
+                            placeholder="Reason for modifying bin count (e.g. Venue has extra existing dustbins on site)..."
+                            value={decisionReason}
+                            onChange={(e) => setDecisionReason(e.target.value)}
+                            rows="2"
+                            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-blue-500"
+                          />
+                        </div>
+
+                        <button
+                          disabled={decisionSubmitting}
+                          onClick={() => handleModifyEvent(selectedEventRequest._id)}
+                          className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
+                        >
+                          {decisionSubmitting ? "Updating..." : `Save & Approve Modified ${modWetBins + modDryBins + modGeneralBins} Bins ✏️`}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action 3: Allocate Form */}
+                    {eventDecisionType === "allocate" && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Assign Collection Vehicle</label>
+                          <select
+                            value={allocVehicleId}
+                            onChange={(e) => setAllocVehicleId(e.target.value)}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                          >
+                            <option value="">-- Select Municipal Vehicle --</option>
+                            {vehicles.map((v) => (
+                              <option key={v._id} value={v._id}>
+                                🚚 {v.vehicleNumber} ({v.model || "Compactor Truck"})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Assign Sanitation Field Staff</label>
+                          <select
+                            value={allocStaffId}
+                            onChange={(e) => setAllocStaffId(e.target.value)}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
+                          >
+                            <option value="">-- Select Staff Officer --</option>
+                            {staff.map((s) => (
+                              <option key={s._id} value={s._id}>
+                                👤 {s.name} ({s.phone || "Sanitation Supervisor"})
+                              </option>
+                            ))}
+                          </select>
+                        </div>
+
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Collection Timetable Schedule</label>
+                          <input
+                            type="text"
+                            value={allocSchedule}
+                            onChange={(e) => setAllocSchedule(e.target.value)}
+                            className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none"
+                          />
+                        </div>
+
+                        <button
+                          disabled={decisionSubmitting}
+                          onClick={() => handleAllocateEvent(selectedEventRequest._id)}
+                          className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
+                        >
+                          {decisionSubmitting ? "Deploying..." : "Deploy Fleet & Assign Resources 🚚"}
+                        </button>
+                      </div>
+                    )}
+
+                    {/* Action 4: Reject Form */}
+                    {eventDecisionType === "reject" && (
+                      <div className="space-y-3">
+                        <div>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Rejection Reason *</label>
+                          <textarea
+                            required
+                            placeholder="State reason for rejection (e.g. Incomplete invitation proof, illegal commercial event)..."
+                            value={decisionReason}
+                            onChange={(e) => setDecisionReason(e.target.value)}
+                            rows="3"
+                            className="w-full p-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs outline-none focus:border-red-500"
+                          />
+                        </div>
+                        <button
+                          disabled={decisionSubmitting}
+                          onClick={() => handleRejectEvent(selectedEventRequest._id)}
+                          className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
+                        >
+                          {decisionSubmitting ? "Rejecting..." : "Reject Event Dustbin Request ❌"}
+                        </button>
+                      </div>
+                    )}
+                  </div>
+                </div>
+              </div>
             </div>
           </div>
         )}
