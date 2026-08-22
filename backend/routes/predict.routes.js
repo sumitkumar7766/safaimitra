@@ -5,6 +5,7 @@ const fs = require("fs");
 const os = require("os");
 const axios = require("axios");
 const FormData = require("form-data");
+const mongoose = require("mongoose");
 const Dustbin = require("../model/DustbinModel"); // ✅ Import Dustbin Model
 
 const uploadDir = process.env.VERCEL ? os.tmpdir() : "uploads/";

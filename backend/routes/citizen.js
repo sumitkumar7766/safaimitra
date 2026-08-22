@@ -341,13 +341,14 @@ router.post(
       const {
         officeId,
         dustbinId,
-        complaintType,
-        description,
         latitude,
         longitude,
-        area,
-        priority,
       } = req.body;
+
+      const complaintType = req.body.complaintType || req.body.type || req.body.category || (req.body.aiVerification ? "AI Verified Garbage Report" : "Overflowing Dustbin");
+      const description = req.body.description || req.body.desc || req.body.details || req.body.notes || "Garbage overflow reported by citizen";
+      const area = req.body.area || req.body.locationName || req.body.address || "Local Zone";
+      const priority = req.body.priority || "medium";
 
       const result = await cloudinary.uploader.upload(req.file.path, {
         folder: "safaimitra_complaints",

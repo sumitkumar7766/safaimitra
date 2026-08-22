@@ -39,9 +39,9 @@ const ComplaintSchema = new mongoose.Schema({
         default: "Not Assigned"
     },
 
-    complaintType: { type: String, required: true },
-    description: { type: String, required: true },
-    area: { type: String },
+    complaintType: { type: String, required: true, default: "Overflowing Dustbin" },
+    description: { type: String, required: true, default: "Garbage overflow reported by citizen" },
+    area: { type: String, default: "Assigned Zone" },
     priority: {
         type: String,
         enum: ["low", "medium", "high", "critical"], // Added 'critical' for high priority
