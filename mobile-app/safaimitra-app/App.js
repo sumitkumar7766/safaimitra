@@ -38,8 +38,8 @@ import {
   CheckCircle2,
   RefreshCw,
   KeyRound,
-  Zap,
-  Globe,
+  UserPlus,
+  Shield,
 } from "lucide-react-native";
 
 import AdminPage from "./screens/Admin/Admin";
@@ -52,13 +52,11 @@ const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.5.49.186
 const { width } = Dimensions.get("window");
 
 // =========================================================================
-// 🌟 FLUID ANIMATIONS & PRESSABLE UTILITIES
+// 🌟 FLUID SPRING ANIMATION & TOUCH FEEDBACK
 // =========================================================================
-
-// Staggered Fade & Spring Entrance
 const FadeInView = ({ children, delay = 0, style }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(20)).current;
+  const slideAnim = useRef(new Animated.Value(18)).current;
 
   useEffect(() => {
     Animated.parallel([
@@ -71,7 +69,7 @@ const FadeInView = ({ children, delay = 0, style }) => {
       Animated.spring(slideAnim, {
         toValue: 0,
         delay,
-        tension: 55,
+        tension: 50,
         friction: 7,
         useNativeDriver: true,
       }),
@@ -93,7 +91,6 @@ const FadeInView = ({ children, delay = 0, style }) => {
   );
 };
 
-// Gentle Floating Badge Animation
 const FloatingBadge = ({ children, delay = 0 }) => {
   const floatAnim = useRef(new Animated.Value(0)).current;
 
@@ -101,14 +98,14 @@ const FloatingBadge = ({ children, delay = 0 }) => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
-          toValue: -5,
-          duration: 1600,
+          toValue: -4,
+          duration: 1500,
           delay,
           useNativeDriver: true,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
-          duration: 1600,
+          duration: 1500,
           useNativeDriver: true,
         }),
       ])
@@ -122,16 +119,15 @@ const FloatingBadge = ({ children, delay = 0 }) => {
   );
 };
 
-// Spring Bounce Pressable
-const ScalePressable = ({ onPress, children, style, disabled = false, activeOpacity = 0.9 }) => {
+const ScalePressable = ({ onPress, children, style, disabled = false, activeOpacity = 0.88 }) => {
   const scale = useRef(new Animated.Value(1)).current;
 
   const handlePressIn = () => {
     if (disabled) return;
     Animated.spring(scale, {
-      toValue: 0.96,
+      toValue: 0.97,
       useNativeDriver: true,
-      tension: 120,
+      tension: 100,
       friction: 6,
     }).start();
   };
@@ -161,82 +157,6 @@ const ScalePressable = ({ onPress, children, style, disabled = false, activeOpac
   );
 };
 
-// Modern Color-Coded Input Component
-const ModernInput = ({
-  label,
-  value,
-  onChangeText,
-  placeholder,
-  IconComponent,
-  secureTextEntry = false,
-  keyboardType = "default",
-  accentColor = "#10B981",
-  rightAction,
-  autoCapitalize = "none",
-  editable = true,
-  error,
-}) => {
-  const [isFocused, setIsFocused] = useState(false);
-
-  return (
-    <View style={{ marginBottom: 14 }}>
-      {label ? (
-        <Text style={{ fontSize: 12, fontWeight: "800", color: "#475569", marginBottom: 6, letterSpacing: 0.4 }}>
-          {label}
-        </Text>
-      ) : null}
-      <View
-        style={{
-          flexDirection: "row",
-          alignItems: "center",
-          backgroundColor: isFocused ? "#FFFFFF" : "#F8FAFC",
-          borderRadius: 16,
-          borderWidth: 1.5,
-          borderColor: error ? "#EF4444" : isFocused ? accentColor : "#E2E8F0",
-          paddingHorizontal: 14,
-          paddingVertical: Platform.OS === "ios" ? 13 : 3,
-          shadowColor: isFocused ? accentColor : "#000",
-          shadowOffset: { width: 0, height: 3 },
-          shadowOpacity: isFocused ? 0.16 : 0.03,
-          shadowRadius: 8,
-          elevation: isFocused ? 3 : 1,
-        }}
-      >
-        {IconComponent ? (
-          <View style={{ marginRight: 10 }}>
-            <IconComponent size={19} color={isFocused ? accentColor : "#94A3B8"} />
-          </View>
-        ) : null}
-
-        <TextInput
-          style={{
-            flex: 1,
-            fontSize: 15,
-            fontWeight: "500",
-            color: "#0F172A",
-            paddingVertical: Platform.OS === "ios" ? 0 : 8,
-          }}
-          placeholder={placeholder}
-          placeholderTextColor="#94A3B8"
-          value={value}
-          onChangeText={onChangeText}
-          secureTextEntry={secureTextEntry}
-          keyboardType={keyboardType}
-          autoCapitalize={autoCapitalize}
-          editable={editable}
-          onFocus={() => setIsFocused(true)}
-          onBlur={() => setIsFocused(false)}
-        />
-
-        {rightAction ? rightAction : null}
-      </View>
-      {error ? (
-        <Text style={{ color: "#EF4444", fontSize: 11, marginTop: 4, fontWeight: "600" }}>{error}</Text>
-      ) : null}
-    </View>
-  );
-};
-
 // =========================================================================
 // 🔐 CORE STRICT LOGIN LOGIC
 // =========================================================================
@@ -248,7 +168,7 @@ const processStrictLogin = async (
   onSuccess
 ) => {
   if (!username || !password) {
-    Alert.alert("Missing Information", "Please enter ID/Username and Password");
+    Alert.alert("Missing Information", "Please enter your ID/Username and Password");
     return;
   }
 
@@ -314,7 +234,7 @@ const processStrictLogin = async (
     console.error("LOGIN ERROR:", err);
     Alert.alert(
       "Connection Error",
-      err.response?.data?.message || "Could not connect to SafaiMitra server. Please try again."
+      err.response?.data?.message || "Could not reach SafaiMitra server. Please verify network."
     );
   }
 };
@@ -335,21 +255,21 @@ const VehicleLoginScreen = ({ goBack, onLoginSuccess }) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFBEB" }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#FFFBEB" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFDF7" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFDF7" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-        {/* Top Header Navigation */}
+        {/* Navigation */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
           <ScalePressable
             onPress={goBack}
             style={{
               paddingHorizontal: 14,
-              paddingVertical: 10,
+              paddingVertical: 9,
               borderRadius: 14,
               backgroundColor: "#FFFFFF",
               flexDirection: "row",
               alignItems: "center",
-              borderWidth: 1,
+              borderWidth: 1.5,
               borderColor: "#FDE68A",
               shadowColor: "#D97706",
               shadowOffset: { width: 0, height: 2 },
@@ -359,50 +279,49 @@ const VehicleLoginScreen = ({ goBack, onLoginSuccess }) => {
             }}
           >
             <ChevronLeft size={18} color="#D97706" style={{ marginRight: 4 }} />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>Citizen Login</Text>
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#D97706" }}>Citizen Portal</Text>
           </ScalePressable>
 
-          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FEF3C7", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#FCD34D" }}>
-            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D97706", marginRight: 6 }} />
-            <Text style={{ fontSize: 12, fontWeight: "700", color: "#92400E" }}>Vehicle Crew</Text>
+          <View style={{ backgroundColor: "#FEF3C7", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "#FCD34D" }}>
+            <Text style={{ fontSize: 11, fontWeight: "800", color: "#B45309" }}>FIELD CREW</Text>
           </View>
         </View>
 
-        {/* Hero Header */}
+        {/* Hero */}
         <FadeInView delay={100} style={{ paddingHorizontal: 24, marginBottom: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <FloatingBadge delay={150}>
               <LinearGradient
-                colors={["#F59E0B", "#EA580C"]}
+                colors={["#F97316", "#EA580C"]}
                 style={{
-                  width: 58,
-                  height: 58,
+                  width: 56,
+                  height: 56,
                   borderRadius: 18,
                   justifyContent: "center",
                   alignItems: "center",
                   marginRight: 14,
-                  shadowColor: "#F59E0B",
+                  shadowColor: "#EA580C",
                   shadowOffset: { width: 0, height: 6 },
                   shadowOpacity: 0.35,
                   shadowRadius: 12,
                   elevation: 6,
                 }}
               >
-                <Truck size={30} color="#FFFFFF" />
+                <Truck size={28} color="#FFFFFF" />
               </LinearGradient>
             </FloatingBadge>
             <View>
-              <Text style={{ fontSize: 26, fontWeight: "900", color: "#78350F", letterSpacing: -0.5 }}>
-                Vehicle Staff
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#7C2D12", letterSpacing: -0.4 }}>
+                Vehicle Staff Portal
               </Text>
-              <Text style={{ fontSize: 14, color: "#B45309", fontWeight: "600", marginTop: 2 }}>
-                Collection team & driver operations
+              <Text style={{ fontSize: 13, color: "#9A3412", fontWeight: "600", marginTop: 2 }}>
+                Driver navigation & route pickups
               </Text>
             </View>
           </View>
         </FadeInView>
 
-        {/* Card Form */}
+        {/* Form Card */}
         <FadeInView delay={200} style={{ paddingHorizontal: 20 }}>
           <View
             style={{
@@ -418,44 +337,51 @@ const VehicleLoginScreen = ({ goBack, onLoginSuccess }) => {
               elevation: 4,
             }}
           >
-            <ModernInput
-              label="STAFF IDENTIFIER / PHONE"
-              placeholder="Enter your registered staff ID"
-              value={id}
-              onChangeText={setId}
-              keyboardType="numeric"
-              IconComponent={User}
-              accentColor="#D97706"
-            />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6 }}>
+              Staff ID / Phone Number
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 3, marginBottom: 16 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#FEF3C7", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                <Phone size={17} color="#D97706" />
+              </View>
+              <TextInput
+                style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#0F172A" }}
+                placeholder="Enter registered staff ID"
+                placeholderTextColor="#94A3B8"
+                value={id}
+                onChangeText={setId}
+                keyboardType="numeric"
+              />
+            </View>
 
-            <ModernInput
-              label="PASSWORD"
-              placeholder="Enter your password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              keyboardType="numeric"
-              IconComponent={Lock}
-              accentColor="#D97706"
-              rightAction={
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                  {showPassword ? (
-                    <EyeOff size={18} color="#64748B" />
-                  ) : (
-                    <Eye size={18} color="#64748B" />
-                  )}
-                </TouchableOpacity>
-              }
-            />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6 }}>
+              Password
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 3, marginBottom: 20 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: "#FEF3C7", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                <Lock size={17} color="#D97706" />
+              </View>
+              <TextInput
+                style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#0F172A" }}
+                placeholder="Enter password"
+                placeholderTextColor="#94A3B8"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+                keyboardType="numeric"
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                {showPassword ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}
+              </TouchableOpacity>
+            </View>
 
-            {/* Submit Action */}
-            <ScalePressable onPress={handleLogin} disabled={loading} style={{ marginTop: 10 }}>
+            <ScalePressable onPress={handleLogin} disabled={loading}>
               <LinearGradient
-                colors={["#F59E0B", "#EA580C"]}
+                colors={["#F97316", "#EA580C"]}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={{
-                  borderRadius: 16,
+                  borderRadius: 18,
                   paddingVertical: 15,
                   alignItems: "center",
                   justifyContent: "center",
@@ -481,82 +407,35 @@ const VehicleLoginScreen = ({ goBack, onLoginSuccess }) => {
             </ScalePressable>
           </View>
         </FadeInView>
-
-        {/* Operational Notice */}
-        <FadeInView delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "#FEF3C7",
-              borderRadius: 16,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: "#FCD34D",
-            }}
-          >
-            <Compass size={22} color="#B45309" style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#78350F" }}>
-                Live GPS Routing Active
-              </Text>
-              <Text style={{ fontSize: 12, color: "#92400E", marginTop: 2 }}>
-                Ensure device GPS remains enabled to sync waste collection progress with headquarters.
-              </Text>
-            </View>
-          </View>
-        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 // =========================================================================
-// 🏢 OFFICE STAFF & SYSTEM ADMIN LOGIN VIEW
+// 🏢 OFFICE / ADMIN UNIFIED PORTAL LOGIN VIEW
 // =========================================================================
-const AdminLoginScreen = ({ goBack, onLoginSuccess, isOffice }) => {
+const OfficeAdminLoginScreen = ({ goBack, onLoginSuccess }) => {
+  const [roleTab, setRoleTab] = useState("office"); // "office" or "admin"
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
-  const theme = isOffice
-    ? {
-        screenBg: "#EEF2FF",
-        borderTone: "#C7D2FE",
-        badgeBg: "#E0E7FF",
-        badgeText: "#4338CA",
-        accent: "#4F46E5",
-        gradient: ["#6366F1", "#4F46E5", "#7C3AED"],
-        title: "Office Operations",
-        subtitle: "Municipal Operations & Staff Portal",
-        icon: Building2,
-      }
-    : {
-        screenBg: "#F1F5F9",
-        borderTone: "#CBD5E1",
-        badgeBg: "#E2E8F0",
-        badgeText: "#0F172A",
-        accent: "#0F172A",
-        gradient: ["#334155", "#1E293B", "#0F172A"],
-        title: "System Admin",
-        subtitle: "Central Control & Governance",
-        icon: ShieldCheck,
-      };
-
   const handleLogin = async () => {
     setLoading(true);
-    const endpoint = isOffice ? "/office/login" : "/admin/login";
-    const role = isOffice ? "office" : "admin";
-    await processStrictLogin(id, password, endpoint, role, onLoginSuccess);
+    const endpoint = roleTab === "office" ? "/office/login" : "/admin/login";
+    await processStrictLogin(id, password, endpoint, roleTab, onLoginSuccess);
     setLoading(false);
   };
 
-  const IconComp = theme.icon;
+  const isOffice = roleTab === "office";
+  const accentGradient = isOffice ? ["#6366F1", "#4F46E5"] : ["#334155", "#0F172A"];
+  const accentColor = isOffice ? "#4F46E5" : "#0F172A";
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: theme.screenBg }}>
-      <StatusBar barStyle="dark-content" backgroundColor={theme.screenBg} />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FAFAFF" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FAFAFF" />
       <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
         {/* Navigation */}
         <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
@@ -564,67 +443,107 @@ const AdminLoginScreen = ({ goBack, onLoginSuccess, isOffice }) => {
             onPress={goBack}
             style={{
               paddingHorizontal: 14,
-              paddingVertical: 10,
+              paddingVertical: 9,
               borderRadius: 14,
               backgroundColor: "#FFFFFF",
               flexDirection: "row",
               alignItems: "center",
-              borderWidth: 1,
-              borderColor: theme.borderTone,
-              shadowColor: "#000",
+              borderWidth: 1.5,
+              borderColor: "#E0E7FF",
+              shadowColor: "#4F46E5",
               shadowOffset: { width: 0, height: 2 },
-              shadowOpacity: 0.05,
+              shadowOpacity: 0.08,
               shadowRadius: 6,
               elevation: 2,
             }}
           >
-            <ChevronLeft size={18} color={theme.accent} style={{ marginRight: 4 }} />
-            <Text style={{ fontSize: 13, fontWeight: "700", color: theme.accent }}>Citizen Login</Text>
+            <ChevronLeft size={18} color="#4F46E5" style={{ marginRight: 4 }} />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#4F46E5" }}>Citizen Portal</Text>
           </ScalePressable>
 
-          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: theme.badgeBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.borderTone }}>
-            <KeyRound size={12} color={theme.badgeText} style={{ marginRight: 6 }} />
-            <Text style={{ fontSize: 12, fontWeight: "700", color: theme.badgeText }}>
-              {isOffice ? "Operations Portal" : "Admin Console"}
-            </Text>
+          <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 12, paddingVertical: 5, borderRadius: 20, borderWidth: 1, borderColor: "#C7D2FE" }}>
+            <Text style={{ fontSize: 11, fontWeight: "800", color: "#4338CA" }}>ADMIN / MUNICIPAL</Text>
           </View>
         </View>
 
-        {/* Header */}
+        {/* Hero Title */}
         <FadeInView delay={100} style={{ paddingHorizontal: 24, marginBottom: 20 }}>
           <View style={{ flexDirection: "row", alignItems: "center" }}>
             <FloatingBadge delay={200}>
               <LinearGradient
-                colors={theme.gradient}
+                colors={accentGradient}
                 style={{
-                  width: 58,
-                  height: 58,
+                  width: 56,
+                  height: 56,
                   borderRadius: 18,
                   justifyContent: "center",
                   alignItems: "center",
                   marginRight: 14,
-                  shadowColor: theme.accent,
+                  shadowColor: accentColor,
                   shadowOffset: { width: 0, height: 6 },
-                  shadowOpacity: 0.3,
+                  shadowOpacity: 0.35,
                   shadowRadius: 12,
                   elevation: 6,
                 }}
               >
-                <IconComp size={30} color="#FFFFFF" />
+                {isOffice ? <Building2 size={28} color="#FFFFFF" /> : <ShieldCheck size={28} color="#FFFFFF" />}
               </LinearGradient>
             </FloatingBadge>
             <View>
-              <Text style={{ fontSize: 26, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 }}>
-                {theme.title}
+              <Text style={{ fontSize: 24, fontWeight: "900", color: "#1E1B4B", letterSpacing: -0.4 }}>
+                Office / Admin Portal
               </Text>
-              <Text style={{ fontSize: 14, color: "#64748B", fontWeight: "600", marginTop: 2 }}>
-                {theme.subtitle}
+              <Text style={{ fontSize: 13, color: "#4338CA", fontWeight: "600", marginTop: 2 }}>
+                Management & monitoring dashboard
               </Text>
             </View>
           </View>
         </FadeInView>
 
-        {/* Card Form */}
+        {/* Role Segment Switcher */}
+        <View style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+          <View style={{ flexDirection: "row", backgroundColor: "#E0E7FF", borderRadius: 16, padding: 4 }}>
+            <TouchableOpacity
+              onPress={() => setRoleTab("office")}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 12,
+                backgroundColor: isOffice ? "#FFFFFF" : "transparent",
+                alignItems: "center",
+                shadowColor: isOffice ? "#000" : "transparent",
+                shadowOpacity: isOffice ? 0.08 : 0,
+                shadowRadius: 4,
+                elevation: isOffice ? 2 : 0,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "800", color: isOffice ? "#4338CA" : "#6366F1" }}>
+                🏢 Office Staff
+              </Text>
+            </TouchableOpacity>
+
+            <TouchableOpacity
+              onPress={() => setRoleTab("admin")}
+              style={{
+                flex: 1,
+                paddingVertical: 10,
+                borderRadius: 12,
+                backgroundColor: !isOffice ? "#FFFFFF" : "transparent",
+                alignItems: "center",
+                shadowColor: !isOffice ? "#000" : "transparent",
+                shadowOpacity: !isOffice ? 0.08 : 0,
+                shadowRadius: 4,
+                elevation: !isOffice ? 2 : 0,
+              }}
+            >
+              <Text style={{ fontSize: 13, fontWeight: "800", color: !isOffice ? "#0F172A" : "#6366F1" }}>
+                🔐 System Admin
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+
+        {/* Form Card */}
         <FadeInView delay={200} style={{ paddingHorizontal: 20 }}>
           <View
             style={{
@@ -632,55 +551,62 @@ const AdminLoginScreen = ({ goBack, onLoginSuccess, isOffice }) => {
               borderRadius: 24,
               padding: 22,
               borderWidth: 1.5,
-              borderColor: theme.borderTone,
-              shadowColor: "#0F172A",
+              borderColor: isOffice ? "#C7D2FE" : "#CBD5E1",
+              shadowColor: accentColor,
               shadowOffset: { width: 0, height: 8 },
-              shadowOpacity: 0.07,
+              shadowOpacity: 0.08,
               shadowRadius: 20,
               elevation: 4,
             }}
           >
-            <ModernInput
-              label="OFFICIAL USERNAME / EMAIL"
-              placeholder="Enter official credentials"
-              value={id}
-              onChangeText={setId}
-              IconComponent={User}
-              accentColor={theme.accent}
-            />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6 }}>
+              {isOffice ? "Official Username / Email" : "Admin ID / Username"}
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 3, marginBottom: 16 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: isOffice ? "#EEF2FF" : "#F1F5F9", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                <User size={17} color={accentColor} />
+              </View>
+              <TextInput
+                style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#0F172A" }}
+                placeholder="Enter credentials"
+                placeholderTextColor="#94A3B8"
+                value={id}
+                onChangeText={setId}
+              />
+            </View>
 
-            <ModernInput
-              label="SECURITY PASSWORD"
-              placeholder="Enter secret password"
-              value={password}
-              onChangeText={setPassword}
-              secureTextEntry={!showPassword}
-              IconComponent={Lock}
-              accentColor={theme.accent}
-              rightAction={
-                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
-                  {showPassword ? (
-                    <EyeOff size={18} color="#64748B" />
-                  ) : (
-                    <Eye size={18} color="#64748B" />
-                  )}
-                </TouchableOpacity>
-              }
-            />
+            <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6 }}>
+              Security Password
+            </Text>
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 12 : 3, marginBottom: 20 }}>
+              <View style={{ width: 34, height: 34, borderRadius: 17, backgroundColor: isOffice ? "#EEF2FF" : "#F1F5F9", justifyContent: "center", alignItems: "center", marginRight: 10 }}>
+                <Lock size={17} color={accentColor} />
+              </View>
+              <TextInput
+                style={{ flex: 1, fontSize: 15, fontWeight: "600", color: "#0F172A" }}
+                placeholder="Enter secret password"
+                placeholderTextColor="#94A3B8"
+                value={password}
+                onChangeText={setPassword}
+                secureTextEntry={!showPassword}
+              />
+              <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                {showPassword ? <EyeOff size={18} color="#64748B" /> : <Eye size={18} color="#64748B" />}
+              </TouchableOpacity>
+            </View>
 
-            {/* Login Action */}
-            <ScalePressable onPress={handleLogin} disabled={loading} style={{ marginTop: 10 }}>
+            <ScalePressable onPress={handleLogin} disabled={loading}>
               <LinearGradient
-                colors={theme.gradient}
+                colors={accentGradient}
                 start={{ x: 0, y: 0 }}
                 end={{ x: 1, y: 0 }}
                 style={{
-                  borderRadius: 16,
+                  borderRadius: 18,
                   paddingVertical: 15,
                   alignItems: "center",
                   justifyContent: "center",
                   flexDirection: "row",
-                  shadowColor: theme.accent,
+                  shadowColor: accentColor,
                   shadowOffset: { width: 0, height: 6 },
                   shadowOpacity: 0.35,
                   shadowRadius: 12,
@@ -701,51 +627,26 @@ const AdminLoginScreen = ({ goBack, onLoginSuccess, isOffice }) => {
             </ScalePressable>
           </View>
         </FadeInView>
-
-        {/* Security Notice */}
-        <FadeInView delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
-          <View
-            style={{
-              flexDirection: "row",
-              alignItems: "center",
-              backgroundColor: "#FFFFFF",
-              borderRadius: 16,
-              padding: 14,
-              borderWidth: 1,
-              borderColor: theme.borderTone,
-            }}
-          >
-            <ShieldCheck size={22} color={theme.accent} style={{ marginRight: 12 }} />
-            <View style={{ flex: 1 }}>
-              <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155" }}>
-                Encrypted Session
-              </Text>
-              <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
-                All administrative access is monitored and audited in compliance with municipal IT guidelines.
-              </Text>
-            </View>
-          </View>
-        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
 // =========================================================================
-// 🌟 MAIN APPLICATION & UNIFIED DEFAULT CITIZEN LOGIN SCREEN
+// 🌿 MAIN HOME SCREEN - DEFAULT CITIZEN LOGIN (EXACT MATCH TO REFERENCE)
 // =========================================================================
 export default function App() {
-  const [screen, setScreen] = useState("home"); // "home" is Default Citizen Portal + other options
+  const [screen, setScreen] = useState("home");
   const [loading, setLoading] = useState(false);
 
-  // Citizen Login/Register state
+  // Citizen Login / Register Tab
   const [isLoginTab, setIsLoginTab] = useState(true);
-  const [citizenId, setCitizenId] = useState("");
-  const [citizenPassword, setCitizenPassword] = useState("");
+  const [citizenPhone, setCitizenPhone] = useState("7488308179");
+  const [citizenPassword, setCitizenPassword] = useState("123456789012");
   const [showCitizenPassword, setShowCitizenPassword] = useState(false);
   const [citizenLoading, setCitizenLoading] = useState(false);
 
-  // Citizen Registration States
+  // Registration States
   const [officeList, setOfficeList] = useState([]);
   const [loadingCities, setLoadingCities] = useState(false);
   const [locationLoading, setLocationLoading] = useState(false);
@@ -795,7 +696,7 @@ export default function App() {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== "granted") {
-        setLocationError("GPS permission denied.");
+        setLocationError("GPS permission was denied.");
         setLocationLoading(false);
         return;
       }
@@ -816,8 +717,8 @@ export default function App() {
   };
 
   const handleCitizenLogin = async () => {
-    if (!citizenId || !citizenPassword) {
-      Alert.alert("Missing Details", "Please enter your Phone Number and Password.");
+    if (!citizenPhone || !citizenPassword) {
+      Alert.alert("Missing Details", "Please enter Phone Number and Password.");
       return;
     }
     setCitizenLoading(true);
@@ -826,7 +727,7 @@ export default function App() {
     try {
       const res = await axios.post(
         fullUrl,
-        { username: citizenId, password: citizenPassword },
+        { username: citizenPhone, password: citizenPassword },
         { headers: { "Content-Type": "application/json" }, timeout: 10000 }
       );
 
@@ -840,14 +741,14 @@ export default function App() {
           await AsyncStorage.setItem("officeId", user.officeId.toString());
         }
 
-        Alert.alert("Welcome! 🎉", `Logged in as ${user.name || user.fullName || "Citizen"}`);
+        Alert.alert("Welcome! 🎉", `Signed in as ${user.name || user.fullName || "Citizen"}`);
         setScreen("citizen");
       } else {
         Alert.alert("Authentication Failed", res.data.message || "Invalid credentials.");
       }
     } catch (err) {
       console.error("Citizen Login Error:", err);
-      Alert.alert("Login Error", err.response?.data?.message || "Unable to connect to the backend server.");
+      Alert.alert("Login Error", err.response?.data?.message || "Could not connect to SafaiMitra server.");
     } finally {
       setCitizenLoading(false);
     }
@@ -897,7 +798,7 @@ export default function App() {
       if (res.data && res.data.success) {
         Alert.alert("Account Created! 🎉", "Your citizen profile is registered. Please sign in.");
         setIsLoginTab(true);
-        setCitizenId(regData.phone);
+        setCitizenPhone(regData.phone);
         setRegData({
           fullName: "",
           email: "",
@@ -943,252 +844,180 @@ export default function App() {
   if (screen === "vehicle") return <StaffDashboard goBack={handleLogout} />;
   if (screen === "register") return <UserRegister goBack={() => setScreen("home")} />;
 
-  // Secondary Specialized Login Screens (Accessible from options below)
+  // Specialized Login Screens
   if (screen === "vehicleLogin") {
-    return (
-      <VehicleLoginScreen
-        goBack={() => setScreen("home")}
-        onLoginSuccess={(next) => setScreen(next)}
-      />
-    );
+    return <VehicleLoginScreen goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} />;
   }
-  if (screen === "officeLogin") {
-    return (
-      <AdminLoginScreen
-        isOffice={true}
-        goBack={() => setScreen("home")}
-        onLoginSuccess={(next) => setScreen(next)}
-      />
-    );
-  }
-  if (screen === "adminLogin") {
-    return (
-      <AdminLoginScreen
-        isOffice={false}
-        goBack={() => setScreen("home")}
-        onLoginSuccess={(next) => setScreen(next)}
-      />
-    );
+  if (screen === "officeAdminLogin") {
+    return <OfficeAdminLoginScreen goBack={() => setScreen("home")} onLoginSuccess={(next) => setScreen(next)} />;
   }
 
   // =========================================================================
-  // 🌟 COLORFUL DEFAULT HOME SCREEN (CITIZEN LOGIN + OTHER PORTAL CARDS)
+  // 🌟 MAIN SCREEN: PIXEL-PERFECT MATCH TO REFERENCE IMAGE
   // =========================================================================
-  const ColorfulPortalOption = ({
-    title,
-    subtitle,
-    badge,
-    icon: IconComponent,
-    gradientColors,
-    accentColor,
-    borderColor,
-    targetScreen,
-    delay,
-  }) => {
-    return (
-      <FadeInView delay={delay} style={{ marginBottom: 12 }}>
-        <ScalePressable
-          onPress={() => setScreen(targetScreen)}
-          style={{
-            backgroundColor: "#FFFFFF",
-            borderRadius: 20,
-            padding: 14,
-            borderWidth: 1.5,
-            borderColor,
-            shadowColor: accentColor,
-            shadowOffset: { width: 0, height: 4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 12,
-            elevation: 3,
-            flexDirection: "row",
-            alignItems: "center",
-          }}
-        >
-          {/* Icon Badge with Multi-stop Gradient */}
-          <LinearGradient
-            colors={gradientColors}
-            start={{ x: 0, y: 0 }}
-            end={{ x: 1, y: 1 }}
-            style={{
-              width: 48,
-              height: 48,
-              borderRadius: 15,
-              justifyContent: "center",
-              alignItems: "center",
-              marginRight: 14,
-              shadowColor: accentColor,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              elevation: 4,
-            }}
-          >
-            <IconComponent size={24} color="#FFFFFF" />
-          </LinearGradient>
-
-          {/* Description */}
-          <View style={{ flex: 1 }}>
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
-              <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A", marginRight: 6 }}>
-                {title}
-              </Text>
-              {badge ? (
-                <View style={{ backgroundColor: `${accentColor}18`, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
-                  <Text style={{ fontSize: 10, fontWeight: "800", color: accentColor }}>{badge}</Text>
-                </View>
-              ) : null}
-            </View>
-            <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>{subtitle}</Text>
-          </View>
-
-          {/* Arrow Pill */}
-          <View
-            style={{
-              width: 34,
-              height: 34,
-              borderRadius: 11,
-              backgroundColor: `${accentColor}15`,
-              justifyContent: "center",
-              alignItems: "center",
-            }}
-          >
-            <ArrowRight size={17} color={accentColor} />
-          </View>
-        </ScalePressable>
-      </FadeInView>
-    );
-  };
-
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
-      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F9FBFC" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F9FBFC" />
       <KeyboardAvoidingView
         behavior={Platform.OS === "ios" ? "padding" : undefined}
         style={{ flex: 1 }}
       >
-        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
-          {/* Top Brand Hero with Vibrant Gradient Banner */}
-          <FadeInView delay={50} style={{ paddingHorizontal: 20, paddingTop: 12, marginBottom: 16 }}>
-            {/* Live Indicator + Tagline Banner */}
-            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 12 }}>
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#ECFDF5",
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: "#A7F3D0",
-                }}
-              >
-                <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#10B981", marginRight: 6 }} />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#047857" }}>
-                  🟢 Live Network Active
-                </Text>
-              </View>
-
-              <View
-                style={{
-                  flexDirection: "row",
-                  alignItems: "center",
-                  backgroundColor: "#EEF2FF",
-                  paddingHorizontal: 10,
-                  paddingVertical: 5,
-                  borderRadius: 20,
-                  borderWidth: 1,
-                  borderColor: "#C7D2FE",
-                }}
-              >
-                <Sparkles size={12} color="#6366F1" style={{ marginRight: 4 }} />
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#4F46E5" }}>
-                  Swachh Bharat 2.0
-                </Text>
-              </View>
-            </View>
-
-            {/* Brand Logo & Title */}
-            <LinearGradient
-              colors={["#059669", "#10B981", "#0D9488"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 36 }}>
+          {/* 1. TOP STATUS BADGES */}
+          <FadeInView delay={30} style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", paddingHorizontal: 20, paddingTop: 8, paddingBottom: 10 }}>
+            {/* Live Network Active Pill */}
+            <View
               style={{
-                borderRadius: 24,
-                padding: 18,
-                shadowColor: "#10B981",
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.35,
-                shadowRadius: 16,
-                elevation: 6,
                 flexDirection: "row",
                 alignItems: "center",
+                backgroundColor: "#ECFDF5",
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                borderWidth: 1.2,
+                borderColor: "#A7F3D0",
               }}
             >
-              <FloatingBadge delay={0}>
-                <View
-                  style={{
-                    width: 52,
-                    height: 52,
-                    borderRadius: 18,
-                    backgroundColor: "#FFFFFF",
-                    justifyContent: "center",
-                    alignItems: "center",
-                    marginRight: 14,
-                    shadowColor: "#000",
-                    shadowOffset: { width: 0, height: 4 },
-                    shadowOpacity: 0.15,
-                    shadowRadius: 8,
-                    elevation: 4,
-                  }}
-                >
-                  <Text style={{ fontSize: 26 }}>🌿</Text>
-                </View>
-              </FloatingBadge>
-              <View style={{ flex: 1 }}>
-                <Text style={{ fontSize: 24, fontWeight: "900", color: "#FFFFFF", letterSpacing: -0.5 }}>
-                  SafaiMitra
-                </Text>
-                <Text style={{ fontSize: 12, fontWeight: "600", color: "#D1FAE5", marginTop: 2 }}>
-                  Smart Civic Waste & Sanitation Platform
-                </Text>
-              </View>
-            </LinearGradient>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981", marginRight: 7 }} />
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#065F46" }}>
+                Live Network Active
+              </Text>
+            </View>
+
+            {/* Swachh Bharat 2.0 Pill */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F5F3FF",
+                paddingHorizontal: 14,
+                paddingVertical: 7,
+                borderRadius: 20,
+                borderWidth: 1.2,
+                borderColor: "#DDD6FE",
+              }}
+            >
+              <Sparkles size={13} color="#7C3AED" style={{ marginRight: 6 }} />
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#6D28D9" }}>
+                Swachh Bharat 2.0
+              </Text>
+            </View>
           </FadeInView>
 
-          {/* ========================================================= */}
-          {/* 🌟 1. DEFAULT CITIZEN LOGIN & REGISTRATION CARD */}
-          {/* ========================================================= */}
-          <FadeInView delay={120} style={{ paddingHorizontal: 20, marginBottom: 24 }}>
+          {/* 2. HERO BRANDING & ILLUSTRATION HEADER */}
+          <FadeInView delay={80} style={{ paddingHorizontal: 20, paddingTop: 6, paddingBottom: 12, position: "relative" }}>
+            <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "flex-start" }}>
+              {/* Left Brand Details */}
+              <View style={{ flex: 1, paddingRight: 10 }}>
+                {/* Floating Elevated Logo */}
+                <FloatingBadge delay={0}>
+                  <View
+                    style={{
+                      width: 58,
+                      height: 58,
+                      borderRadius: 18,
+                      backgroundColor: "#FFFFFF",
+                      justifyContent: "center",
+                      alignItems: "center",
+                      marginBottom: 12,
+                      shadowColor: "#059669",
+                      shadowOffset: { width: 0, height: 6 },
+                      shadowOpacity: 0.15,
+                      shadowRadius: 12,
+                      elevation: 5,
+                      borderWidth: 1,
+                      borderColor: "#ECFDF5",
+                    }}
+                  >
+                    <Text style={{ fontSize: 28 }}>🌿</Text>
+                  </View>
+                </FloatingBadge>
+
+                {/* Brand Title */}
+                <Text style={{ fontSize: 32, fontWeight: "900", letterSpacing: -0.8, lineHeight: 38 }}>
+                  <Text style={{ color: "#059669" }}>Safai</Text>
+                  <Text style={{ color: "#0F172A" }}>Mitra</Text>
+                </Text>
+
+                {/* Subtitle */}
+                <Text style={{ fontSize: 14, fontWeight: "700", color: "#334155", marginTop: 4, lineHeight: 20 }}>
+                  Smart Civic Waste &{"\n"}Sanitation Platform
+                </Text>
+
+                {/* Tagline */}
+                <View style={{ flexDirection: "row", alignItems: "center", marginTop: 8 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "700", color: "#059669" }}>
+                    🍃 Cleaner City • Better Tomorrow
+                  </Text>
+                </View>
+              </View>
+
+              {/* Right Hero Visual Representation (City & Crew Artwork) */}
+              <View
+                style={{
+                  width: width * 0.42,
+                  height: 140,
+                  borderRadius: 24,
+                  overflow: "hidden",
+                  justifyContent: "center",
+                  alignItems: "center",
+                }}
+              >
+                <LinearGradient
+                  colors={["#D1FAE5", "#ECFDF5", "#E0F2FE"]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 1 }}
+                  style={{
+                    width: "100%",
+                    height: "100%",
+                    borderRadius: 24,
+                    padding: 12,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    borderWidth: 1,
+                    borderColor: "#A7F3D0",
+                  }}
+                >
+                  <Text style={{ fontSize: 34, marginBottom: 4 }}>👥 🗑️</Text>
+                  <View style={{ backgroundColor: "#FFFFFF", paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12, shadowColor: "#000", shadowOpacity: 0.06, shadowRadius: 4, elevation: 2 }}>
+                    <Text style={{ fontSize: 10, fontWeight: "800", color: "#047857" }}>Clean City Team</Text>
+                  </View>
+                </LinearGradient>
+              </View>
+            </View>
+          </FadeInView>
+
+          {/* 3. MAIN CITIZEN PORTAL CARD */}
+          <FadeInView delay={140} style={{ paddingHorizontal: 18, marginBottom: 20 }}>
             <View
               style={{
                 backgroundColor: "#FFFFFF",
-                borderRadius: 24,
+                borderRadius: 28,
                 padding: 20,
-                borderWidth: 1.5,
-                borderColor: "#A7F3D0",
-                shadowColor: "#10B981",
-                shadowOffset: { width: 0, height: 8 },
-                shadowOpacity: 0.1,
-                shadowRadius: 20,
-                elevation: 4,
+                borderWidth: 1.2,
+                borderColor: "#F1F5F9",
+                shadowColor: "#0F172A",
+                shadowOffset: { width: 0, height: 10 },
+                shadowOpacity: 0.07,
+                shadowRadius: 24,
+                elevation: 5,
               }}
             >
-              {/* Header Title with User Icon */}
-              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 14 }}>
+              {/* Card Header */}
+              <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 16 }}>
                 <View style={{ flexDirection: "row", alignItems: "center" }}>
                   <LinearGradient
-                    colors={["#10B981", "#059669"]}
+                    colors={["#059669", "#10B981"]}
                     style={{
-                      width: 36,
-                      height: 36,
-                      borderRadius: 12,
+                      width: 44,
+                      height: 44,
+                      borderRadius: 14,
                       justifyContent: "center",
                       alignItems: "center",
-                      marginRight: 10,
+                      marginRight: 12,
                     }}
                   >
-                    <User size={20} color="#FFFFFF" />
+                    <User size={22} color="#FFFFFF" />
                   </LinearGradient>
                   <View>
                     <Text style={{ fontSize: 18, fontWeight: "800", color: "#0F172A" }}>
@@ -1200,31 +1029,41 @@ export default function App() {
                   </View>
                 </View>
 
-                {/* Status Chip */}
-                <View style={{ backgroundColor: "#DCFCE7", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8 }}>
-                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#166534" }}>PUBLIC</Text>
+                {/* PUBLIC Badge */}
+                <View
+                  style={{
+                    backgroundColor: "#DCFCE7",
+                    paddingHorizontal: 12,
+                    paddingVertical: 5,
+                    borderRadius: 10,
+                  }}
+                >
+                  <Text style={{ fontSize: 11, fontWeight: "800", color: "#166534", letterSpacing: 0.5 }}>
+                    PUBLIC
+                  </Text>
                 </View>
               </View>
 
-              {/* Segmented Control Pill Switcher */}
+              {/* Segmented Tab Switcher */}
               <View
                 style={{
                   flexDirection: "row",
                   backgroundColor: "#F1F5F9",
-                  borderRadius: 14,
+                  borderRadius: 16,
                   padding: 4,
-                  marginBottom: 16,
-                  borderWidth: 1,
-                  borderColor: "#E2E8F0",
+                  marginBottom: 18,
                 }}
               >
+                {/* Active Sign In Tab */}
                 <TouchableOpacity
                   onPress={() => setIsLoginTab(true)}
                   style={{
                     flex: 1,
-                    paddingVertical: 9,
-                    borderRadius: 11,
+                    paddingVertical: 10,
+                    borderRadius: 13,
                     backgroundColor: isLoginTab ? "#FFFFFF" : "transparent",
+                    flexDirection: "row",
+                    justifyContent: "center",
                     alignItems: "center",
                     shadowColor: isLoginTab ? "#000" : "transparent",
                     shadowOffset: { width: 0, height: 2 },
@@ -1233,18 +1072,22 @@ export default function App() {
                     elevation: isLoginTab ? 2 : 0,
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: isLoginTab ? "#047857" : "#64748B" }}>
+                  <Text style={{ fontSize: 14, marginRight: 6 }}>🌿</Text>
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: isLoginTab ? "#065F46" : "#64748B" }}>
                     Sign In
                   </Text>
                 </TouchableOpacity>
 
+                {/* Create Account Tab */}
                 <TouchableOpacity
                   onPress={() => setIsLoginTab(false)}
                   style={{
                     flex: 1,
-                    paddingVertical: 9,
-                    borderRadius: 11,
+                    paddingVertical: 10,
+                    borderRadius: 13,
                     backgroundColor: !isLoginTab ? "#FFFFFF" : "transparent",
+                    flexDirection: "row",
+                    justifyContent: "center",
                     alignItems: "center",
                     shadowColor: !isLoginTab ? "#000" : "transparent",
                     shadowOffset: { width: 0, height: 2 },
@@ -1253,60 +1096,126 @@ export default function App() {
                     elevation: !isLoginTab ? 2 : 0,
                   }}
                 >
-                  <Text style={{ fontSize: 13, fontWeight: "800", color: !isLoginTab ? "#047857" : "#64748B" }}>
+                  <UserPlus size={15} color={!isLoginTab ? "#065F46" : "#64748B"} style={{ marginRight: 6 }} />
+                  <Text style={{ fontSize: 13, fontWeight: "800", color: !isLoginTab ? "#065F46" : "#64748B" }}>
                     Create Account
                   </Text>
                 </TouchableOpacity>
               </View>
 
               {isLoginTab ? (
-                /* ================= CITIZEN SIGN IN ================= */
+                /* ================= SIGN IN TAB ================= */
                 <View>
-                  <ModernInput
-                    label="PHONE NUMBER"
-                    placeholder="Enter registered 10-digit mobile"
-                    value={citizenId}
-                    onChangeText={setCitizenId}
-                    keyboardType="phone-pad"
-                    IconComponent={Phone}
-                    accentColor="#10B981"
-                  />
+                  {/* Phone Number Field */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>
+                    Phone Number
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 18,
+                      borderWidth: 1.5,
+                      borderColor: "#E2E8F0",
+                      paddingHorizontal: 12,
+                      paddingVertical: Platform.OS === "ios" ? 11 : 3,
+                      marginBottom: 16,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#ECFDF5",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginRight: 10,
+                      }}
+                    >
+                      <Phone size={17} color="#059669" />
+                    </View>
+                    <TextInput
+                      style={{ flex: 1, fontSize: 15, fontWeight: "700", color: "#0F172A" }}
+                      placeholder="Enter 10-digit phone"
+                      placeholderTextColor="#94A3B8"
+                      value={citizenPhone}
+                      onChangeText={setCitizenPhone}
+                      keyboardType="phone-pad"
+                    />
+                    <CheckCircle2 size={19} color="#10B981" />
+                  </View>
 
-                  <ModernInput
-                    label="PASSWORD"
-                    placeholder="Enter secret password"
-                    value={citizenPassword}
-                    onChangeText={setCitizenPassword}
-                    secureTextEntry={!showCitizenPassword}
-                    IconComponent={Lock}
-                    accentColor="#10B981"
-                    rightAction={
-                      <TouchableOpacity onPress={() => setShowCitizenPassword(!showCitizenPassword)} style={{ padding: 4 }}>
-                        {showCitizenPassword ? (
-                          <EyeOff size={18} color="#64748B" />
-                        ) : (
-                          <Eye size={18} color="#64748B" />
-                        )}
-                      </TouchableOpacity>
-                    }
-                  />
+                  {/* Password Field */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>
+                    Password
+                  </Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      alignItems: "center",
+                      backgroundColor: "#FFFFFF",
+                      borderRadius: 18,
+                      borderWidth: 1.5,
+                      borderColor: "#E2E8F0",
+                      paddingHorizontal: 12,
+                      paddingVertical: Platform.OS === "ios" ? 11 : 3,
+                      marginBottom: 8,
+                    }}
+                  >
+                    <View
+                      style={{
+                        width: 36,
+                        height: 36,
+                        borderRadius: 18,
+                        backgroundColor: "#ECFDF5",
+                        justifyContent: "center",
+                        alignItems: "center",
+                        marginRight: 10,
+                      }}
+                    >
+                      <Lock size={17} color="#059669" />
+                    </View>
+                    <TextInput
+                      style={{ flex: 1, fontSize: 16, fontWeight: "700", color: "#0F172A", letterSpacing: 2 }}
+                      placeholder="Enter password"
+                      placeholderTextColor="#94A3B8"
+                      value={citizenPassword}
+                      onChangeText={setCitizenPassword}
+                      secureTextEntry={!showCitizenPassword}
+                    />
+                    <TouchableOpacity onPress={() => setShowCitizenPassword(!showCitizenPassword)} style={{ padding: 4 }}>
+                      {showCitizenPassword ? <EyeOff size={19} color="#64748B" /> : <Eye size={19} color="#64748B" />}
+                    </TouchableOpacity>
+                  </View>
 
-                  {/* Sign In CTA Button */}
-                  <ScalePressable onPress={handleCitizenLogin} disabled={citizenLoading} style={{ marginTop: 6 }}>
+                  {/* Forgot Password Link */}
+                  <TouchableOpacity
+                    onPress={() => Alert.alert("Password Reset", "Please contact your Municipal Administrator or use registered OTP.")}
+                    style={{ alignSelf: "flex-end", marginBottom: 18 }}
+                  >
+                    <Text style={{ fontSize: 12, fontWeight: "700", color: "#059669" }}>
+                      Forgot Password?
+                    </Text>
+                  </TouchableOpacity>
+
+                  {/* Sign In as Citizen CTA Button */}
+                  <ScalePressable onPress={handleCitizenLogin} disabled={citizenLoading}>
                     <LinearGradient
-                      colors={["#10B981", "#059669"]}
+                      colors={["#059669", "#0D9488"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{
-                        borderRadius: 16,
-                        paddingVertical: 14,
+                        borderRadius: 20,
+                        paddingVertical: 16,
                         alignItems: "center",
                         justifyContent: "center",
                         flexDirection: "row",
-                        shadowColor: "#10B981",
-                        shadowOffset: { width: 0, height: 6 },
+                        shadowColor: "#059669",
+                        shadowOffset: { width: 0, height: 8 },
                         shadowOpacity: 0.35,
-                        shadowRadius: 12,
+                        shadowRadius: 14,
                         elevation: 5,
                       }}
                     >
@@ -1314,7 +1223,7 @@ export default function App() {
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <>
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#FFFFFF", marginRight: 8 }}>
+                          <Text style={{ fontSize: 16, fontWeight: "800", color: "#FFFFFF", marginRight: 8 }}>
                             Sign In as Citizen
                           </Text>
                           <ArrowRight size={18} color="#FFFFFF" />
@@ -1324,107 +1233,110 @@ export default function App() {
                   </ScalePressable>
                 </View>
               ) : (
-                /* ================= CITIZEN REGISTER ================= */
+                /* ================= CREATE ACCOUNT TAB ================= */
                 <View>
-                  <ModernInput
-                    label="FULL NAME *"
-                    placeholder="e.g. Rahul Sharma"
-                    value={regData.fullName}
-                    onChangeText={(val) => setRegData({ ...regData, fullName: val })}
-                    IconComponent={User}
-                    accentColor="#10B981"
-                    autoCapitalize="words"
-                  />
-
-                  <ModernInput
-                    label="PHONE NUMBER *"
-                    placeholder="10-digit mobile number"
-                    value={regData.phone}
-                    onChangeText={(val) => setRegData({ ...regData, phone: val })}
-                    keyboardType="phone-pad"
-                    IconComponent={Phone}
-                    accentColor="#10B981"
-                  />
-
-                  <ModernInput
-                    label="EMAIL ADDRESS *"
-                    placeholder="rahul@example.com"
-                    value={regData.email}
-                    onChangeText={(val) => setRegData({ ...regData, email: val })}
-                    keyboardType="email-address"
-                    IconComponent={Mail}
-                    accentColor="#10B981"
-                  />
-
-                  <ModernInput
-                    label="RESIDENTIAL ADDRESS *"
-                    placeholder="Flat / House No, Street, Colony"
-                    value={regData.address}
-                    onChangeText={(val) => setRegData({ ...regData, address: val })}
-                    IconComponent={Building2}
-                    accentColor="#10B981"
-                  />
-
-                  {/* City Selector */}
-                  <View style={{ marginBottom: 14 }}>
-                    <Text style={{ fontSize: 12, fontWeight: "800", color: "#475569", marginBottom: 6 }}>
-                      MUNICIPAL CORPORATION *
-                    </Text>
-                    <View
-                      style={{
-                        backgroundColor: "#F8FAFC",
-                        borderRadius: 16,
-                        borderWidth: 1.5,
-                        borderColor: "#E2E8F0",
-                        overflow: "hidden",
-                      }}
-                    >
-                      {loadingCities ? (
-                        <View style={{ padding: 14, flexDirection: "row", alignItems: "center" }}>
-                          <ActivityIndicator size="small" color="#10B981" />
-                          <Text style={{ marginLeft: 10, color: "#64748B", fontSize: 13 }}>Loading cities...</Text>
-                        </View>
-                      ) : (
-                        <Picker
-                          selectedValue={regData.officeId}
-                          onValueChange={(itemValue, itemIndex) => {
-                            if (itemIndex > 0) {
-                              const selectedObj = officeList[itemIndex - 1];
-                              setRegData({
-                                ...regData,
-                                officeId: itemValue,
-                                cityName: selectedObj ? selectedObj.name : "",
-                              });
-                            } else {
-                              setRegData({ ...regData, officeId: "", cityName: "" });
-                            }
-                          }}
-                          style={{ color: "#0F172A" }}
-                        >
-                          <Picker.Item label="-- Select City / Corporation --" value="" color="#94A3B8" />
-                          {officeList.map((office) => (
-                            <Picker.Item key={office.id} label={`📍 ${office.name}`} value={office.id} />
-                          ))}
-                        </Picker>
-                      )}
-                    </View>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Full Name *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <User size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="e.g. Rahul Sharma"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.fullName}
+                      onChangeText={(val) => setRegData({ ...regData, fullName: val })}
+                      autoCapitalize="words"
+                    />
                   </View>
 
-                  <ModernInput
-                    label="PINCODE *"
-                    placeholder="e.g. 452001"
-                    value={regData.pincode}
-                    onChangeText={(val) => setRegData({ ...regData, pincode: val })}
-                    keyboardType="numeric"
-                    IconComponent={MapPin}
-                    accentColor="#10B981"
-                  />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Phone Number *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <Phone size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="10-digit mobile number"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.phone}
+                      onChangeText={(val) => setRegData({ ...regData, phone: val })}
+                      keyboardType="phone-pad"
+                    />
+                  </View>
 
-                  {/* GPS Coordinate Auto-Detector */}
-                  <View style={{ backgroundColor: "#F0FDF4", padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 14 }}>
-                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 6 }}>
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Email Address *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <Mail size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="rahul@example.com"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.email}
+                      onChangeText={(val) => setRegData({ ...regData, email: val })}
+                      keyboardType="email-address"
+                    />
+                  </View>
+
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Residential Address *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <Building2 size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="House No, Street, Colony"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.address}
+                      onChangeText={(val) => setRegData({ ...regData, address: val })}
+                    />
+                  </View>
+
+                  {/* City Selector */}
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Municipal Corporation *</Text>
+                  <View style={{ backgroundColor: "#F8FAFC", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", overflow: "hidden", marginBottom: 12 }}>
+                    {loadingCities ? (
+                      <View style={{ padding: 12, flexDirection: "row", alignItems: "center" }}>
+                        <ActivityIndicator size="small" color="#10B981" />
+                        <Text style={{ marginLeft: 8, color: "#64748B", fontSize: 13 }}>Loading cities...</Text>
+                      </View>
+                    ) : (
+                      <Picker
+                        selectedValue={regData.officeId}
+                        onValueChange={(itemValue, itemIndex) => {
+                          if (itemIndex > 0) {
+                            const selectedObj = officeList[itemIndex - 1];
+                            setRegData({
+                              ...regData,
+                              officeId: itemValue,
+                              cityName: selectedObj ? selectedObj.name : "",
+                            });
+                          } else {
+                            setRegData({ ...regData, officeId: "", cityName: "" });
+                          }
+                        }}
+                        style={{ color: "#0F172A" }}
+                      >
+                        <Picker.Item label="-- Select City / Corporation --" value="" color="#94A3B8" />
+                        {officeList.map((office) => (
+                          <Picker.Item key={office.id} label={`📍 ${office.name}`} value={office.id} />
+                        ))}
+                      </Picker>
+                    )}
+                  </View>
+
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Pincode *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <MapPin size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="e.g. 452001"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.pincode}
+                      onChangeText={(val) => setRegData({ ...regData, pincode: val })}
+                      keyboardType="numeric"
+                    />
+                  </View>
+
+                  {/* GPS Auto Detector */}
+                  <View style={{ backgroundColor: "#F0FDF4", padding: 12, borderRadius: 16, borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 12 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 4 }}>
                       <View style={{ flexDirection: "row", alignItems: "center" }}>
-                        <Navigation size={16} color="#059669" />
+                        <Navigation size={15} color="#059669" />
                         <Text style={{ fontSize: 12, fontWeight: "800", color: "#065F46", marginLeft: 6 }}>
                           Auto GPS Verification
                         </Text>
@@ -1432,7 +1344,7 @@ export default function App() {
                       <TouchableOpacity
                         onPress={fetchCurrentLocation}
                         disabled={locationLoading}
-                        style={{ backgroundColor: "#10B981", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, flexDirection: "row", alignItems: "center" }}
+                        style={{ backgroundColor: "#10B981", paddingHorizontal: 9, paddingVertical: 4, borderRadius: 8, flexDirection: "row", alignItems: "center" }}
                       >
                         {locationLoading ? (
                           <ActivityIndicator size="small" color="#FFF" />
@@ -1444,56 +1356,55 @@ export default function App() {
                         )}
                       </TouchableOpacity>
                     </View>
-
                     {regData.latitude && regData.longitude ? (
-                      <View style={{ backgroundColor: "#DCFCE7", padding: 6, borderRadius: 8 }}>
-                        <Text style={{ fontSize: 11, color: "#166534", fontWeight: "700" }}>
-                          📍 Lat: {regData.latitude}, Lng: {regData.longitude}
-                        </Text>
-                      </View>
+                      <Text style={{ fontSize: 11, color: "#166534", fontWeight: "700" }}>
+                        📍 Coordinates: {regData.latitude}, {regData.longitude}
+                      </Text>
                     ) : (
                       <Text style={{ fontSize: 11, color: "#059669" }}>
-                        Tap &apos;Detect GPS&apos; to link your residential location.
+                        Tap &apos;Detect GPS&apos; to link your residential coordinates.
                       </Text>
                     )}
-                    {locationError ? (
-                      <Text style={{ color: "#DC2626", fontSize: 11, marginTop: 4 }}>{locationError}</Text>
-                    ) : null}
                   </View>
 
-                  <ModernInput
-                    label="CREATE PASSWORD *"
-                    placeholder="Min 6 characters"
-                    value={regData.password}
-                    onChangeText={(val) => setRegData({ ...regData, password: val })}
-                    secureTextEntry
-                    IconComponent={Lock}
-                    accentColor="#10B981"
-                  />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Password *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 12 }}>
+                    <Lock size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="Min 6 characters"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.password}
+                      onChangeText={(val) => setRegData({ ...regData, password: val })}
+                      secureTextEntry
+                    />
+                  </View>
 
-                  <ModernInput
-                    label="CONFIRM PASSWORD *"
-                    placeholder="Re-enter password"
-                    value={regData.confirmPassword}
-                    onChangeText={(val) => setRegData({ ...regData, confirmPassword: val })}
-                    secureTextEntry
-                    IconComponent={ShieldCheck}
-                    accentColor="#10B981"
-                  />
+                  <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155", marginBottom: 6 }}>Confirm Password *</Text>
+                  <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FFFFFF", borderRadius: 16, borderWidth: 1.5, borderColor: "#E2E8F0", paddingHorizontal: 12, paddingVertical: Platform.OS === "ios" ? 11 : 3, marginBottom: 16 }}>
+                    <ShieldCheck size={18} color="#059669" style={{ marginRight: 8 }} />
+                    <TextInput
+                      style={{ flex: 1, fontSize: 14, fontWeight: "600", color: "#0F172A" }}
+                      placeholder="Re-enter password"
+                      placeholderTextColor="#94A3B8"
+                      value={regData.confirmPassword}
+                      onChangeText={(val) => setRegData({ ...regData, confirmPassword: val })}
+                      secureTextEntry
+                    />
+                  </View>
 
-                  {/* Register CTA Button */}
-                  <ScalePressable onPress={handleCitizenRegister} disabled={citizenLoading} style={{ marginTop: 6 }}>
+                  <ScalePressable onPress={handleCitizenRegister} disabled={citizenLoading}>
                     <LinearGradient
-                      colors={["#10B981", "#059669"]}
+                      colors={["#059669", "#0D9488"]}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={{
-                        borderRadius: 16,
-                        paddingVertical: 14,
+                        borderRadius: 18,
+                        paddingVertical: 15,
                         alignItems: "center",
                         justifyContent: "center",
                         flexDirection: "row",
-                        shadowColor: "#10B981",
+                        shadowColor: "#059669",
                         shadowOffset: { width: 0, height: 6 },
                         shadowOpacity: 0.35,
                         shadowRadius: 12,
@@ -1504,7 +1415,7 @@ export default function App() {
                         <ActivityIndicator color="#FFFFFF" />
                       ) : (
                         <>
-                          <Text style={{ fontSize: 15, fontWeight: "800", color: "#FFFFFF", marginRight: 8 }}>
+                          <Text style={{ fontSize: 16, fontWeight: "800", color: "#FFFFFF", marginRight: 8 }}>
                             Register Citizen Account
                           </Text>
                           <CheckCircle2 size={18} color="#FFFFFF" />
@@ -1517,115 +1428,219 @@ export default function App() {
             </View>
           </FadeInView>
 
-          {/* ========================================================= */}
-          {/* 🌈 2. COLORFUL SPECIALIZED PORTAL OPTIONS (BELOW CITIZEN) */}
-          {/* ========================================================= */}
-          <View style={{ paddingHorizontal: 20 }}>
-            {/* Section Divider with Badge */}
-            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 16 }}>
-              <View style={{ flex: 1, height: 1, backgroundColor: "#CBD5E1" }} />
-              <View style={{ backgroundColor: "#F1F5F9", paddingHorizontal: 12, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: "#E2E8F0" }}>
-                <Text style={{ fontSize: 11, fontWeight: "800", color: "#64748B", letterSpacing: 0.5 }}>
-                  OTHER SPECIALIZED PORTALS
-                </Text>
-              </View>
-              <View style={{ flex: 1, height: 1, backgroundColor: "#CBD5E1" }} />
+          {/* 4. OTHER SPECIALIZED PORTALS SECTION DIVIDER */}
+          <FadeInView delay={180} style={{ paddingHorizontal: 20, marginBottom: 14 }}>
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#E2E8F0" }} />
+              <Text style={{ paddingHorizontal: 12, fontSize: 11, fontWeight: "800", color: "#94A3B8", letterSpacing: 0.8 }}>
+                OTHER SPECIALIZED PORTALS
+              </Text>
+              <View style={{ flex: 1, height: 1, backgroundColor: "#E2E8F0" }} />
             </View>
+          </FadeInView>
 
-            {/* 🚛 Vehicle Staff Card */}
-            <ColorfulPortalOption
-              title="Vehicle Staff Portal"
-              subtitle="Driver navigation & route pickups"
-              badge="FIELD CREW"
-              icon={Truck}
-              gradientColors={["#F59E0B", "#EA580C"]}
-              accentColor="#D97706"
-              borderColor="#FDE68A"
-              targetScreen="vehicleLogin"
-              delay={200}
-            />
+          {/* 5. SPECIALIZED PORTAL CARDS */}
+          <View style={{ paddingHorizontal: 18 }}>
+            {/* Card 1: Vehicle Staff Portal */}
+            <FadeInView delay={220} style={{ marginBottom: 14 }}>
+              <ScalePressable
+                onPress={() => setScreen("vehicleLogin")}
+                style={{
+                  backgroundColor: "#FFFDF7",
+                  borderRadius: 22,
+                  padding: 16,
+                  borderWidth: 1.5,
+                  borderColor: "#FDE68A",
+                  shadowColor: "#D97706",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 12,
+                  elevation: 3,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {/* Orange Circle Icon */}
+                <LinearGradient
+                  colors={["#F97316", "#EA580C"]}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 14,
+                    shadowColor: "#EA580C",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                >
+                  <Truck size={24} color="#FFFFFF" />
+                </LinearGradient>
 
-            {/* 🏢 Office Staff Card */}
-            <ColorfulPortalOption
-              title="Office Staff Portal"
-              subtitle="Operations, complaints & staff oversight"
-              badge="MUNICIPAL"
-              icon={Building2}
-              gradientColors={["#6366F1", "#4F46E5", "#7C3AED"]}
-              accentColor="#4F46E5"
-              borderColor="#C7D2FE"
-              targetScreen="officeLogin"
-              delay={260}
-            />
+                {/* Content */}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A", marginRight: 6 }}>
+                      Vehicle Staff Portal
+                    </Text>
+                    <View style={{ backgroundColor: "#FEF3C7", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#C2410C" }}>FIELD CREW</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>
+                    Driver navigation & route pickups
+                  </Text>
+                </View>
 
-            {/* 🔐 System Admin Card */}
-            <ColorfulPortalOption
-              title="System Admin Console"
-              subtitle="Central governance & city controls"
-              badge="GOVERNANCE"
-              icon={ShieldCheck}
-              gradientColors={["#334155", "#1E293B", "#0F172A"]}
-              accentColor="#0F172A"
-              borderColor="#CBD5E1"
-              targetScreen="adminLogin"
-              delay={320}
-            />
+                {/* Right Arrow Button */}
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: "#FFFFFF",
+                    borderWidth: 1.2,
+                    borderColor: "#FED7AA",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#000",
+                    shadowOpacity: 0.05,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }}
+                >
+                  <ArrowRight size={17} color="#EA580C" />
+                </View>
+              </ScalePressable>
+            </FadeInView>
+
+            {/* Card 2: Office/Admin Portal */}
+            <FadeInView delay={280} style={{ marginBottom: 18 }}>
+              <ScalePressable
+                onPress={() => setScreen("officeAdminLogin")}
+                style={{
+                  backgroundColor: "#FAFAFF",
+                  borderRadius: 22,
+                  padding: 16,
+                  borderWidth: 1.5,
+                  borderColor: "#E0E7FF",
+                  shadowColor: "#4F46E5",
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.08,
+                  shadowRadius: 12,
+                  elevation: 3,
+                  flexDirection: "row",
+                  alignItems: "center",
+                }}
+              >
+                {/* Indigo Circle Icon */}
+                <LinearGradient
+                  colors={["#6366F1", "#4F46E5"]}
+                  style={{
+                    width: 48,
+                    height: 48,
+                    borderRadius: 24,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 14,
+                    shadowColor: "#4F46E5",
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.25,
+                    shadowRadius: 8,
+                    elevation: 3,
+                  }}
+                >
+                  <Building2 size={24} color="#FFFFFF" />
+                </LinearGradient>
+
+                {/* Content */}
+                <View style={{ flex: 1 }}>
+                  <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+                    <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A", marginRight: 6 }}>
+                      Office/Admin Portal
+                    </Text>
+                    <View style={{ backgroundColor: "#EEF2FF", paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                      <Text style={{ fontSize: 10, fontWeight: "800", color: "#4338CA" }}>ADMIN</Text>
+                    </View>
+                  </View>
+                  <Text style={{ fontSize: 12, color: "#64748B", fontWeight: "600" }}>
+                    Management & monitoring dashboard
+                  </Text>
+                </View>
+
+                {/* Right Arrow Button */}
+                <View
+                  style={{
+                    width: 36,
+                    height: 36,
+                    borderRadius: 18,
+                    backgroundColor: "#FFFFFF",
+                    borderWidth: 1.2,
+                    borderColor: "#C7D2FE",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    shadowColor: "#000",
+                    shadowOpacity: 0.05,
+                    shadowRadius: 4,
+                    elevation: 1,
+                  }}
+                >
+                  <ArrowRight size={17} color="#4F46E5" />
+                </View>
+              </ScalePressable>
+            </FadeInView>
           </View>
 
-          {/* Quick System Highlights Banner */}
-          <FadeInView delay={380} style={{ paddingHorizontal: 20, marginTop: 14 }}>
-            <LinearGradient
-              colors={["#F0FDF4", "#ECFDF5", "#EFF6FF"]}
-              start={{ x: 0, y: 0 }}
-              end={{ x: 1, y: 1 }}
+          {/* 6. BOTTOM FOOTER SECURITY & MADE IN INDIA BADGE */}
+          <FadeInView delay={340} style={{ paddingHorizontal: 18, marginTop: 4 }}>
+            <View
               style={{
-                borderRadius: 18,
+                backgroundColor: "#F8FAFC",
+                borderRadius: 20,
                 padding: 14,
                 borderWidth: 1,
-                borderColor: "#BBF7D0",
+                borderColor: "#E2E8F0",
                 flexDirection: "row",
+                alignItems: "center",
                 justifyContent: "space-between",
               }}
             >
-              <View style={{ alignItems: "center", flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "900", color: "#065F46" }}>100%</Text>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: "#047857", marginTop: 1 }}>Digital</Text>
+              {/* Left Security Note */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <Shield size={20} color="#10B981" style={{ marginRight: 8 }} />
+                <View>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: "#334155" }}>
+                    Secured Access
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "600" }}>
+                    Your data is safe with us
+                  </Text>
+                </View>
               </View>
-              <View style={{ width: 1, backgroundColor: "#A7F3D0" }} />
-              <View style={{ alignItems: "center", flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "900", color: "#065F46" }}>AI Photo</Text>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: "#047857", marginTop: 1 }}>Verification</Text>
-              </View>
-              <View style={{ width: 1, backgroundColor: "#A7F3D0" }} />
-              <View style={{ alignItems: "center", flex: 1 }}>
-                <Text style={{ fontSize: 14, fontWeight: "900", color: "#065F46" }}>JAES 24h</Text>
-                <Text style={{ fontSize: 10, fontWeight: "700", color: "#047857", marginTop: 1 }}>Auto-Escalation</Text>
-              </View>
-            </LinearGradient>
-          </FadeInView>
 
-          {/* Footer Reset & Security Seal */}
-          <FadeInView delay={440} style={{ alignItems: "center", marginTop: 18, paddingHorizontal: 20 }}>
-            <TouchableOpacity
-              onPress={handleLogout}
-              style={{
-                paddingHorizontal: 18,
-                paddingVertical: 8,
-                borderRadius: 20,
-                backgroundColor: "#FFFFFF",
-                borderWidth: 1,
-                borderColor: "#E2E8F0",
-                marginBottom: 12,
-              }}
-            >
-              <Text style={{ fontSize: 11, fontWeight: "700", color: "#64748B" }}>
-                🔄 Clear App Cache / Reset Session
+              {/* Right Made in India */}
+              <View style={{ flexDirection: "row", alignItems: "center" }}>
+                <View style={{ alignItems: "flex-end", marginRight: 6 }}>
+                  <Text style={{ fontSize: 12, fontWeight: "800", color: "#334155" }}>
+                    Made in India
+                  </Text>
+                  <Text style={{ fontSize: 10, color: "#94A3B8", fontWeight: "600" }}>
+                    For a Cleaner India
+                  </Text>
+                </View>
+                <Text style={{ fontSize: 18 }}>🇮🇳</Text>
+              </View>
+            </View>
+
+            {/* Clear Session Option */}
+            <TouchableOpacity onPress={handleLogout} style={{ alignItems: "center", marginTop: 14 }}>
+              <Text style={{ fontSize: 11, fontWeight: "700", color: "#94A3B8" }}>
+                🔄 Clear Session Cache
               </Text>
             </TouchableOpacity>
-
-            <Text style={{ fontSize: 10, fontWeight: "700", color: "#94A3B8" }}>
-              SafaiMitra Smart Civic Network • Swachh Bharat Initiative 2026
-            </Text>
           </FadeInView>
         </ScrollView>
       </KeyboardAvoidingView>
