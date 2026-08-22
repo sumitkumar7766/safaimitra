@@ -1,3 +1,11 @@
+const dns = require("dns");
+try {
+  // Use public DNS to ensure MongoDB Atlas SRV records resolve cleanly on macOS
+  dns.setServers(["8.8.8.8", "8.8.4.4", "1.1.1.1"]);
+} catch (e) {
+  console.warn("Could not set custom DNS servers:", e.message);
+}
+
 const express = require("express");
 const mongoose = require("mongoose");
 const cors = require("cors");
@@ -10,6 +18,14 @@ const bodyParser = require("body-parser");
 const cron = require("node-cron");
 const http = require("http");
 const { Server } = require("socket.io");
+
+// Global exception guards to prevent nodemon crashes on transient network issues
+process.on("unhandledRejection", (reason) => {
+  console.warn("⚠️ Unhandled Promise Rejection:", reason?.message || reason);
+});
+process.on("uncaughtException", (err) => {
+  console.warn("⚠️ Uncaught Exception:", err?.message || err);
+});
 
 const MONGO_URL =
   process.env.MONGO_URL ||
@@ -52,11 +68,13 @@ const connectDB = async () => {
     return;
   }
   try {
-    const conn = await mongoose.connect(MONGO_URL);
+    const conn = await mongoose.connect(MONGO_URL, {
+      serverSelectionTimeoutMS: 5000,
+    });
     isDbConnected = conn.connections[0].readyState === 1;
     console.log("✅ MongoDB Connection successful");
   } catch (err) {
-    console.error("❌ MongoDB Connection Error:", err);
+    console.error("❌ MongoDB Connection Error:", err.message);
   }
 };
 
@@ -77,6 +95,10 @@ const MongoStore = require("connect-mongo");
 const store = MongoStore.create({
   mongoUrl: MONGO_URL,
   touchAfter: 24 * 3600,
+});
+
+store.on("error", function (error) {
+  console.warn("⚠️ MongoStore Session Warning:", error.message);
 });
 
 const allowedOrigins = [
