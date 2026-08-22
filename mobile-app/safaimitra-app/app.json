@@ -22,15 +22,34 @@
         "backgroundColor": "#ffffff"
       },
       "edgeToEdgeEnabled": true,
-      "package": "com.anonymous.safaimitraapp"
+      "package": "com.anonymous.safaimitraapp",
+      "permissions": [
+        "android.permission.CAMERA",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.READ_EXTERNAL_STORAGE",
+        "android.permission.WRITE_EXTERNAL_STORAGE",
+        "android.permission.RECORD_AUDIO",
+        "android.permission.MODIFY_AUDIO_SETTINGS"
+      ]
     },
     "web": {
       "favicon": "./assets/logoapp.png"
     },
     "plugins": [
       "expo-secure-store",
+      "expo-location",
+      "expo-image-picker",
+      "expo-document-picker",
       "expo-audio",
-      "expo-video"
-    ]
+      "expo-video",
+      "expo-font",
+      "expo-asset"
+    ],
+    "extra": {
+      "eas": {
+        "projectId": "1b9808f4-197c-4973-8891-d7c375f3d9eb"
+      }
+    }
   }
 }
