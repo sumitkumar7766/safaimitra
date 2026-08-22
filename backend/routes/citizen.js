@@ -128,9 +128,15 @@ router.get("/dustbin/list/:officeId", citizenAuth, async (req, res) => {
 });
 
 // Configure Multer
+const os = require("os");
+const citizenUploadDir = process.env.VERCEL ? os.tmpdir() : "./uploads/";
+if (!process.env.VERCEL && !fs.existsSync("./uploads/")) {
+  fs.mkdirSync("./uploads/", { recursive: true });
+}
+
 const storage = multer.diskStorage({
   destination: function (req, file, cb) {
-    cb(null, "./uploads/");
+    cb(null, citizenUploadDir);
   },
   filename: function (req, file, cb) {
     cb(null, Date.now() + "-" + file.originalname);

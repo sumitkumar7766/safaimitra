@@ -2,11 +2,16 @@ const express = require("express");
 const router = express.Router();
 const multer = require("multer");
 const fs = require("fs");
+const os = require("os");
 const axios = require("axios");
 const FormData = require("form-data");
 const Dustbin = require("../model/DustbinModel"); // ✅ Import Dustbin Model
 
-const upload = multer({ dest: "uploads/" });
+const uploadDir = process.env.VERCEL ? os.tmpdir() : "uploads/";
+if (!process.env.VERCEL && !fs.existsSync("uploads/")) {
+  fs.mkdirSync("uploads/", { recursive: true });
+}
+const upload = multer({ dest: uploadDir });
 //radius
 const { isWithinRadius } = require("../utils/geo");
 

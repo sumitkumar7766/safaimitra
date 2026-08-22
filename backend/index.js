@@ -10,7 +10,12 @@ const bodyParser = require("body-parser");
 const cron = require("node-cron");
 const http = require("http");
 const { Server } = require("socket.io");
-const MONGO_URL = "mongodb://127.0.0.1:27017/safaimitra";
+
+const MONGO_URL =
+  process.env.MONGO_URL ||
+  process.env.MONGODB_URI ||
+  "mongodb://127.0.0.1:27017/safaimitra";
+
 const app = express();
 
 // Models
@@ -34,25 +39,38 @@ const AdminRegister = require("./routes/admin.js");
 const StaffRegister = require("./routes/staff.js");
 const RouteRegister = require("./routes/route.js");
 const dustbinRoutes = require("./routes/dustbin.js");
-const StaffLogin = require("./routes/loginStaff.js")
+const StaffLogin = require("./routes/loginStaff.js");
 const predictRoutes = require("./routes/predict.routes");
 const ComplaintRoutes = require("./routes/complaint");
 const citizenSystemRoutes = require("./routes/citizenSystem");
 
-// 👇 2. ADD THIS DEBUG BLOCK (Delete later)
-// console.log("--- DEBUGGING ENV VARS ---");
-// console.log("Cloud Name:", process.env.CLOUDINARY_CLOUD_NAME ? "✅ Loaded" : "❌ MISSING");
-// console.log("API Key:", process.env.CLOUDINARY_API_KEY ? "✅ Loaded" : "❌ MISSING");
-// console.log("API Secret:", process.env.CLOUDINARY_API_SECRET ? "✅ Loaded" : "❌ MISSING");
-// console.log("--------------------------");
+// Database Connection with Caching for Serverless
+let isDbConnected = false;
+const connectDB = async () => {
+  if (isDbConnected && mongoose.connection.readyState === 1) {
+    return;
+  }
+  try {
+    const conn = await mongoose.connect(MONGO_URL);
+    isDbConnected = conn.connections[0].readyState === 1;
+    console.log("✅ MongoDB Connection successful");
+  } catch (err) {
+    console.error("❌ MongoDB Connection Error:", err);
+  }
+};
 
-// DB Connection
-mongoose
-  .connect(MONGO_URL)
-  .then(() => console.log("DB Connection successful"))
-  .catch((err) => console.log("Mongo Error:", err));
+// Initial connection
+connectDB();
 
-// Session Store (OLD API compatible)
+// Middleware to ensure DB connection on serverless requests
+app.use(async (req, res, next) => {
+  if (mongoose.connection.readyState !== 1) {
+    await connectDB();
+  }
+  next();
+});
+
+// Session Store (Compatible with MongoDB)
 const MongoStore = require("connect-mongo");
 
 const store = MongoStore.create({
@@ -61,35 +79,61 @@ const store = MongoStore.create({
 });
 
 const allowedOrigins = [
+  "https://safaimitra.online",
+  "http://safaimitra.online",
+  "https://www.safaimitra.online",
+  "http://www.safaimitra.online",
+  "https://api.safaimitra.online",
+  "http://api.safaimitra.online",
+  "https://admin.safaimitra.online",
   "http://localhost:3000",
-  "http://10.242.244.129:5001"
+  "http://localhost:5001",
+  "http://127.0.0.1:3000",
 ];
-// Middlewares
-app.use(cors({
-  origin: function (origin, callback) {
-    // allow requests with no origin (like mobile apps or curl requests)
-    if (!origin) return callback(null, true);
-    if (allowedOrigins.indexOf(origin) === -1) {
-      var msg = 'The CORS policy for this site does not allow access from the specified Origin.';
-      return callback(new Error(msg), false);
-    }
-    return callback(null, true);
-  },
-  credentials: true
-}));
+
+// CORS Middleware
+app.use(
+  cors({
+    origin: function (origin, callback) {
+      if (!origin) return callback(null, true);
+      if (
+        allowedOrigins.includes(origin) ||
+        /\.safaimitra\.online$/.test(origin) ||
+        /\.vercel\.app$/.test(origin) ||
+        /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
+        /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
+        /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
+      ) {
+        return callback(null, true);
+      }
+      return callback(null, true); // Permissive fallback
+    },
+    credentials: true,
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
+  })
+);
+
 app.use(express.json());
 app.use(bodyParser.json());
 
 const server = http.createServer(app);
 
-// 2. 🔥 SOCKET.IO SETUP WITH CORS (Ye Important Hai) 🔥
+// Socket.IO Setup
 const io = new Server(server, {
   cors: {
-    origin: ["http://localhost:3000", "http://10.242.244.129:5001", "http://172.24.64.210:3000", "http://172.24.64.210:5001","http://127.0.0.1:3000", "http://172.24.64.210:3000", "https://f208-103-39-236-130.ngrok-free.app"], // Dono URLs allow kar diye
+    origin: [
+      "https://safaimitra.online",
+      "https://www.safaimitra.online",
+      "https://admin.safaimitra.online",
+      "http://localhost:3000",
+      "http://localhost:5001",
+      "http://127.0.0.1:3000",
+    ],
     methods: ["GET", "POST"],
-    credentials: true
+    credentials: true,
   },
-  transports: ['polling', 'websocket']
+  transports: ["polling", "websocket"],
 });
 
 app.set("io", io);
@@ -183,78 +227,59 @@ app.get("/", (_req, res) => {
   res.send("Welcome to SafaiMitra backend!");
 });
 
-/* ============================================================ */
-/* 👇 4:00 AM DAILY CLEANING SCHEDULE (IDEAL DUSTBIN) 👇        */
-/* ============================================================ */
-
-// '0 4 * * *' ka matlab hai: Minute 0, Hour 4 (Subah 4 Baje)
-cron.schedule("48 22 * * *", async () => {
+// ---------------- Cron Job Implementations ----------------
+const resetDailyDustbins = async () => {
   console.log("🌌 4:00 AM: Making all dustbins IDEAL for the new day...");
-
   try {
     const result = await Dustbin.updateMany(
       { active: true },
       {
         $set: {
-          status: "ideal",           // Status wapas 'ideal' set
-          imageUrl: ""               // Purani photo hata di
-        }
+          status: "ideal",
+          imageUrl: "",
+        },
       }
     );
-    
     console.log(`✅ System Reset: ${result.modifiedCount} dustbins are now Ideal & Ready.`);
+    return { success: true, modifiedCount: result.modifiedCount };
   } catch (err) {
     console.error("❌ Error in Daily Reset Job:", err);
+    return { success: false, error: err.message };
   }
-}, {
-  scheduled: true,
-  timezone: "Asia/Kolkata" // India Time ke hisaab se 4 AM
-});
+};
 
-/* ============================================================ */
-/* 👇 AUTO OFFLINE VEHICLE CHECKER (Har 2 Minute mein) 👇       */
-/* ============================================================ */
-
-cron.schedule("*/2 * * * *", async () => {
-  // console.log("🕵️ Checking for inactive vehicles...");
-
-  // 5 Minute se purana time
+const checkInactiveVehicles = async () => {
   const fiveMinutesAgo = new Date(Date.now() - 5 * 60 * 1000);
-
   try {
-    // Aise VEHICLES dhoondo jo 'Online' hain par 5 min se inactive hain
     const result = await Vehicle.updateMany(
       {
         isOnline: true,
-        lastSeen: { $lt: fiveMinutesAgo } // lastSeen < 5 min pehle
+        lastSeen: { $lt: fiveMinutesAgo },
       },
       {
         $set: {
           isOnline: false,
-          status: "Inactive" // Status bhi inactive kar do
-        }
+          status: "Inactive",
+        },
       }
     );
-
     if (result.modifiedCount > 0) {
       console.log(`💤 Auto-offlined ${result.modifiedCount} inactive vehicles.`);
     }
+    return { success: true, modifiedCount: result.modifiedCount };
   } catch (err) {
     console.error("❌ Error in Auto-Offline Job:", err);
+    return { success: false, error: err.message };
   }
-});
+};
 
-/* ============================================================ */
-/* 👇 JAES AUTOMATIC ESCALATION ENGINE (Har 1 Minute mein) 👇  */
-/* ============================================================ */
-
-cron.schedule("*/1 * * * *", async () => {
+const escalateComplaints = async () => {
   const io = app.get("io");
   const now = new Date();
-  
+
   try {
     const unresolvedComplaints = await Complaint.find({
-      status: { $nin: ["resolved", "closed", "rejected"] }
+      status: { $nin: ["resolved", "closed", "rejected"] },
     });
 
     const authorityNames = {
@@ -262,15 +287,17 @@ cron.schedule("*/1 * * * *", async () => {
       2: "Area Supervisor",
       3: "Zone Officer",
       4: "Municipal Officer",
-      5: "City Commissioner"
+      5: "City Commissioner",
     };
 
     const roles = {
       2: "supervisor",
       3: "zone_officer",
       4: "municipal_officer",
-      5: "commissioner"
+      5: "commissioner",
     };
+
+    let escalatedCount = 0;
 
     for (const comp of unresolvedComplaints) {
       const createdTime = comp.reportedAt || comp.createdAt;
@@ -282,13 +309,13 @@ cron.schedule("*/1 * * * *", async () => {
 
       let updated = false;
 
-      // Fallback: If for some reason nextEscalationAt is missing, initialize it to 24h after report time
       if (!comp.nextEscalationAt && comp.currentEscalationLevel < 5) {
-        comp.nextEscalationAt = new Date(createdTime.getTime() + 24 * 60 * 60 * 1000);
+        comp.nextEscalationAt = new Date(
+          createdTime.getTime() + 24 * 60 * 60 * 1000
+        );
         updated = true;
       }
 
-      // Check if current escalation level timer has expired
       if (comp.nextEscalationAt && now >= comp.nextEscalationAt) {
         const oldLevel = comp.currentEscalationLevel;
 
@@ -296,15 +323,19 @@ cron.schedule("*/1 * * * *", async () => {
           const targetLevel = oldLevel + 1;
           comp.currentEscalationLevel = targetLevel;
           comp.escalatedAt = now;
-          // Every hierarchy level gets a fresh 24 hours countdown!
-          comp.nextEscalationAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
+          comp.nextEscalationAt = new Date(
+            now.getTime() + 24 * 60 * 60 * 1000
+          );
 
           const role = roles[targetLevel];
           let targetStaffId = null;
           if (role) {
             const fieldName = `${role === "supervisor" ? "supervisor" : role}Id`;
             if (!comp[fieldName]) {
-              const staff = await Staff.findOne({ officeId: comp.officeId, role: role });
+              const staff = await Staff.findOne({
+                officeId: comp.officeId,
+                role: role,
+              });
               if (staff) {
                 comp[fieldName] = staff._id;
                 targetStaffId = staff._id;
@@ -324,55 +355,64 @@ cron.schedule("*/1 * * * *", async () => {
             prevAuthority: prevAuthName,
             newAuthority: newAuthName,
             statusChange: `Escalated to Level ${targetLevel} (${newAuthName})`,
-            resolutionTime: null
+            resolutionTime: null,
           });
 
           updated = true;
+          escalatedCount++;
 
-          if (comp.citizenId) {
-            io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
+          if (io) {
+            if (comp.citizenId) {
+              io.to(`citizen_${comp.citizenId}`).emit(
+                "complaint_notification",
+                {
+                  type: "ESCALATED",
+                  message: `Your complaint has been automatically escalated to ${newAuthName}!`,
+                  complaintId: comp._id,
+                }
+              );
+            }
+
+            if (targetStaffId) {
+              io.to(`driver_${targetStaffId}`).emit("new_job_alert", {
+                title: "🚨 JAES Escalated Complaint!",
+                message: `Complaint #${comp._id.toString().slice(-6)} has been escalated to you: ${comp.description}`,
+                newStop: {
+                  id: comp.dustbinId || comp._id,
+                  name: `🚨 Escalated: ${comp.area}`,
+                  coordinates: [comp.latitude, comp.longitude],
+                  status: "overflow",
+                  type: "complaint",
+                  isNew: true,
+                  complaintId: comp._id,
+                },
+                imageUrl: comp.ComimageUrl,
+              });
+            }
+
+            io.emit("complaint_status_update", {
               type: "ESCALATED",
-              message: `Your complaint has been automatically escalated to ${newAuthName}!`,
-              complaintId: comp._id
+              complaintId: comp._id,
+              level: targetLevel,
+              authority: newAuthName,
             });
           }
-
-          if (targetStaffId) {
-            io.to(`driver_${targetStaffId}`).emit("new_job_alert", {
-              title: "🚨 JAES Escalated Complaint!",
-              message: `Complaint #${comp._id.toString().slice(-6)} has been escalated to you: ${comp.description}`,
-              newStop: {
-                id: comp.dustbinId || comp._id,
-                name: `🚨 Escalated: ${comp.area}`,
-                coordinates: [comp.latitude, comp.longitude],
-                status: "overflow",
-                type: "complaint",
-                isNew: true,
-                complaintId: comp._id
-              },
-              imageUrl: comp.ComimageUrl
-            });
-          }
-
-          io.emit("complaint_status_update", {
-            type: "ESCALATED",
-            complaintId: comp._id,
-            level: targetLevel,
-            authority: newAuthName
-          });
         } else if (oldLevel === 5) {
-          // Level 5 timer expired -> mark public escalation eligible!
           if (!comp.publicEscalationEligible) {
             comp.publicEscalationEligible = true;
-            comp.nextEscalationAt = null; // No further countdowns
+            comp.nextEscalationAt = null;
             updated = true;
 
-            if (comp.citizenId) {
-              io.to(`citizen_${comp.citizenId}`).emit("complaint_notification", {
-                type: "PUBLIC_ELIGIBLE",
-                message: `Your complaint is now eligible for public sharing on social media!`,
-                complaintId: comp._id
-              });
+            if (io && comp.citizenId) {
+              io.to(`citizen_${comp.citizenId}`).emit(
+                "complaint_notification",
+                {
+                  type: "PUBLIC_ELIGIBLE",
+                  message:
+                    "Your complaint is now eligible for public sharing on social media!",
+                  complaintId: comp._id,
+                }
+              );
             }
           }
         }
@@ -382,32 +422,73 @@ cron.schedule("*/1 * * * *", async () => {
         await comp.save();
       }
     }
+    return { success: true, escalatedCount };
   } catch (error) {
     console.error("❌ JAES Escalation Cron Error:", error);
+    return { success: false, error: error.message };
   }
+};
+
+// ---------------- Vercel Cron Endpoints ----------------
+app.get("/api/cron/reset-dustbins", async (req, res) => {
+  const result = await resetDailyDustbins();
+  res.json(result);
 });
 
-// GET /public-offices
-// Isme koi adminAuth nahi lagayenge taaki registration page par load ho sake
+app.get("/api/cron/check-offline-vehicles", async (req, res) => {
+  const result = await checkInactiveVehicles();
+  res.json(result);
+});
+
+app.get("/api/cron/escalate-complaints", async (req, res) => {
+  const result = await escalateComplaints();
+  res.json(result);
+});
+
+// ---------------- Node-Cron for Standalone Mode ----------------
+if (!process.env.VERCEL) {
+  cron.schedule("0 4 * * *", resetDailyDustbins, {
+    scheduled: true,
+    timezone: "Asia/Kolkata",
+  });
+
+  cron.schedule("*/2 * * * *", checkInactiveVehicles);
+
+  cron.schedule("*/1 * * * *", escalateComplaints);
+}
+
+// GET /public-list
 app.get("/public-list", async (req, res) => {
   try {
-    // Humein sirf _id aur cityName chahiye
     const offices = await Office.find({}, "cityName _id");
-
     res.json({
       success: true,
-      cities: offices.map(o => ({
-        id: o._id,       // Ye backend par save hoga
-        name: o.cityName // Ye dropdown me dikhega
-      }))
+      cities: offices.map((o) => ({
+        id: o._id,
+        name: o.cityName,
+      })),
     });
   } catch (err) {
     res.status(500).json({ success: false, message: err.message });
   }
 });
 
-// Start server
-// Humein uss 'server' ko start karna hai jisme humne 'io' attach kiya tha (Line 68)
-server.listen(5001, "0.0.0.0", () => {
-  console.log("🚀 Server running on 0.0.0.0:5001 (Socket.io Enabled)");
+// Health check endpoint
+app.get("/health", (_req, res) => {
+  res.json({
+    status: "healthy",
+    timestamp: new Date().toISOString(),
+    domain: "safaimitra.online",
+  });
 });
+
+// Start server in standalone mode
+const PORT = process.env.PORT || 5001;
+if (!process.env.VERCEL) {
+  server.listen(PORT, "0.0.0.0", () => {
+    console.log(`🚀 Server running on 0.0.0.0:${PORT} (Socket.io Enabled)`);
+  });
+}
+
+// Export Express App for Vercel Serverless
+module.exports = app;

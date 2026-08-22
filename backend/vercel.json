@@ -1,0 +1,23 @@
+{
+  "version": 2,
+  "rewrites": [
+    {
+      "source": "/(.*)",
+      "destination": "/api/index.js"
+    }
+  ],
+  "crons": [
+    {
+      "path": "/api/cron/reset-dustbins",
+      "schedule": "0 4 * * *"
+    },
+    {
+      "path": "/api/cron/check-offline-vehicles",
+      "schedule": "*/2 * * * *"
+    },
+    {
+      "path": "/api/cron/escalate-complaints",
+      "schedule": "*/1 * * * *"
+    }
+  ]
+}
