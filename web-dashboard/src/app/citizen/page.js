@@ -1893,11 +1893,14 @@ export default function CitizenPage() {
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
               {/* City Leaderboard */}
               <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
-                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
-                  <span>🌍</span> City-Wide Top 10
+                <h3 className="text-lg font-bold text-gray-800 mb-2 flex items-center gap-2">
+                  <span>🌍</span> {parsedUser?.cityName || "City-Wide"} Top 10 Citizens
                 </h3>
+                <p className="text-xs text-gray-500 mb-4">
+                  Rankings of registered citizens in {parsedUser?.cityName || "your city"} only.
+                </p>
                 {cityLeaderboard.length === 0 ? (
-                  <p className="text-sm text-gray-500 text-center py-6">No leaderboard data available.</p>
+                  <p className="text-sm text-gray-500 text-center py-6">No leaderboard data available for {parsedUser?.cityName || "your city"}.</p>
                 ) : (
                   <div className="space-y-3">
                     {cityLeaderboard.map((citizen, idx) => {

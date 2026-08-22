@@ -10,11 +10,11 @@ import {
   ActivityIndicator,
   Platform,
   Dimensions,
-  SafeAreaView,
   StatusBar,
   RefreshControl,
   AppState, // 🔥 Added AppState to handle background/foreground
 } from "react-native";
+import { SafeAreaView } from "react-native-safe-area-context";
 import MapView, {
   Marker,
   Polyline,
@@ -713,7 +713,7 @@ export default function VehiclePage({ goBack }) {
 
     // 1. Launch Camera with Reduced Quality
     let result = await ImagePicker.launchCameraAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      mediaTypes: ["images"],
       allowsEditing: true, // Editing on karne se aspect ratio fix rehta hai
       aspect: [9, 16],
       quality: 0.8, // 🔥 Quality 0.8 (80%) taaki size kam ho (Important)

@@ -131,29 +131,46 @@ router.get("/profile-scorecard/:citizenId", async (req, res) => {
   }
 });
 
-// 2. GET LEADERBOARDS
+// 2. GET SAME-CITY LEADERBOARD
 router.get("/leaderboard/:citizenId", async (req, res) => {
   try {
     const { citizenId } = req.params;
     const user = await Citizen.findById(citizenId);
     if (!user) return res.status(404).json({ success: false, message: "User not found" });
 
-    // City Leaderboard (Top 10)
-    const cityLeaderboard = await Citizen.find({ role: "citizen" })
+    const userCity = user.cityName ? user.cityName.trim() : null;
+
+    // Strict Same-City Filter (Excludes other cities and suspended accounts)
+    const sameCityQuery = {
+      role: "citizen",
+      status: { $ne: "suspended" },
+    };
+    if (userCity) {
+      sameCityQuery.cityName = { $regex: new RegExp(`^${userCity}$`, "i") };
+    }
+
+    // Same-City Leaderboard (Top 10 citizens from user's city)
+    const cityLeaderboard = await Citizen.find(sameCityQuery)
       .select("fullName trustScore validComplaints citizenLevel cityName badges")
       .sort({ trustScore: -1, validComplaints: -1 })
       .limit(10);
 
-    // Area Leaderboard (Top 10)
-    const areaLeaderboard = await Citizen.find({ role: "citizen", cityName: user.cityName })
-      .select("fullName trustScore validComplaints citizenLevel cityName badges")
-      .sort({ trustScore: -1, validComplaints: -1 })
-      .limit(10);
+    // Calculate user's personal rank in their city
+    const higherRankedCount = await Citizen.countDocuments({
+      ...sameCityQuery,
+      $or: [
+        { trustScore: { $gt: user.trustScore || 0 } },
+        { trustScore: user.trustScore || 0, validComplaints: { $gt: user.validComplaints || 0 } },
+      ],
+    });
+    const myCityRank = higherRankedCount + 1;
 
     return res.status(200).json({
       success: true,
+      cityName: user.cityName || "City",
+      myCityRank,
       cityLeaderboard,
-      areaLeaderboard
+      areaLeaderboard: cityLeaderboard,
     });
   } catch (error) {
     return res.status(500).json({ success: false, message: error.message });
