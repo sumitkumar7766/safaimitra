@@ -100,6 +100,8 @@ app.use(
         allowedOrigins.includes(origin) ||
         /\.safaimitra\.online$/.test(origin) ||
         /\.vercel\.app$/.test(origin) ||
+        /\.northflank\.app$/.test(origin) ||
+        /\.code\.run$/.test(origin) ||
         /^http:\/\/10\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
         /^http:\/\/172\.\d+\.\d+\.\d+:\d+$/.test(origin) ||
         /^http:\/\/192\.168\.\d+\.\d+:\d+$/.test(origin)
@@ -119,21 +121,14 @@ app.use(bodyParser.json());
 
 const server = http.createServer(app);
 
-// Socket.IO Setup
+// Socket.IO Setup with Native WebSocket support
 const io = new Server(server, {
   cors: {
-    origin: [
-      "https://safaimitra.online",
-      "https://www.safaimitra.online",
-      "https://admin.safaimitra.online",
-      "http://localhost:3000",
-      "http://localhost:5001",
-      "http://127.0.0.1:3000",
-    ],
+    origin: (origin, callback) => callback(null, true),
     methods: ["GET", "POST"],
     credentials: true,
   },
-  transports: ["polling", "websocket"],
+  transports: ["websocket", "polling"],
 });
 
 app.set("io", io);
@@ -447,17 +442,15 @@ app.get("/api/cron/escalate-complaints", async (req, res) => {
   res.json(result);
 });
 
-// ---------------- Node-Cron for Standalone Mode ----------------
-if (!process.env.VERCEL) {
-  cron.schedule("0 4 * * *", resetDailyDustbins, {
-    scheduled: true,
-    timezone: "Asia/Kolkata",
-  });
+// ---------------- Continuous Cron Jobs ----------------
+cron.schedule("0 4 * * *", resetDailyDustbins, {
+  scheduled: true,
+  timezone: "Asia/Kolkata",
+});
 
-  cron.schedule("*/2 * * * *", checkInactiveVehicles);
+cron.schedule("*/2 * * * *", checkInactiveVehicles);
 
-  cron.schedule("*/1 * * * *", escalateComplaints);
-}
+cron.schedule("*/1 * * * *", escalateComplaints);
 
 // GET /public-list
 app.get("/public-list", async (req, res) => {
@@ -475,7 +468,7 @@ app.get("/public-list", async (req, res) => {
   }
 });
 
-// Health check endpoint
+// Health check endpoint (Used by Northflank readiness/liveness probes)
 app.get("/health", (_req, res) => {
   res.json({
     status: "healthy",
@@ -484,13 +477,28 @@ app.get("/health", (_req, res) => {
   });
 });
 
-// Start server in standalone mode
+// Start HTTP & Socket.IO server
 const PORT = process.env.PORT || 5001;
-if (!process.env.VERCEL) {
-  server.listen(PORT, "0.0.0.0", () => {
-    console.log(`🚀 Server running on 0.0.0.0:${PORT} (Socket.io Enabled)`);
-  });
-}
+server.listen(PORT, "0.0.0.0", () => {
+  console.log(`🚀 SafaiMitra Backend running on 0.0.0.0:${PORT} (Socket.io Enabled)`);
+});
 
-// Export Express App for Vercel Serverless
+// Graceful Shutdown for Northflank / Container orchestrators
+const gracefulShutdown = (signal) => {
+  console.log(`\n🛑 Received ${signal}. Shutting down gracefully...`);
+  server.close(async () => {
+    console.log("🔒 HTTP & WebSocket server closed.");
+    try {
+      await mongoose.connection.close(false);
+      console.log("🍃 MongoDB connection closed.");
+    } catch (e) {
+      console.error("Error closing MongoDB:", e);
+    }
+    process.exit(0);
+  });
+};
+
+process.on("SIGTERM", () => gracefulShutdown("SIGTERM"));
+process.on("SIGINT", () => gracefulShutdown("SIGINT"));
+
 module.exports = app;
