@@ -4,6 +4,7 @@ import React, { useState } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { ArrowLeft, Save } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 
 export default function NewAdminPage() {
   const router = useRouter();
@@ -29,7 +30,7 @@ export default function NewAdminPage() {
       const token = localStorage.getItem("token");
 
       await axios.post(
-        "http://localhost:5001/admin/register",
+        `${API_BASE_URL}/admin/register`,
         formData,
         {
           headers: {

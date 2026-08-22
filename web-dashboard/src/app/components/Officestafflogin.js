@@ -3,6 +3,7 @@
 import React, { useState } from 'react';
 import { ChevronLeft } from 'lucide-react';
 import axios from 'axios';
+import { API_BASE_URL } from '@/config/api';
 
 export default function OfficeStaffLogin({ portal, onBack, router }) {
   const [username, setUsername] = useState("");
@@ -14,7 +15,7 @@ export default function OfficeStaffLogin({ portal, onBack, router }) {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5001/office/login", {
+      const res = await axios.post(`${API_BASE_URL}/office/login`, {
         username,
         password,
       });

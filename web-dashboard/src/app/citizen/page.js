@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { API_BASE_URL } from "@/config/api";
 
 // --- ERROR FIX START ---
 // We must import hooks directly. We cannot use dynamic() for hooks like useMap.
@@ -94,7 +95,7 @@ export default function CitizenPage() {
       const token = localStorage.getItem("token");
 
       const scorecardRes = await axios.get(
-        `http://localhost:5001/citizen-system/profile-scorecard/${userId}`,
+        `${API_BASE_URL}/citizen-system/profile-scorecard/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (scorecardRes.data.success) {
@@ -102,7 +103,7 @@ export default function CitizenPage() {
       }
 
       const leaderboardRes = await axios.get(
-        `http://localhost:5001/citizen-system/leaderboard/${userId}`,
+        `${API_BASE_URL}/citizen-system/leaderboard/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } }
       );
       if (leaderboardRes.data.success) {
@@ -120,7 +121,7 @@ export default function CitizenPage() {
     setAppealStatus("submitting");
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.post("http://localhost:5001/citizen-system/citizen/appeal", {
+      const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/appeal`, {
         reason: appealReason,
         evidenceUrl: appealEvidenceUrl
       }, {
@@ -150,7 +151,7 @@ export default function CitizenPage() {
       if (!userId) return;
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/complaint/history/${userId}`,
+        `${API_BASE_URL}/citizen/complaint/history/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -168,7 +169,7 @@ export default function CitizenPage() {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/active-vehicles-nearby?lat=${lat}&lng=${lng}`,
+        `${API_BASE_URL}/citizen/active-vehicles-nearby?lat=${lat}&lng=${lng}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -189,7 +190,7 @@ export default function CitizenPage() {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/area-stats?lat=${lat}&lng=${lng}`,
+        `${API_BASE_URL}/citizen/area-stats?lat=${lat}&lng=${lng}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -216,7 +217,7 @@ export default function CitizenPage() {
       }
 
       const res = await fetch(
-        `http://localhost:5001/citizen/dustbin/list/${officeId}`,
+        `${API_BASE_URL}/citizen/dustbin/list/${officeId}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -247,7 +248,7 @@ export default function CitizenPage() {
           socketRef.current = null;
         }
 
-        await axios.post("http://localhost:5001/citizen/logout");
+        await axios.post(`${API_BASE_URL}/citizen/logout`);
 
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -301,7 +302,7 @@ export default function CitizenPage() {
 
     if (parsedUser && parsedUser._id) {
       // Create socket connection with proper options
-      socketRef.current = io("http://localhost:5001", {
+      socketRef.current = io(API_BASE_URL, {
         transports: ["websocket", "polling"], // Allow both transport methods
         reconnection: true,
         reconnectionAttempts: 5,
@@ -690,7 +691,7 @@ export default function CitizenPage() {
         }
 
         const res = await axios.post(
-          "http://localhost:5001/api/predict/complaint",
+          `${API_BASE_URL}/api/predict/complaint`,
           formData,
           {
             headers: {
@@ -760,7 +761,7 @@ export default function CitizenPage() {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5001/citizen/complaint/create",
+        `${API_BASE_URL}/citizen/complaint/create`,
         formData,
         {
           headers: {

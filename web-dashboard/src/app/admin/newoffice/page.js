@@ -4,7 +4,10 @@ import React, { useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { ArrowLeft, Save } from "lucide-react";
+import { API_BASE_URL } from "@/config/api";
 import dynamic from "next/dynamic";
+import { useMapEvents, useMap } from "react-leaflet";
+import { Navigation } from "lucide-react";
 
 // 1. Only Import COMPONENTS dynamically
 const MapContainer = dynamic(
@@ -20,12 +23,8 @@ const Marker = dynamic(
   { ssr: false }
 );
 
-// 2. Define the Map Click Component OUTSIDE the main function
-// We pass 'setFormData' as a prop
+// 2. Map Click Component to set coordinates on click
 const LocationSelector = ({ setFormData }) => {
-  // We use require here to access the Hook safely on the client side
-  const { useMapEvents } = require("react-leaflet");
-
   useMapEvents({
     click(e) {
       setFormData((prev) => ({
@@ -35,6 +34,25 @@ const LocationSelector = ({ setFormData }) => {
       }));
     },
   });
+  return null;
+};
+
+// 3. Map View Updater when coordinates change manually or via map
+const MapUpdater = ({ center }) => {
+  const map = useMap();
+  useEffect(() => {
+    if (
+      center &&
+      !isNaN(center[0]) &&
+      !isNaN(center[1]) &&
+      center[0] >= -90 &&
+      center[0] <= 90 &&
+      center[1] >= -180 &&
+      center[1] <= 180
+    ) {
+      map.setView(center, Math.max(map.getZoom(), 12));
+    }
+  }, [center, map]);
   return null;
 };
 
@@ -75,6 +93,25 @@ export default function NewOfficePage() {
     setFormData({ ...formData, [e.target.name]: e.target.value });
   };
 
+  const handleGetLocation = () => {
+    if (!navigator.geolocation) {
+      alert("Geolocation is not supported by your browser");
+      return;
+    }
+    navigator.geolocation.getCurrentPosition(
+      (position) => {
+        setFormData((prev) => ({
+          ...prev,
+          latitude: position.coords.latitude.toFixed(6),
+          longitude: position.coords.longitude.toFixed(6),
+        }));
+      },
+      (error) => {
+        alert("Unable to fetch your current location. Please enter manually or select on the map.");
+      }
+    );
+  };
+
   const handleCreateOffice = async () => {
     if (
       !formData.stateName ||
@@ -93,7 +130,7 @@ export default function NewOfficePage() {
     try {
       const token = localStorage.getItem("token");
 
-      await axios.post("http://localhost:5001/office/register", formData, {
+      await axios.post(`${API_BASE_URL}/office/register`, formData, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -104,6 +141,16 @@ export default function NewOfficePage() {
       alert(err.response?.data?.message || "Failed to create office");
     }
   };
+
+  const hasValidCoords =
+    formData.latitude !== "" &&
+    formData.longitude !== "" &&
+    !isNaN(parseFloat(formData.latitude)) &&
+    !isNaN(parseFloat(formData.longitude));
+
+  const coords = hasValidCoords
+    ? [parseFloat(formData.latitude), parseFloat(formData.longitude)]
+    : null;
 
   return (
     <div className="min-h-screen bg-gray-100 p-6 text-black">
@@ -124,69 +171,84 @@ export default function NewOfficePage() {
 
         <div className="p-6 grid grid-cols-1 md:grid-cols-2 gap-4">
           {[
-            ["stateName", "State Name"],
-            ["cityName", "City Name"],
-            ["officeName", "Office Name"],
-            ["adminName", "Admin Name"],
-            ["adminEmail", "Admin Email"],
-            ["password", "Password", "password"],
-          ].map(([name, label, type = "text"]) => (
+            ["stateName", "State Name", "text", "e.g. Madhya Pradesh"],
+            ["cityName", "City Name", "text", "e.g. Indore"],
+            ["officeName", "Office Name", "text", "e.g. Nagar Nigam Zone 1"],
+            ["adminName", "Admin Name", "text", "e.g. Rajesh Sharma"],
+            ["adminEmail", "Admin Email", "email", "e.g. rajesh@safaimitra.in"],
+            ["password", "Password", "password", "Enter secure password"],
+          ].map(([name, label, type = "text", placeholder = ""]) => (
             <div key={name}>
               <label className="block text-sm font-medium mb-1">{label}</label>
               <input
                 type={type}
                 name={name}
+                placeholder={placeholder}
                 value={formData[name]}
                 onChange={handleInputChange}
-                className="w-full px-4 py-2 border rounded-lg"
+                className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500"
               />
             </div>
           ))}
 
           <div>
-            <label className="block text-sm font-medium mb-1">Latitude</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium">Latitude</label>
+              <span className="text-xs text-gray-400">Manual or map click</span>
+            </div>
             <input
               type="number"
+              step="any"
+              name="latitude"
+              placeholder="e.g. 23.259933"
               value={formData.latitude}
-              readOnly
-              className="w-full px-4 py-2 border rounded-lg bg-gray-100"
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             />
           </div>
 
           <div>
-            <label className="block text-sm font-medium mb-1">Longitude</label>
+            <div className="flex justify-between items-center mb-1">
+              <label className="block text-sm font-medium">Longitude</label>
+              <span className="text-xs text-gray-400">Manual or map click</span>
+            </div>
             <input
               type="number"
+              step="any"
+              name="longitude"
+              placeholder="e.g. 77.412615"
               value={formData.longitude}
-              readOnly
-              className="w-full px-4 py-2 border rounded-lg bg-gray-100"
+              onChange={handleInputChange}
+              className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-green-500 bg-white"
             />
           </div>
         </div>
 
         <div className="px-6 pb-6">
-          <p className="text-sm text-gray-500 mb-2">
-            Map par click karke city location select karo
-          </p>
+          <div className="flex items-center justify-between mb-2">
+            <p className="text-sm text-gray-600">
+              Click on the map or type coordinates above to set office location
+            </p>
+            <button
+              type="button"
+              onClick={handleGetLocation}
+              className="flex items-center gap-1.5 text-xs bg-emerald-50 text-emerald-700 hover:bg-emerald-100 border border-emerald-300 px-3 py-1.5 rounded-lg transition-colors font-medium"
+            >
+              <Navigation className="w-3.5 h-3.5" />
+              Use Current Location
+            </button>
+          </div>
           <div className="h-[300px] rounded-lg overflow-hidden border">
             <MapContainer
-              center={[23.2599, 77.4126]}
-              zoom={6}
+              center={coords || [23.2599, 77.4126]}
+              zoom={coords ? 13 : 6}
               style={{ height: "100%", width: "100%" }}
             >
               <TileLayer url="https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png" />
 
-              {/* 3. Use the corrected Component here */}
               <LocationSelector setFormData={setFormData} />
-
-              {formData.latitude && formData.longitude && (
-                <Marker
-                  position={[
-                    parseFloat(formData.latitude),
-                    parseFloat(formData.longitude),
-                  ]}
-                />
-              )}
+              {coords && <MapUpdater center={coords} />}
+              {coords && <Marker position={coords} />}
             </MapContainer>
           </div>
         </div>
@@ -194,13 +256,13 @@ export default function NewOfficePage() {
         <div className="flex justify-end gap-3 p-6 border-t">
           <button
             onClick={() => router.back()}
-            className="px-6 py-2 border rounded-lg"
+            className="px-6 py-2 border rounded-lg hover:bg-gray-50"
           >
             Cancel
           </button>
           <button
             onClick={handleCreateOffice}
-            className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg"
+            className="flex items-center gap-2 px-6 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 font-semibold"
           >
             <Save className="w-4 h-4" />
             Create Office
