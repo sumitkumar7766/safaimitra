@@ -398,6 +398,65 @@ router.patch("/event-dustbin-requests/:id/cancel", citizenAuth, async (req, res)
 });
 
 // ==============================================================================
+// 4B. RUN REAL-TIME ML PREDICTION ON AN EVENT REQUEST
+// ==============================================================================
+router.post("/event-dustbin-requests/:id/predict", async (req, res) => {
+  try {
+    const request = await EventDustbinRequest.findById(req.params.id);
+    if (!request) {
+      return res.status(404).json({ success: false, message: "Event request not found." });
+    }
+
+    // 1. Run Real ML Prediction
+    const prediction = await mlPredictionService.predict(request.event);
+
+    // 2. Update Request's aiAnalysis object in MongoDB
+    request.aiAnalysis.estimatedWasteKg = prediction.estimatedWasteKg;
+    request.aiAnalysis.recommendedBins = prediction.recommendedBins;
+    request.aiAnalysis.collectionFrequency = prediction.collectionFrequency;
+    request.aiAnalysis.wasteRisk = prediction.wasteRisk;
+    request.aiAnalysis.dataCoverage = prediction.dataCoverage;
+    request.aiAnalysis.modelVersion = prediction.modelVersion;
+    request.aiAnalysis.algorithm = prediction.algorithm;
+    request.aiAnalysis.trainingSampleCount = prediction.trainingSampleCount;
+    request.aiAnalysis.validationMae = prediction.validationMae;
+    request.aiAnalysis.reasoning = prediction.reasoning;
+    request.aiAnalysis.analyzedAt = new Date();
+
+    // 3. Update Audit Log
+    request.auditLog.push({
+      user: req.user?.name || "SafaiMitra ML Engine",
+      action: "ML_PREDICTION_EVALUATED",
+      timestamp: new Date(),
+      previousValue: `Estimated: ${request.aiAnalysis.estimatedWasteKg} kg`,
+      newValue: `Predicted: ${prediction.estimatedWasteKg} kg (${prediction.modelVersion})`,
+      reason: "Real-time ML waste regression pipeline re-evaluation.",
+    });
+
+    await request.save();
+
+    return res.json({
+      success: true,
+      eventId: request._id,
+      requestId: request.requestId,
+      estimatedWasteKg: prediction.estimatedWasteKg,
+      recommendedBins: prediction.recommendedBins,
+      collectionFrequency: prediction.collectionFrequency,
+      riskLevel: prediction.wasteRisk,
+      dataCoverage: prediction.dataCoverage,
+      modelVersion: prediction.modelVersion,
+      algorithm: prediction.algorithm,
+      trainingSampleCount: prediction.trainingSampleCount,
+      validationMae: prediction.validationMae,
+      reasoning: prediction.reasoning,
+    });
+  } catch (error) {
+    console.error("Predict Event Error:", error);
+    return res.status(500).json({ success: false, message: error.message });
+  }
+});
+
+// ==============================================================================
 // 5. ADMIN: GET ALL REQUESTS WITH FILTERS & COUNTERS
 // ==============================================================================
 router.get("/admin/event-dustbin-requests", officeAuth, async (req, res) => {

@@ -1,0 +1,36 @@
+# SafaiMitra Event Waste ML Prediction Configuration
+
+data:
+  source: "VISVA Sustainable Foundation"
+  source_url: "https://visva.org.in/statistics/"
+  raw_file: "data/raw/visva_events_raw.csv"
+  processed_file: "data/processed/event_waste_training.csv"
+  report_file: "data/processed/dataset_report.json"
+  predictions_file: "data/processed/predictions.csv"
+
+model:
+  version: "v1.0.0"
+  algorithm: "XGBoostRegressor"
+  fallback_algorithm: "RandomForestRegressor"
+  test_size: 0.20
+  random_state: 42
+  model_save_path: "models/event_waste_model_v1.joblib"
+  metadata_save_path: "models/model_metadata.json"
+  evaluation_save_path: "models/evaluation.json"
+
+bin_requirement_engine:
+  bin_capacity_kg: 45.0
+  safety_factor: 1.25
+  waste_ratios_with_food:
+    wet: 0.55
+    dry: 0.30
+    general: 0.15
+  waste_ratios_no_food:
+    wet: 0.15
+    dry: 0.60
+    general: 0.25
+  min_bins: 2
+
+data_coverage:
+  min_participants: 50
+  max_participants: 35000

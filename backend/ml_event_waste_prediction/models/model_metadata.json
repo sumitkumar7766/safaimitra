@@ -1,0 +1,52 @@
+{
+  "modelVersion": "v1.0.0",
+  "algorithm": "RandomForestRegressor",
+  "trainedAt": "2026-08-22T15:35:03.558615+00:00",
+  "trainingSamples": 36,
+  "testSamples": 10,
+  "totalSamples": 46,
+  "target": "total_waste_kg",
+  "features": [
+    "participants",
+    "log_participants",
+    "month",
+    "day_of_week",
+    "is_weekend",
+    "quarter",
+    "type_Marathon/Sports",
+    "type_Marriage",
+    "type_Religious",
+    "type_Festival",
+    "type_Exhibition/Bazaar",
+    "type_Corporate",
+    "type_School/College",
+    "type_Community",
+    "type_Other"
+  ],
+  "metrics": {
+    "mae": 117.25,
+    "rmse": 209.18,
+    "r2": 0.9162,
+    "mape": 37.73
+  },
+  "allModelComparisons": {
+    "GradientBoostingRegressor": {
+      "mae": 202.78,
+      "rmse": 450.5,
+      "r2": 0.6114,
+      "mape": 45.77
+    },
+    "RandomForestRegressor": {
+      "mae": 117.25,
+      "rmse": 209.18,
+      "r2": 0.9162,
+      "mape": 37.73
+    }
+  },
+  "dataCoverage": {
+    "minParticipants": 100.0,
+    "maxParticipants": 48200.0,
+    "minWasteKg": 5.0,
+    "maxWasteKg": 5644.46
+  }
+}

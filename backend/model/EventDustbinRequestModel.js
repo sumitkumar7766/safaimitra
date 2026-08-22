@@ -134,9 +134,13 @@ const EventDustbinRequestSchema = new mongoose.Schema(
         default: "HIGH",
       },
       confidenceScoreNumeric: { type: Number, default: 90 },
+      dataCoverage: { type: String, default: "GOOD" }, // "GOOD" | "LOW DATA COVERAGE"
+      algorithm: { type: String, default: "RandomForestRegressor" },
+      trainingSampleCount: { type: Number, default: 46 },
+      validationMae: { type: Number, default: 117.25 },
       reasoning: { type: String, default: "" },
       warnings: [{ type: String }],
-      modelVersion: { type: String, default: "SafaiMitra-WasteEngine-v2.1" },
+      modelVersion: { type: String, default: "v1.0.0" },
       analyzedAt: { type: Date, default: Date.now },
     },
 

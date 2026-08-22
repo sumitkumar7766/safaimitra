@@ -1,0 +1,47 @@
+table_source,event_number,event_date,event_name,participants_raw,dry_waste_raw,wet_waste_raw,mix_waste_raw,total_waste_raw,participants,dry_waste_kg,wet_waste_kg,mix_waste_kg,total_waste_raw_num,total_waste_kg,parsed_date,event_type,month,day_of_week,is_weekend,quarter,log_participants,type_Marathon/Sports,type_Marriage,type_Religious,type_Festival,type_Exhibition/Bazaar,type_Corporate,type_School/College,type_Community,type_Other
+Table_1,58.0,21/06/2026,"Vegan Bazaar 6, Our Sacred Space, Secunderabad",300+,,7.3,2.3,,300.0,0.0,7.3,2.3,0.0,9.6,2026-06-21,Exhibition/Bazaar,6,6,1,2,5.707110264748875,0,0,0,0,1,0,0,0,0
+Table_1,54.0,24/05/2026,"Hyderabad City Slam Run, Jalavihar Water Park",2000+,29.28,173.27,,,2000.0,29.28,173.27,0.0,0.0,202.55,2026-05-24,Marathon/Sports,5,6,1,2,7.601402334583733,1,0,0,0,0,0,0,0,0
+Table_1,53.0,14/05/2026,"12th Day Ceremony, Alkapuri Colony",100+,,22.95,2,,100.0,0.0,22.95,2.0,0.0,24.95,2026-05-14,Other,5,3,0,2,4.61512051684126,0,0,0,0,0,0,0,0,1
+Table_1,52.0,10/05/2026,"Nanda Kishore and Bindu’s Wedding Celebrations, Markona, Odisha",500+,14.0,83.0,3,,500.0,14.0,83.0,3.0,0.0,100.0,2026-05-10,Marriage,5,6,1,2,6.2166061010848646,0,1,0,0,0,0,0,0,0
+Table_1,50.0,25/04/2026,"Uma Lingeshwara Swamy Temple, Mansoorbad",1000+,6.3,127.0,,,1000.0,6.3,127.0,0.0,0.0,133.3,2026-04-25,Religious,4,5,1,2,6.90875477931522,0,0,1,0,0,0,0,0,0
+Table_1,48.0,12/04/2026,"Annadanam at Shri Mallikarjuna Temple, Nizampet",500+,,27.3,,,500.0,0.0,27.3,0.0,0.0,27.3,2026-04-12,Religious,4,6,1,2,6.2166061010848646,0,0,1,0,0,0,0,0,0
+Table_1,47.0,12/04/2026,"Hospital Inaugural Ceremony, Ramayampet",1000+,53.095,107.11,5.7,,1000.0,53.095,107.11,5.7,0.0,165.90499999999997,2026-04-12,Other,4,6,1,2,6.90875477931522,0,0,0,0,0,0,0,0,1
+Table_1,45.0,"09/04/2026, 10/04/2026 & 11/04/2026","Guru Pooja, Begumpet",1500+,4.145,150.06,4.64,,1500.0,4.145,150.06,4.64,0.0,158.845,,Religious,6,6,1,2,7.313886831633462,0,0,1,0,0,0,0,0,0
+Table_1,44.0,03/04/2026 & 04/04/2026,"Amulya’s Wedding Celebrations, Wanaparthy",2200+,10.0,543.81,,,2200.0,10.0,543.81,0.0,0.0,553.81,,Marriage,6,6,1,2,7.696667081526462,0,1,0,0,0,0,0,0,0
+Table_1,43.0,26/03/2026,"Rama Kalyanam, Krishna Giri Enclave, Tarnaka",300+,3.5,9.0,2,,300.0,3.5,9.0,2.0,0.0,14.5,2026-03-26,Other,3,3,0,1,5.707110264748875,0,0,0,0,0,0,0,0,1
+Table_1,42.0,15/03/2026,"Freshathon, T- works",800+,8.0,15.6,,,800.0,8.0,15.6,0.0,0.0,23.6,2026-03-15,Other,3,6,1,1,6.68586094706836,0,0,0,0,0,0,0,0,1
+Table_1,39.0,08/02/2026,"Hare Krishna Run, Sanjeevaiah Park",1000+,20.0,27.2,61.7,,1000.0,20.0,27.2,61.7,0.0,108.9,2026-02-08,Marathon/Sports,2,6,1,1,6.90875477931522,1,0,0,0,0,0,0,0,0
+Table_1,38.0,01/02/2026,Naimisam Earth Fetival 2026,2000+,13.5,139.5,9.9,,2000.0,13.5,139.5,9.9,0.0,162.9,2026-02-01,Other,2,6,1,1,7.601402334583733,0,0,0,0,0,0,0,0,1
+Table_1,37.0,04/01/2026,"Vegan Bazar, The Sacred Space, Secunderabad",400+,4.4,0.6,0,,400.0,4.4,0.6,0.0,0.0,5.0,2026-01-04,Other,1,6,1,1,5.993961427306569,0,0,0,0,0,0,0,0,1
+Table_1,36.0,04/01/2026,"Examthon, T-Works",2000+,52.5,99.6,35.1,,2000.0,52.5,99.6,35.1,0.0,187.2,2026-01-04,Other,1,6,1,1,7.601402334583733,0,0,0,0,0,0,0,0,1
+Table_1,35.0,03/01/2026,"Manja Awareness Campaign, Sanjeevaiah Park",400+,0.5,35.0,–,,400.0,0.5,35.0,0.0,0.0,35.5,2026-01-03,Community,1,5,1,1,5.993961427306569,0,0,0,0,0,0,0,1,0
+Table_2,34.0,28/12/2025,"Kamineni East Hyd Half Marathon, LB Nagar run, Unicent School , Nagole",2000+,49.4,193.9,37.2,,2000.0,49.4,193.9,37.2,0.0,280.5,2025-12-28,Marathon/Sports,12,6,1,4,7.601402334583733,1,0,0,0,0,0,0,0,0
+Table_2,33.0,21/12/2025,"Meditation and Ahimsa Run 2025, Sanjeevaiah Park",900+,26.0,19.0,–,,900.0,26.0,19.0,0.0,0.0,45.0,2025-12-21,Marathon/Sports,12,6,1,4,6.803505257608338,1,0,0,0,0,0,0,0,0
+Table_2,32.0,14/12/2025,"Run Jaathara, ECIL, 2025",1000+,16.0,199.0,4,,1000.0,16.0,199.0,4.0,0.0,219.0,2025-12-14,Marathon/Sports,12,6,1,4,6.90875477931522,1,0,0,0,0,0,0,0,0
+Table_2,31.0,13/12/2025 & 14/12/2025,The Kind Carnival 2025,500+,5.0,64.0,–,,500.0,5.0,64.0,0.0,0.0,69.0,,Festival,6,6,1,2,6.2166061010848646,0,0,0,1,0,0,0,0,0
+Table_2,30.0,16/11/2025,Global Geeta Utsav 2025,4000+,31.0,492.0,–,,4000.0,31.0,492.0,0.0,0.0,523.0,2025-11-16,Festival,11,6,1,4,8.294299608857235,0,0,0,1,0,0,0,0,0
+Table_2,29.0,12/10/2025,"Grace Cancer Run 2025, Gachibowli Stadium",15000+,,2013.0,70,,15000.0,0.0,2013.0,70.0,0.0,2083.0,2025-10-12,Marathon/Sports,10,6,1,4,9.61587214452889,1,0,0,0,0,0,0,0,0
+Table_2,28.0,24/08/2025,"NMDC Hyderabad Marathon 2025, People’s Plaza to Gachibowli Stadium, Hitex to Gachibowli Stadium",17000+,581.2,2461.0,891.98,,17000.0,581.2,2461.0,891.98,0.0,3934.18,2025-08-24,Marathon/Sports,8,6,1,3,9.741027444837728,1,0,0,0,0,0,0,0,0
+Table_2,27.0,23/08/2025,"NMDC Hyderabad Marathon 5k Run 2025, Hitex Exibition Centre",10000+,302.0,931.0,19,,10000.0,302.0,931.0,19.0,0.0,1252.0,2025-08-23,Marathon/Sports,8,5,1,3,9.210440366976517,1,0,0,0,0,0,0,0,0
+Table_2,26.0,03/08/2025,"Telangana 10K Run, Sanjeevaiah Park, Parking",1500+,69.5,15.0,–,,1500.0,69.5,15.0,0.0,0.0,84.5,2025-08-03,Marathon/Sports,8,6,1,3,7.313886831633462,1,0,0,0,0,0,0,0,0
+Table_2,25.0,02/06/2025,"Telangana Run, Ambedkar Statue, IMAX",1000+,14.0,91.0,12,,1000.0,14.0,91.0,12.0,0.0,117.0,2025-06-02,Marathon/Sports,6,0,0,2,6.90875477931522,1,0,0,0,0,0,0,0,0
+Table_2,24.0,12/05/2025,"Buddha Purnima Celebrations, Mahabodhi Buddha Vihara",1000+,29.0,70.0,70,,1000.0,29.0,70.0,70.0,0.0,169.0,2025-05-12,Marriage,5,0,0,2,6.90875477931522,0,1,0,0,0,0,0,0,0
+Table_2,23.0,13/04/2025,"Honda Big Wing 10K Run, Gachibowli Stadium",800+,50.0,,59,,800.0,50.0,0.0,59.0,0.0,109.0,2025-04-13,Marathon/Sports,4,6,1,2,6.68586094706836,1,0,0,0,0,0,0,0,0
+Table_2,22.0,09/03/2025,"Run for Her, T Hub",500+,17.5,23.0,11.1,,500.0,17.5,23.0,11.1,0.0,51.6,2025-03-09,Marathon/Sports,3,6,1,1,6.2166061010848646,1,0,0,0,0,0,0,0,0
+Table_3,21.0,29/12/2024,"Ace East Hyderabad Half Marathon, Nagole",1000+,,,,257.0,1000.0,0.0,0.0,0.0,257.0,257.0,2024-12-29,Marathon/Sports,12,6,1,4,6.90875477931522,1,0,0,0,0,0,0,0,0
+Table_3,20.0,08/12/2024,"Run Jathara, ECIL Runners, ECIL",800+,,,,134.35,800.0,0.0,0.0,0.0,134.35,134.35,2024-12-08,Marathon/Sports,12,6,1,4,6.68586094706836,1,0,0,0,0,0,0,0,0
+Table_3,18.0,25/08/2024,"NMDC Hyderabad Marathon 2024, People’s Plaza & Hitex to Gachibowli Stadium",15000+,,,,4062.16,15000.0,0.0,0.0,0.0,4062.16,4062.16,2024-08-25,Marathon/Sports,8,6,1,3,9.61587214452889,1,0,0,0,0,0,0,0,0
+Table_3,17.0,24/08/2024,"NMDC Hyderabad Marathon 5K Run 2024, Hitex Exibition Centre",10000+,,,,810.5,10000.0,0.0,0.0,0.0,810.5,810.5,2024-08-24,Marathon/Sports,8,5,1,3,9.210440366976517,1,0,0,0,0,0,0,0,0
+Table_3,16.0,16/06/2024,"5K Run for Green, Sanjeevaiah Park Parking",800+,,,,24.0,800.0,0.0,0.0,0.0,24.0,24.0,2024-06-16,Marathon/Sports,6,6,1,2,6.68586094706836,1,0,0,0,0,0,0,0,0
+Table_3,15.0,09/06/2024,"OK Kids Graduation Run, Dulapali Forest",500+,,,,133.0,500.0,0.0,0.0,0.0,133.0,133.0,2024-06-09,Marathon/Sports,6,6,1,2,6.2166061010848646,1,0,0,0,0,0,0,0,0
+Table_3,13.0,23/05/2023,"Buddha Purnima Celebrations, Mahabodhi Buddha Vihara",1000+,,,,90.0,1000.0,0.0,0.0,0.0,90.0,90.0,2023-05-23,Marriage,5,1,0,2,6.90875477931522,0,1,0,0,0,0,0,0,0
+Table_3,11.0,02/03/2024,"International Women’s Day Walk 2024, ECIL Officers Association",500+,,,,23.0,500.0,0.0,0.0,0.0,23.0,23.0,2024-03-02,Marathon/Sports,3,5,1,1,6.2166061010848646,1,0,0,0,0,0,0,0,0
+Table_3,9.0,01/01/2024,"Indukuris LB Nagar Half Marathon, Indukuri Lakeshore, Nagole, Hyderabad",400+,,,,110.45,400.0,0.0,0.0,0.0,110.45,110.45,2024-01-01,Marathon/Sports,1,0,0,1,5.993961427306569,1,0,0,0,0,0,0,0,0
+Table_3,,,Total,48200+,,,,5644.46,48200.0,0.0,0.0,0.0,5644.46,5644.46,,Other,6,6,1,2,10.783135046711445,0,0,0,0,0,0,0,0,1
+Table_4,8.0,10/12/2023,"ECIL Runners Anniversary Run, ECIL Officers Association",400+,,,,53.9,400.0,0.0,0.0,0.0,53.9,53.9,2023-12-10,Marathon/Sports,12,6,1,4,5.993961427306569,1,0,0,0,0,0,0,0,0
+Table_4,7.0,08/10/2023,"Grace Cancer Run 2023, Gachibowli Stadium",10000+,,,,1318.0,10000.0,0.0,0.0,0.0,1318.0,1318.0,2023-10-08,Marathon/Sports,10,6,1,4,9.210440366976517,1,0,0,0,0,0,0,0,0
+Table_4,6.0,27/08/2023,"NMDC Hyderabad Marathon 2023, People’s Plaza",13000+,,,,2530.0,13000.0,0.0,0.0,0.0,2530.0,2530.0,2023-08-27,Marathon/Sports,8,6,1,3,9.472781556562168,1,0,0,0,0,0,0,0,0
+Table_4,5.0,26/08/2023,NMDC Hyderabad Marathon 5k Run 2023. Hitex Exhibition Centre,8000+,,,,988.0,8000.0,0.0,0.0,0.0,988.0,988.0,2023-08-26,Marathon/Sports,8,5,1,3,8.987321812850125,1,0,0,0,0,0,0,0,0
+Table_4,3.0,03/06/2023 & 04/06/2023,"Kaushal Mahotsav, NSTIW, Shivam Road",9000+,,,,276.8,9000.0,0.0,0.0,0.0,276.8,276.8,,Other,6,6,1,2,9.105090961257085,0,0,0,0,0,0,0,0,1
+Table_4,2.0,27/05/2023,"World Emergency Medicine Day Run by SEMI, Thrill City Necklace Road",1000+,,,,92.2,1000.0,0.0,0.0,0.0,92.2,92.2,2023-05-27,Marathon/Sports,5,5,1,2,6.90875477931522,1,0,0,0,0,0,0,0,0
+Table_4,1.0,07/05/2023,"HCR 3.0, Parade Ground Secunderabad",1000+,,,,108.0,1000.0,0.0,0.0,0.0,108.0,108.0,2023-05-07,Other,5,6,1,2,6.90875477931522,0,0,0,0,0,0,0,0,1

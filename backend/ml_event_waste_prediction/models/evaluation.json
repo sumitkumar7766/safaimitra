@@ -1,0 +1,29 @@
+{
+  "modelVersion": "v1.0.0",
+  "algorithm": "RandomForestRegressor",
+  "evaluatedAt": "2026-08-22T15:35:03.559005+00:00",
+  "mae": 117.25,
+  "rmse": 209.18,
+  "r2": 0.9162,
+  "mape": 37.73,
+  "trainingSamples": 36,
+  "testSamples": 10,
+  "featureCount": 15,
+  "features": [
+    "participants",
+    "log_participants",
+    "month",
+    "day_of_week",
+    "is_weekend",
+    "quarter",
+    "type_Marathon/Sports",
+    "type_Marriage",
+    "type_Religious",
+    "type_Festival",
+    "type_Exhibition/Bazaar",
+    "type_Corporate",
+    "type_School/College",
+    "type_Community",
+    "type_Other"
+  ]
+}

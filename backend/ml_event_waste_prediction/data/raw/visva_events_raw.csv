@@ -1,0 +1,63 @@
+table_source,event_number,event_date,event_name,participants_raw,dry_waste_raw,wet_waste_raw,mix_waste_raw,total_waste_raw
+Table_1,60.,09/07/2026,"Annadanam, Itikyal, Jagdevpur",,29.7,96.4,,
+Table_1,59.,24/06/2026,"Ravi Keerthi’s Wedding Celebrations, Vijayawada",,,,,
+Table_1,58.,21/06/2026,"Vegan Bazaar 6, Our Sacred Space, Secunderabad",300+,,7.3,2.3,
+Table_1,57.,07/06/2026,"Telangana Half Marathon, Necklace Road, HMDA Grounds",,46.8,173.6,155.46,
+Table_1,56.,07/06/2026,"OK Kids Run, T.S. Forest Academy, Dulapally",,20.01,26.1,20.9,
+Table_1,55.,31/05/2026,"Vegan Bazaar 5, The Sacred Space, Secunderabad",,,,,
+Table_1,54.,24/05/2026,"Hyderabad City Slam Run, Jalavihar Water Park",2000+,29.28,173.27,,
+Table_1,53.,14/05/2026,"12th Day Ceremony, Alkapuri Colony",100+,,22.95,2,
+Table_1,52.,10/05/2026,"Nanda Kishore and Bindu’s Wedding Celebrations, Markona, Odisha",500+,14,83,3,
+Table_1,51.,01/05/2026,"Buddha Purnima Celebrations, Mahabodhi Buddha Vihara",,4.075,114.26,1.3,
+Table_1,50.,25/04/2026,"Uma Lingeshwara Swamy Temple, Mansoorbad",1000+,6.3,127,,
+Table_1,49.,25/04/2026,"Earth Bound 2 – Vegan Bazaar 4, Phoenix Arena, Hitech City",,,,3.2,
+Table_1,48.,12/04/2026,"Annadanam at Shri Mallikarjuna Temple, Nizampet",500+,,27.3,,
+Table_1,47.,12/04/2026,"Hospital Inaugural Ceremony, Ramayampet",1000+,53.095,107.11,5.7,
+Table_1,45.,"09/04/2026, 10/04/2026 & 11/04/2026","Guru Pooja, Begumpet",1500+,4.145,150.06,4.64,
+Table_1,44.,03/04/2026 & 04/04/2026,"Amulya’s Wedding Celebrations, Wanaparthy",2200+,10,543.81,,
+Table_1,43.,26/03/2026,"Rama Kalyanam, Krishna Giri Enclave, Tarnaka",300+,3.5,9,2,
+Table_1,42.,15/03/2026,"Freshathon, T- works",800+,8,15.6,,
+Table_1,41.,14/03/2026,"Vegan Bazaar 3,The Sacred Space, Secunderabad",400+,,,,
+Table_1,40.,22/02/2026,"Earth Bound 2, Phoenix arena, Hitech city",1000+,,,,
+Table_1,39.,08/02/2026,"Hare Krishna Run, Sanjeevaiah Park",1000+,20,27.2,61.7,
+Table_1,38.,01/02/2026,Naimisam Earth Fetival 2026,2000+,13.5,139.5,9.9,
+Table_1,37.,04/01/2026,"Vegan Bazar, The Sacred Space, Secunderabad",400+,4.4,0.6,0,
+Table_1,36.,04/01/2026,"Examthon, T-Works",2000+,52.5,99.6,35.1,
+Table_1,35.,03/01/2026,"Manja Awareness Campaign, Sanjeevaiah Park",400+,0.5,35,–,
+Table_2,34.,28/12/2025,"Kamineni East Hyd Half Marathon, LB Nagar run, Unicent School , Nagole",2000+,49.4,193.9,37.2,
+Table_2,33.,21/12/2025,"Meditation and Ahimsa Run 2025, Sanjeevaiah Park",900+,26,19,–,
+Table_2,32.,14/12/2025,"Run Jaathara, ECIL, 2025",1000+,16,199,4,
+Table_2,31.,13/12/2025 & 14/12/2025,The Kind Carnival 2025,500+,5,64,–,
+Table_2,30.,16/11/2025,Global Geeta Utsav 2025,4000+,31,492,–,
+Table_2,29.,12/10/2025,"Grace Cancer Run 2025, Gachibowli Stadium",15000+,,2013,70,
+Table_2,28.,24/08/2025,"NMDC Hyderabad Marathon 2025, People’s Plaza to Gachibowli Stadium, Hitex to Gachibowli Stadium",17000+,581.2,2461,891.98,
+Table_2,27.,23/08/2025,"NMDC Hyderabad Marathon 5k Run 2025, Hitex Exibition Centre",10000+,302,931,19,
+Table_2,26.,03/08/2025,"Telangana 10K Run, Sanjeevaiah Park, Parking",1500+,69.5,15,–,
+Table_2,25.,02/06/2025,"Telangana Run, Ambedkar Statue, IMAX",1000+,14,91,12,
+Table_2,24.,12/05/2025,"Buddha Purnima Celebrations, Mahabodhi Buddha Vihara",1000+,29,70,70,
+Table_2,23.,13/04/2025,"Honda Big Wing 10K Run, Gachibowli Stadium",800+,50,,59,
+Table_2,22.,09/03/2025,"Run for Her, T Hub",500+,17.5,23,11.1,
+Table_2,,,Total (  Dry+Wet+Mix Waste),,,,,
+Table_3,21.,29/12/2024,"Ace East Hyderabad Half Marathon, Nagole",1000+,,,,257
+Table_3,20.,08/12/2024,"Run Jathara, ECIL Runners, ECIL",800+,,,,134.35
+Table_3,19.,06/10/2024,"Grace Cancer Run 2024, Gachibowli Stadium",15000+,,,,
+Table_3,18.,25/08/2024,"NMDC Hyderabad Marathon 2024, People’s Plaza & Hitex to Gachibowli Stadium",15000+,,,,4062.16
+Table_3,17.,24/08/2024,"NMDC Hyderabad Marathon 5K Run 2024, Hitex Exibition Centre",10000+,,,,810.5
+Table_3,16.,16/06/2024,"5K Run for Green, Sanjeevaiah Park Parking",800+,,,,24
+Table_3,15.,09/06/2024,"OK Kids Graduation Run, Dulapali Forest",500+,,,,133
+Table_3,14.,09/06/2024,"Telanagana 10K Run, Sanjeevaiah Park Parking",2000+,,,,
+Table_3,13.,23/05/2023,"Buddha Purnima Celebrations, Mahabodhi Buddha Vihara",1000+,,,,90
+Table_3,12.,24/03/2024,"Twin City 10K Run, Sanjeevaiah Park Parking",500+,,,,
+Table_3,11.,02/03/2024,"International Women’s Day Walk 2024, ECIL Officers Association",500+,,,,23
+Table_3,10.,07/01/2024,"Run for Education, Gachibowli Stadium",700+,,,,
+Table_3,9.,01/01/2024,"Indukuris LB Nagar Half Marathon, Indukuri Lakeshore, Nagole, Hyderabad",400+,,,,110.45
+Table_3,,,Total,48200+,,,,5644.46
+Table_4,8.,10/12/2023,"ECIL Runners Anniversary Run, ECIL Officers Association",400+,,,,53.9
+Table_4,7.,08/10/2023,"Grace Cancer Run 2023, Gachibowli Stadium",10000+,,,,1318
+Table_4,6.,27/08/2023,"NMDC Hyderabad Marathon 2023, People’s Plaza",13000+,,,,2530
+Table_4,5.,26/08/2023,NMDC Hyderabad Marathon 5k Run 2023. Hitex Exhibition Centre,8000+,,,,988
+Table_4,4.,13/08/2023,"10k Independence Run, Peoples Plaza, Necklace Road",500+,,,,
+Table_4,3.,03/06/2023 & 04/06/2023,"Kaushal Mahotsav, NSTIW, Shivam Road",9000+,,,,276.8
+Table_4,2.,27/05/2023,"World Emergency Medicine Day Run by SEMI, Thrill City Necklace Road",1000+,,,,92.2
+Table_4,1.,07/05/2023,"HCR 3.0, Parade Ground Secunderabad",1000+,,,,108
+Table_4,,,Total,42900+,,,,5367.9

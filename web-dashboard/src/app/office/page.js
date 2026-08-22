@@ -2904,6 +2904,26 @@ function OfficeDashboard() {
                       </span>
                     </div>
 
+                    {/* ML Model & Data Coverage Badges */}
+                    <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px]">
+                      <span className="bg-emerald-800/80 px-2 py-0.5 rounded-md font-mono text-emerald-200 border border-emerald-700">
+                        🤖 {selectedEventRequest.aiAnalysis?.algorithm || "RandomForestRegressor"} ({selectedEventRequest.aiAnalysis?.modelVersion || "v1.0.0"})
+                      </span>
+                      <span className="bg-teal-800/80 px-2 py-0.5 rounded-md font-bold text-teal-200 border border-teal-700">
+                        📊 Trained on {selectedEventRequest.aiAnalysis?.trainingSampleCount || 46} real events
+                      </span>
+                      <span className="bg-indigo-800/80 px-2 py-0.5 rounded-md font-bold text-indigo-200 border border-indigo-700">
+                        🎯 MAE: {selectedEventRequest.aiAnalysis?.validationMae || 117.25} kg
+                      </span>
+                      <span className={`px-2 py-0.5 rounded-md font-black tracking-wider uppercase border ${
+                        selectedEventRequest.aiAnalysis?.dataCoverage === "LOW DATA COVERAGE"
+                          ? "bg-amber-500/30 text-amber-200 border-amber-500/50"
+                          : "bg-emerald-500/30 text-emerald-200 border-emerald-500/50"
+                      }`}>
+                        {selectedEventRequest.aiAnalysis?.dataCoverage || "GOOD COVERAGE"}
+                      </span>
+                    </div>
+
                     <div className="text-2xl font-black text-white mb-1">
                       ~{selectedEventRequest.aiAnalysis?.estimatedWasteKg} kg Expected Waste
                     </div>

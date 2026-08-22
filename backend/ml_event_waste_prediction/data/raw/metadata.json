@@ -1,0 +1,10 @@
+{
+  "source": "VISVA Sustainable Foundation",
+  "sourceUrl": "https://visva.org.in/statistics/",
+  "downloadedAt": "2026-08-22T15:33:37.940111+00:00",
+  "originalFilename": "visva_events_raw.csv",
+  "rawCsvPath": "/Users/sumitkumar776693/Desktop/Project/Python/CodeWars HACKATHON/safaimitra/backend/ml_event_waste_prediction/data/raw/visva_events_raw.csv",
+  "isRealData": true,
+  "recordCount": 62,
+  "license": "Public Statistics Data"
+}

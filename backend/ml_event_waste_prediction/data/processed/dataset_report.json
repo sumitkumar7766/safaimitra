@@ -1,0 +1,55 @@
+{
+  "datasetName": "VISVA Sustainable Foundation Real Event Waste Dataset",
+  "rawCsvPath": "/Users/sumitkumar776693/Desktop/Project/Python/CodeWars HACKATHON/safaimitra/backend/ml_event_waste_prediction/data/raw/visva_events_raw.csv",
+  "rowCount": 62,
+  "columnCount": 9,
+  "columns": [
+    "table_source",
+    "event_number",
+    "event_date",
+    "event_name",
+    "participants_raw",
+    "dry_waste_raw",
+    "wet_waste_raw",
+    "mix_waste_raw",
+    "total_waste_raw"
+  ],
+  "dataTypes": {
+    "table_source": "str",
+    "event_number": "float64",
+    "event_date": "str",
+    "event_name": "str",
+    "participants_raw": "str",
+    "dry_waste_raw": "float64",
+    "wet_waste_raw": "float64",
+    "mix_waste_raw": "str",
+    "total_waste_raw": "float64"
+  },
+  "missingValues": {
+    "table_source": 0,
+    "event_number": 3,
+    "event_date": 3,
+    "event_name": 0,
+    "participants_raw": 8,
+    "dry_waste_raw": 33,
+    "wet_waste_raw": 30,
+    "mix_waste_raw": 34,
+    "total_waste_raw": 44
+  },
+  "duplicateRows": 1,
+  "participantStats": {
+    "validCount": 54,
+    "min": 100.0,
+    "max": 48200.0,
+    "mean": 4718.518518518518,
+    "median": 1000.0
+  },
+  "wasteStatsKg": {
+    "validCount": 52,
+    "min": 3.2,
+    "max": 5644.46,
+    "mean": 645.5031730769231,
+    "median": 129.55,
+    "std": 1313.8669538707325
+  }
+}
