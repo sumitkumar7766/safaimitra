@@ -12,6 +12,8 @@ const citizenAuth = require("../middleware/citizenAuth");
 const mongoose = require("mongoose");
 const multer = require("multer");
 const cloudinary = require("cloudinary").v2;
+const fs = require("fs");
+const os = require("os");
 
 // 1. REGISTER CITIZEN (Socket Update Added)
 router.post("/register", async (req, res) => {
@@ -128,7 +130,6 @@ router.get("/dustbin/list/:officeId", citizenAuth, async (req, res) => {
 });
 
 // Configure Multer
-const os = require("os");
 const citizenUploadDir = process.env.VERCEL ? os.tmpdir() : "./uploads/";
 if (!process.env.VERCEL && !fs.existsSync("./uploads/")) {
   fs.mkdirSync("./uploads/", { recursive: true });

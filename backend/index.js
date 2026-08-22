@@ -111,7 +111,7 @@ app.use(
     credentials: true,
     methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
     allowedHeaders: ["Content-Type", "Authorization", "X-Requested-With"],
-  })
+  }),
 );
 
 app.use(express.json());
@@ -165,7 +165,7 @@ app.use(
       maxAge: 7 * 24 * 60 * 60 * 1000,
       httpOnly: true,
     },
-  })
+  }),
 );
 
 // Passport
@@ -238,9 +238,11 @@ const resetDailyDustbins = async () => {
           status: "ideal",
           imageUrl: "",
         },
-      }
+      },
     );
-    console.log(`✅ System Reset: ${result.modifiedCount} dustbins are now Ideal & Ready.`);
+    console.log(
+      `✅ System Reset: ${result.modifiedCount} dustbins are now Ideal & Ready.`,
+    );
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (err) {
     console.error("❌ Error in Daily Reset Job:", err);
@@ -261,10 +263,12 @@ const checkInactiveVehicles = async () => {
           isOnline: false,
           status: "Inactive",
         },
-      }
+      },
     );
     if (result.modifiedCount > 0) {
-      console.log(`💤 Auto-offlined ${result.modifiedCount} inactive vehicles.`);
+      console.log(
+        `💤 Auto-offlined ${result.modifiedCount} inactive vehicles.`,
+      );
     }
     return { success: true, modifiedCount: result.modifiedCount };
   } catch (err) {
@@ -311,7 +315,7 @@ const escalateComplaints = async () => {
 
       if (!comp.nextEscalationAt && comp.currentEscalationLevel < 5) {
         comp.nextEscalationAt = new Date(
-          createdTime.getTime() + 24 * 60 * 60 * 1000
+          createdTime.getTime() + 24 * 60 * 60 * 1000,
         );
         updated = true;
       }
@@ -323,9 +327,7 @@ const escalateComplaints = async () => {
           const targetLevel = oldLevel + 1;
           comp.currentEscalationLevel = targetLevel;
           comp.escalatedAt = now;
-          comp.nextEscalationAt = new Date(
-            now.getTime() + 24 * 60 * 60 * 1000
-          );
+          comp.nextEscalationAt = new Date(now.getTime() + 24 * 60 * 60 * 1000);
 
           const role = roles[targetLevel];
           let targetStaffId = null;
@@ -369,7 +371,7 @@ const escalateComplaints = async () => {
                   type: "ESCALATED",
                   message: `Your complaint has been automatically escalated to ${newAuthName}!`,
                   complaintId: comp._id,
-                }
+                },
               );
             }
 
@@ -411,7 +413,7 @@ const escalateComplaints = async () => {
                   message:
                     "Your complaint is now eligible for public sharing on social media!",
                   complaintId: comp._id,
-                }
+                },
               );
             }
           }
