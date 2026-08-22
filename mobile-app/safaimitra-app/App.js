@@ -10,39 +10,69 @@ import {
   ScrollView,
   ActivityIndicator,
   Dimensions,
+  Platform,
+  KeyboardAvoidingView,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Picker } from "@react-native-picker/picker";
-import UserRegister from "./screens/userRegister";
+import { LinearGradient } from "expo-linear-gradient";
 import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
+import * as Location from "expo-location";
+import {
+  User,
+  Lock,
+  Phone,
+  Mail,
+  MapPin,
+  Building2,
+  Truck,
+  ShieldCheck,
+  Eye,
+  EyeOff,
+  ArrowRight,
+  ChevronLeft,
+  Sparkles,
+  Navigation,
+  Compass,
+  CheckCircle2,
+  RefreshCw,
+  KeyRound,
+  FileText,
+  Award,
+} from "lucide-react-native";
+
 import AdminPage from "./screens/Admin/Admin";
 import OfficeDashboard from "./screens/Office/Office";
 import StaffDashboard from "./screens/Staff/Staff";
 import CitizenDashboard from "./screens/Citizen/Citizen";
-import * as Location from "expo-location";
+import UserRegister from "./screens/userRegister";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.5.49.186:5002";
 const { width } = Dimensions.get("window");
 
-// --- ENHANCED ANIMATION COMPONENTS ---
-const AnimatedCard = ({ children, delay = 0 }) => {
+// =========================================================================
+// 🌟 MODERN ANIMATION & INTERACTIVE UTILITY COMPONENTS
+// =========================================================================
+
+// Staggered Fade & Spring Slide In
+const FadeInView = ({ children, delay = 0, style }) => {
   const fadeAnim = useRef(new Animated.Value(0)).current;
-  const slideAnim = useRef(new Animated.Value(50)).current;
+  const slideAnim = useRef(new Animated.Value(24)).current;
 
   useEffect(() => {
     Animated.parallel([
       Animated.timing(fadeAnim, {
         toValue: 1,
-        duration: 700,
+        duration: 500,
         delay,
         useNativeDriver: true,
       }),
       Animated.spring(slideAnim, {
         toValue: 0,
         delay,
-        tension: 45,
-        friction: 8,
+        tension: 50,
+        friction: 7,
         useNativeDriver: true,
       }),
     ]).start();
@@ -50,34 +80,38 @@ const AnimatedCard = ({ children, delay = 0 }) => {
 
   return (
     <Animated.View
-      style={{
-        opacity: fadeAnim,
-        transform: [{ translateY: slideAnim }],
-      }}
+      style={[
+        {
+          opacity: fadeAnim,
+          transform: [{ translateY: slideAnim }],
+        },
+        style,
+      ]}
     >
       {children}
     </Animated.View>
   );
 };
 
-const FloatingElement = ({ children, delay = 0 }) => {
+// Gentle Floating Motion for Badges / Icons
+const FloatingBadge = ({ children, delay = 0 }) => {
   const floatAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     Animated.loop(
       Animated.sequence([
         Animated.timing(floatAnim, {
-          toValue: -10,
-          duration: 2000,
+          toValue: -6,
+          duration: 1800,
           delay,
           useNativeDriver: true,
         }),
         Animated.timing(floatAnim, {
           toValue: 0,
-          duration: 2000,
+          duration: 1800,
           useNativeDriver: true,
         }),
-      ]),
+      ])
     ).start();
   }, []);
 
@@ -88,27 +122,143 @@ const FloatingElement = ({ children, delay = 0 }) => {
   );
 };
 
-// --- CORE LOGIN FUNCTION (UNCHANGED) ---
+// Interactive Touch Scale Spring Button
+const ScalePressable = ({ onPress, children, style, disabled = false, activeOpacity = 0.9 }) => {
+  const scale = useRef(new Animated.Value(1)).current;
+
+  const handlePressIn = () => {
+    if (disabled) return;
+    Animated.spring(scale, {
+      toValue: 0.96,
+      useNativeDriver: true,
+      tension: 100,
+      friction: 6,
+    }).start();
+  };
+
+  const handlePressOut = () => {
+    if (disabled) return;
+    Animated.spring(scale, {
+      toValue: 1,
+      useNativeDriver: true,
+      tension: 50,
+      friction: 5,
+    }).start();
+  };
+
+  return (
+    <Animated.View style={[{ transform: [{ scale }] }, style]}>
+      <TouchableOpacity
+        onPress={onPress}
+        onPressIn={handlePressIn}
+        onPressOut={handlePressOut}
+        activeOpacity={activeOpacity}
+        disabled={disabled}
+      >
+        {children}
+      </TouchableOpacity>
+    </Animated.View>
+  );
+};
+
+// Modern Text Input with Focus Glow and Icon
+const ModernInput = ({
+  label,
+  value,
+  onChangeText,
+  placeholder,
+  IconComponent,
+  secureTextEntry = false,
+  keyboardType = "default",
+  accentColor = "#10B981",
+  rightAction,
+  autoCapitalize = "none",
+  editable = true,
+  error,
+}) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <View style={{ marginBottom: 16 }}>
+      {label ? (
+        <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6, letterSpacing: 0.3 }}>
+          {label}
+        </Text>
+      ) : null}
+      <View
+        style={{
+          flexDirection: "row",
+          alignItems: "center",
+          backgroundColor: isFocused ? "#FFFFFF" : "#F8FAFC",
+          borderRadius: 16,
+          borderWidth: 1.5,
+          borderColor: error ? "#EF4444" : isFocused ? accentColor : "#E2E8F0",
+          paddingHorizontal: 14,
+          paddingVertical: Platform.OS === "ios" ? 14 : 4,
+          shadowColor: isFocused ? accentColor : "#000",
+          shadowOffset: { width: 0, height: 2 },
+          shadowOpacity: isFocused ? 0.12 : 0.03,
+          shadowRadius: 8,
+          elevation: isFocused ? 3 : 1,
+        }}
+      >
+        {IconComponent ? (
+          <View style={{ marginRight: 10 }}>
+            <IconComponent size={20} color={isFocused ? accentColor : "#94A3B8"} />
+          </View>
+        ) : null}
+
+        <TextInput
+          style={{
+            flex: 1,
+            fontSize: 15,
+            fontWeight: "500",
+            color: "#0F172A",
+            paddingVertical: Platform.OS === "ios" ? 0 : 8,
+          }}
+          placeholder={placeholder}
+          placeholderTextColor="#94A3B8"
+          value={value}
+          onChangeText={onChangeText}
+          secureTextEntry={secureTextEntry}
+          keyboardType={keyboardType}
+          autoCapitalize={autoCapitalize}
+          editable={editable}
+          onFocus={() => setIsFocused(true)}
+          onBlur={() => setIsFocused(false)}
+        />
+
+        {rightAction ? rightAction : null}
+      </View>
+      {error ? (
+        <Text style={{ color: "#EF4444", fontSize: 12, marginTop: 4, fontWeight: "600" }}>{error}</Text>
+      ) : null}
+    </View>
+  );
+};
+
+// =========================================================================
+// 🔐 CORE STRICT LOGIN HELPER (UNCHANGED CORE LOGIC)
+// =========================================================================
 const processStrictLogin = async (
   username,
   password,
   endpoint,
   expectedRole,
-  onSuccess,
+  onSuccess
 ) => {
   if (!username || !password) {
-    Alert.alert("Missing Info", "Please enter ID and Password");
+    Alert.alert("Missing Information", "Please provide both ID/Username and Password");
     return;
   }
 
   const fullUrl = `${API_BASE_URL}${endpoint}`;
-  console.log(`Attempting Login at: ${fullUrl} for Role: ${expectedRole}`);
 
   try {
     const res = await axios.post(
       fullUrl,
       { username, password },
-      { headers: { "Content-Type": "application/json" }, timeout: 10000 },
+      { headers: { "Content-Type": "application/json" }, timeout: 10000 }
     );
 
     if (res.data.success) {
@@ -116,33 +266,37 @@ const processStrictLogin = async (
       const actualRole = user.role ? user.role.toLowerCase() : "";
 
       let isAuthorized = false;
-      if (expectedRole === "admin" && actualRole === "admin")
-        isAuthorized = true;
-      else if (expectedRole === "office" && actualRole === "office")
-        isAuthorized = true;
-      else if (expectedRole === "citizen" && actualRole === "citizen")
-        isAuthorized = true;
+      if (expectedRole === "admin" && actualRole === "admin") isAuthorized = true;
+      else if (expectedRole === "office" && actualRole === "office") isAuthorized = true;
+      else if (expectedRole === "citizen" && actualRole === "citizen") isAuthorized = true;
       else if (
         expectedRole === "vehicle" &&
         ["driver", "helper", "supervisor"].includes(actualRole)
-      )
+      ) {
         isAuthorized = true;
+      }
 
-      if (actualRole === "admin" && expectedRole === "office")
-        isAuthorized = true;
+      if (actualRole === "admin" && expectedRole === "office") isAuthorized = true;
 
       if (!isAuthorized) {
         Alert.alert(
           "Access Denied",
-          `You cannot login as ${expectedRole} with role ${actualRole}`,
+          `You cannot login as ${expectedRole.toUpperCase()} with role: ${actualRole}`
         );
         return;
       }
 
       await AsyncStorage.setItem("token", token);
       await AsyncStorage.setItem("user", JSON.stringify(user));
+      await AsyncStorage.setItem("role", user.role || expectedRole);
+      if (user.id || user._id) {
+        await AsyncStorage.setItem("userId", (user.id || user._id).toString());
+      }
+      if (user.officeId) {
+        await AsyncStorage.setItem("officeId", user.officeId.toString());
+      }
 
-      Alert.alert("Success", `Welcome back, ${user.name || "User"}`);
+      Alert.alert("Success", `Welcome back, ${user.name || user.fullName || "User"}!`);
 
       if (expectedRole === "admin") {
         onSuccess("adminDashboard");
@@ -157,24 +311,30 @@ const processStrictLogin = async (
       Alert.alert("Login Failed", res.data.message || "Invalid Credentials");
     }
   } catch (err) {
-    console.log("LOGIN ERROR:", err);
+    console.error("LOGIN ERROR:", err);
     Alert.alert(
-      "Login Error",
-      err.response?.data?.message || "Connection Failed",
+      "Connection Error",
+      err.response?.data?.message || "Could not connect to SafaiMitra server. Please try again."
     );
   }
 };
 
-// --- UPDATED CITIZEN LOGIN WITH REGISTRATION ---
-const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
+// =========================================================================
+// 👤 CITIZEN LOGIN & REGISTRATION SCREEN (MODERN LIGHT THEME)
+// =========================================================================
+const CitizenLogin = ({ goBack, onLoginSuccess }) => {
   const [isLogin, setIsLogin] = useState(true);
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
+
+  // Registration Form State
   const [officeList, setOfficeList] = useState([]);
   const [loadingCities, setLoadingCities] = useState(false);
+  const [locationLoading, setLocationLoading] = useState(false);
+  const [locationError, setLocationError] = useState("");
 
-  // Registration form states
   const [regData, setRegData] = useState({
     fullName: "",
     email: "",
@@ -190,17 +350,13 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
     cityName: "",
   });
 
-  const [locationLoading, setLocationLoading] = useState(false);
-  const [locationError, setLocationError] = useState("");
-
   const fetchOffices = async () => {
     setLoadingCities(true);
     try {
       const res = await axios.get(`${API_BASE_URL}/public-list`);
       if (res.data && res.data.success) {
-        setOfficeList(res.data.cities);
+        setOfficeList(res.data.cities || []);
       }
-      console.log("Fetched cities for registration:", res.data.cities);
     } catch (error) {
       console.error("Error fetching cities:", error);
     } finally {
@@ -220,23 +376,16 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
   const fetchCurrentLocation = async () => {
     setLocationLoading(true);
     setLocationError("");
-
     try {
-      // 1. Request Permission
       let { status } = await Location.requestForegroundPermissionsAsync();
-
       if (status !== "granted") {
-        setLocationError("Permission to access location was denied");
+        setLocationError("Permission to access GPS was denied.");
         setLocationLoading(false);
         return;
       }
-
-      // 2. Get Current Position
       let location = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
       });
-
-      // 3. Update State
       setRegData((prev) => ({
         ...prev,
         latitude: location.coords.latitude.toFixed(6),
@@ -244,7 +393,7 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
       }));
     } catch (error) {
       console.error("Location Error:", error);
-      setLocationError("Unable to fetch location. Please ensure GPS is ON.");
+      setLocationError("Ensure Device GPS is turned ON.");
     } finally {
       setLocationLoading(false);
     }
@@ -252,45 +401,37 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
 
   const handleLogin = async () => {
     if (!id || !password) {
-      Alert.alert("Missing Info", "Please enter Phone No. and Password");
+      Alert.alert("Missing Details", "Please enter your Phone Number and Password.");
       return;
     }
-
     setLoading(true);
     const fullUrl = `${API_BASE_URL}/citizen/login`;
 
     try {
       const res = await axios.post(
         fullUrl,
-        { username: id, password: password },
-        { headers: { "Content-Type": "application/json" }, timeout: 10000 },
+        { username: id, password },
+        { headers: { "Content-Type": "application/json" }, timeout: 10000 }
       );
 
       if (res.data.success) {
         const { token, user } = res.data;
-
         await AsyncStorage.setItem("token", token);
         await AsyncStorage.setItem("user", JSON.stringify(user));
-        await AsyncStorage.setItem("userId", user.id.toString());
+        await AsyncStorage.setItem("userId", (user.id || user._id).toString());
         await AsyncStorage.setItem("role", "Citizen");
         if (user.officeId) {
           await AsyncStorage.setItem("officeId", user.officeId.toString());
         }
 
-        Alert.alert(
-          "Success",
-          `Welcome back, ${user.name || user.fullName || "User"}`,
-        );
+        Alert.alert("Welcome!", `Signed in successfully as ${user.name || user.fullName || "Citizen"}`);
         onLoginSuccess("citizen");
       } else {
-        Alert.alert("Login Failed", res.data.message || "Invalid Credentials");
+        Alert.alert("Authentication Failed", res.data.message || "Invalid credentials.");
       }
     } catch (err) {
-      console.log("LOGIN ERROR:", err);
-      Alert.alert(
-        "Login Error",
-        err.response?.data?.message || "Connection Failed",
-      );
+      console.error("Citizen Login Error:", err);
+      Alert.alert("Login Error", err.response?.data?.message || "Unable to reach the server.");
     } finally {
       setLoading(false);
     }
@@ -298,20 +439,17 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
 
   const handleRegister = async () => {
     if (regData.password !== regData.confirmPassword) {
-      Alert.alert("Error", "Passwords do not match!");
+      Alert.alert("Validation Error", "Passwords do not match!");
       return;
     }
-
     if (!regData.latitude || !regData.longitude) {
-      Alert.alert("Error", "Please provide your location!");
+      Alert.alert("Location Required", "Please allow GPS location detection.");
       return;
     }
-
     if (!regData.officeId) {
-      Alert.alert("Error", "Please select a City from the list!");
+      Alert.alert("City Required", "Please select your city jurisdiction.");
       return;
     }
-
     if (
       !regData.fullName ||
       !regData.email ||
@@ -320,12 +458,11 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
       !regData.address ||
       !regData.pincode
     ) {
-      Alert.alert("Error", "Please fill all required fields!");
+      Alert.alert("Required Fields", "Please complete all mandatory fields marked with *");
       return;
     }
 
     setLoading(true);
-
     try {
       const res = await axios.post(`${API_BASE_URL}/citizen/register`, {
         fullName: regData.fullName,
@@ -342,8 +479,9 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
       });
 
       if (res.data && res.data.success) {
-        Alert.alert("Success", "Registration successful! Please login.");
+        Alert.alert("Account Created! 🎉", "Your citizen profile is ready. Please sign in.");
         setIsLogin(true);
+        setId(regData.phone);
         setRegData({
           fullName: "",
           email: "",
@@ -359,622 +497,676 @@ const CitizenLogin = ({ goBack, onLoginSuccess, onRegisterPress }) => {
           cityName: "",
         });
       } else {
-        Alert.alert("Error", res.data.message);
+        Alert.alert("Registration Failed", res.data?.message || "Failed to register.");
       }
     } catch (error) {
-      console.error("Registration Error:", error);
-      Alert.alert(
-        "Error",
-        error.response?.data?.message ||
-          "Registration failed. Please try again.",
-      );
+      console.error("Registration error:", error);
+      Alert.alert("Registration Error", error.response?.data?.message || "Server communication failed.");
     } finally {
       setLoading(false);
     }
   };
 
-  const handleRegDataChange = (field, value) => {
-    setRegData((prev) => ({
-      ...prev,
-      [field]: value,
-    }));
-  };
-
-  const handleCityChange = (selectedId) => {
-    const selectedOffice = officeList.find(
-      (office) => office.id === selectedId,
-    );
-    setRegData((prev) => ({
-      ...prev,
-      officeId: selectedId,
-      cityName: selectedOffice ? selectedOffice.name : "",
-      city: selectedOffice ? selectedOffice.name : "",
-    }));
-  };
-
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className="pt-6 pb-4 px-6 bg-green-500">
-          <AnimatedCard delay={0}>
-            <TouchableOpacity
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
+      <KeyboardAvoidingView
+        behavior={Platform.OS === "ios" ? "padding" : undefined}
+        style={{ flex: 1 }}
+      >
+        <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+          {/* Top Navigation Bar */}
+          <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
+            <ScalePressable
               onPress={goBack}
-              className="flex-row items-center justify-center mb-6 self-start bg-white/20 px-5 py-3 rounded-full"
-              activeOpacity={0.8}
+              style={{
+                width: 44,
+                height: 44,
+                borderRadius: 14,
+                backgroundColor: "#FFFFFF",
+                justifyContent: "center",
+                alignItems: "center",
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.05,
+                shadowRadius: 6,
+                elevation: 2,
+              }}
             >
-              <Text className="text-white text-xl font-bold mr-2 mt-[-2px]">
-                ←
-              </Text>
-              <Text className="text-white font-semibold text-base">Back</Text>
-            </TouchableOpacity>
-          </AnimatedCard>
+              <ChevronLeft size={22} color="#1E293B" />
+            </ScalePressable>
 
-          <AnimatedCard delay={100}>
-            <View className="items-center mb-6">
-              <FloatingElement delay={0}>
-                <View className="bg-white w-24 h-24 rounded-3xl justify-center items-center mb-5 shadow-xl">
-                  <Text className="text-6xl">👤</Text>
-                </View>
-              </FloatingElement>
-              <Text className="text-white text-4xl font-bold mb-2">
-                Citizen Portal
-              </Text>
-              <View className="bg-white/20 px-4 py-2 rounded-full">
-                <Text className="text-white text-sm font-semibold">
-                  Community Access
+            <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#ECFDF5", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#A7F3D0" }}>
+              <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#10B981", marginRight: 6 }} />
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#047857" }}>Citizen Portal</Text>
+            </View>
+          </View>
+
+          {/* Hero Branding Header */}
+          <FadeInView delay={100} style={{ paddingHorizontal: 24, marginBottom: 20 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 12 }}>
+              <FloatingBadge delay={100}>
+                <LinearGradient
+                  colors={["#10B981", "#059669"]}
+                  style={{
+                    width: 56,
+                    height: 56,
+                    borderRadius: 18,
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginRight: 14,
+                    shadowColor: "#10B981",
+                    shadowOffset: { width: 0, height: 6 },
+                    shadowOpacity: 0.3,
+                    shadowRadius: 12,
+                    elevation: 6,
+                  }}
+                >
+                  <User size={28} color="#FFFFFF" />
+                </LinearGradient>
+              </FloatingBadge>
+              <View>
+                <Text style={{ fontSize: 26, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 }}>
+                  {isLogin ? "Welcome Citizen" : "Join SafaiMitra"}
+                </Text>
+                <Text style={{ fontSize: 14, color: "#64748B", fontWeight: "500", marginTop: 2 }}>
+                  {isLogin ? "Sign in to report & track waste issues" : "Register to make your city clean & green"}
                 </Text>
               </View>
             </View>
-          </AnimatedCard>
-        </View>
 
-        {/* Toggle Login/Register */}
-        <View className="px-6 pt-6">
-          <View className="flex-row bg-gray-100 rounded-2xl p-1 mb-6">
-            <TouchableOpacity
-              onPress={() => setIsLogin(true)}
-              className={`flex-1 py-3 rounded-xl items-center ${isLogin ? "bg-white shadow-sm" : ""}`}
+            {/* Segmented Control Pill Switcher */}
+            <View
+              style={{
+                flexDirection: "row",
+                backgroundColor: "#E2E8F0",
+                borderRadius: 16,
+                padding: 4,
+                marginTop: 10,
+              }}
             >
-              <Text
-                className={`font-semibold ${isLogin ? "text-green-600" : "text-gray-500"}`}
+              <TouchableOpacity
+                onPress={() => setIsLogin(true)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 13,
+                  backgroundColor: isLogin ? "#FFFFFF" : "transparent",
+                  alignItems: "center",
+                  shadowColor: isLogin ? "#000" : "transparent",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: isLogin ? 0.08 : 0,
+                  shadowRadius: 4,
+                  elevation: isLogin ? 2 : 0,
+                }}
               >
-                Login
-              </Text>
-            </TouchableOpacity>
-            <TouchableOpacity
-              onPress={() => setIsLogin(false)}
-              className={`flex-1 py-3 rounded-xl items-center ${!isLogin ? "bg-white shadow-sm" : ""}`}
+                <Text style={{ fontSize: 14, fontWeight: "700", color: isLogin ? "#0F172A" : "#64748B" }}>
+                  Sign In
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={() => setIsLogin(false)}
+                style={{
+                  flex: 1,
+                  paddingVertical: 10,
+                  borderRadius: 13,
+                  backgroundColor: !isLogin ? "#FFFFFF" : "transparent",
+                  alignItems: "center",
+                  shadowColor: !isLogin ? "#000" : "transparent",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: !isLogin ? 0.08 : 0,
+                  shadowRadius: 4,
+                  elevation: !isLogin ? 2 : 0,
+                }}
+              >
+                <Text style={{ fontSize: 14, fontWeight: "700", color: !isLogin ? "#0F172A" : "#64748B" }}>
+                  Create Account
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </FadeInView>
+
+          {/* Form Card Container */}
+          <FadeInView delay={200} style={{ paddingHorizontal: 20 }}>
+            <View
+              style={{
+                backgroundColor: "#FFFFFF",
+                borderRadius: 24,
+                padding: 22,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+                shadowColor: "#0F172A",
+                shadowOffset: { width: 0, height: 8 },
+                shadowOpacity: 0.05,
+                shadowRadius: 20,
+                elevation: 4,
+              }}
             >
-              <Text
-                className={`font-semibold ${!isLogin ? "text-green-600" : "text-gray-500"}`}
-              >
-                Register
-              </Text>
-            </TouchableOpacity>
-          </View>
-        </View>
+              {isLogin ? (
+                /* ================= SIGN IN FORM ================= */
+                <View>
+                  <ModernInput
+                    label="PHONE NUMBER / CITIZEN ID"
+                    placeholder="Enter 10-digit registered phone"
+                    value={id}
+                    onChangeText={setId}
+                    keyboardType="phone-pad"
+                    IconComponent={Phone}
+                    accentColor="#10B981"
+                  />
 
-        {/* Form Container */}
-        <View className="flex-1 px-6 bg-white">
-          {isLogin ? (
-            // LOGIN FORM
-            <AnimatedCard delay={200}>
-              <View className="bg-white rounded-3xl p-6 shadow-xl border-2 border-green-200 mb-6">
-                <View className="bg-green-500 h-1 rounded-full mb-6" />
+                  <ModernInput
+                    label="PASSWORD"
+                    placeholder="Enter your secret password"
+                    value={password}
+                    onChangeText={setPassword}
+                    secureTextEntry={!showPassword}
+                    IconComponent={Lock}
+                    accentColor="#10B981"
+                    rightAction={
+                      <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                        {showPassword ? (
+                          <EyeOff size={18} color="#64748B" />
+                        ) : (
+                          <Eye size={18} color="#64748B" />
+                        )}
+                      </TouchableOpacity>
+                    }
+                  />
 
-                {/* Phone Input */}
-                <View className="mb-5">
-                  <Text className="text-green-600 font-bold mb-3 text-xs uppercase tracking-wider">
-                    Phone No.
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-4 text-base text-gray-900 font-medium"
-                      placeholder="Enter your phone number"
-                      placeholderTextColor="#9ca3af"
-                      value={id}
-                      onChangeText={setId}
-                      keyboardType="phone-pad"
-                    />
-                  </View>
-                </View>
-
-                {/* Password Input */}
-                <View className="mb-6">
-                  <Text className="text-green-600 font-bold mb-3 text-xs uppercase tracking-wider">
-                    Password
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-4 text-base text-gray-900 font-medium"
-                      placeholder="Enter your password"
-                      placeholderTextColor="#9ca3af"
-                      value={password}
-                      onChangeText={setPassword}
-                      secureTextEntry
-                    />
-                  </View>
-                </View>
-
-                {/* Login Button */}
-                <TouchableOpacity
-                  className="bg-green-500 p-5 rounded-2xl items-center shadow-lg mb-3"
-                  onPress={handleLogin}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <View className="flex-row items-center">
-                      <Text className="text-white font-bold text-base mr-2">
-                        Login to Portal
-                      </Text>
-                      <Text className="text-white text-lg">→</Text>
-                    </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </AnimatedCard>
-          ) : (
-            // REGISTRATION FORM
-            <AnimatedCard delay={200}>
-              <View className="bg-white rounded-3xl p-6 shadow-xl border-2 border-green-200 mb-6">
-                <View className="bg-green-500 h-1 rounded-full mb-6" />
-
-                {/* Full Name */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Full Name *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="Enter your full name"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.fullName}
-                      onChangeText={(value) =>
-                        handleRegDataChange("fullName", value)
-                      }
-                    />
-                  </View>
-                </View>
-
-                {/* Email */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Email *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="your@email.com"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.email}
-                      onChangeText={(value) =>
-                        handleRegDataChange("email", value)
-                      }
-                      keyboardType="email-address"
-                      autoCapitalize="none"
-                    />
-                  </View>
-                </View>
-
-                {/* Phone */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Phone *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="10-digit number"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.phone}
-                      onChangeText={(value) =>
-                        handleRegDataChange("phone", value)
-                      }
-                      keyboardType="phone-pad"
-                      maxLength={10}
-                    />
-                  </View>
-                </View>
-
-                {/* Password */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Password *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="Min 6 characters"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.password}
-                      onChangeText={(value) =>
-                        handleRegDataChange("password", value)
-                      }
-                      secureTextEntry
-                    />
-                  </View>
-                </View>
-
-                {/* Confirm Password */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Confirm Password *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="Re-enter password"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.confirmPassword}
-                      onChangeText={(value) =>
-                        handleRegDataChange("confirmPassword", value)
-                      }
-                      secureTextEntry
-                    />
-                  </View>
-                </View>
-
-                {/* Address */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Address *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="Enter your complete address"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.address}
-                      onChangeText={(value) =>
-                        handleRegDataChange("address", value)
-                      }
-                      multiline
-                      numberOfLines={2}
-                    />
-                  </View>
-                </View>
-
-                {/* City Selection */}
-                <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                  <Picker
-                    selectedValue={regData.officeId}
-                    onValueChange={(itemValue) => handleCityChange(itemValue)}
-                    style={{ height: 55, color: "#111827" }} // Height is important for Android
-                    dropdownIconColor="#10b981"
-                  >
-                    <Picker.Item label="-- Choose City --" value="" />
-
-                    {loadingCities ? (
-                      <Picker.Item label="Loading cities..." value="" />
-                    ) : (
-                      // Added optional chaining ?. to ensure map doesn't run on undefined
-                      officeList?.map((office) => (
-                        <Picker.Item
-                          key={office.id || office._id} // Use _id if your backend is MongoDB
-                          label={office.name}
-                          value={office.id || office._id}
-                        />
-                      ))
-                    )}
-                  </Picker>
-                </View>
-
-                {/* Pincode */}
-                <View className="mb-4">
-                  <Text className="text-green-600 font-bold mb-2 text-xs uppercase tracking-wider">
-                    Pincode *
-                  </Text>
-                  <View className="bg-green-50 rounded-2xl border-2 border-green-300 overflow-hidden">
-                    <TextInput
-                      className="p-3 text-base text-gray-900 font-medium"
-                      placeholder="6-digit pincode"
-                      placeholderTextColor="#9ca3af"
-                      value={regData.pincode}
-                      onChangeText={(value) =>
-                        handleRegDataChange("pincode", value)
-                      }
-                      keyboardType="number-pad"
-                      maxLength={6}
-                    />
-                  </View>
-                </View>
-
-                {/* Location Section */}
-                <View className="bg-green-50 p-4 rounded-2xl border-2 border-green-300 mb-4">
-                  <View className="flex-row items-center justify-between mb-3">
-                    <Text className="text-green-600 font-bold text-xs uppercase tracking-wider">
-                      📍 Location Coordinates *
-                    </Text>
-                    <TouchableOpacity
-                      onPress={fetchCurrentLocation}
-                      disabled={locationLoading}
-                      className="bg-green-600 px-3 py-2 rounded-lg"
+                  {/* Submit Button */}
+                  <ScalePressable onPress={handleLogin} disabled={loading} style={{ marginTop: 8 }}>
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{
+                        borderRadius: 16,
+                        paddingVertical: 15,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        shadowColor: "#10B981",
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: 0.35,
+                        shadowRadius: 12,
+                        elevation: 5,
+                      }}
                     >
-                      {locationLoading ? (
-                        <ActivityIndicator size="small" color="white" />
+                      {loading ? (
+                        <ActivityIndicator color="#FFFFFF" />
                       ) : (
-                        <Text className="text-white text-xs font-bold">
-                          Auto-Fetch
-                        </Text>
+                        <>
+                          <Text style={{ fontSize: 16, fontWeight: "700", color: "#FFFFFF", marginRight: 8 }}>
+                            Sign In to Portal
+                          </Text>
+                          <ArrowRight size={18} color="#FFFFFF" />
+                        </>
                       )}
-                    </TouchableOpacity>
-                  </View>
+                    </LinearGradient>
+                  </ScalePressable>
+                </View>
+              ) : (
+                /* ================= REGISTRATION FORM ================= */
+                <View>
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A", marginBottom: 14 }}>
+                    Personal Details
+                  </Text>
 
-                  <View className="flex-row gap-2 mb-2">
-                    <View className="flex-1">
-                      <TextInput
-                        className="p-2.5 bg-white border-2 border-green-300 rounded-lg text-gray-900 text-sm"
-                        placeholder="Latitude"
-                        placeholderTextColor="#9ca3af"
-                        value={regData.latitude}
-                        onChangeText={(value) =>
-                          handleRegDataChange("latitude", value)
-                        }
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                    <View className="flex-1">
-                      <TextInput
-                        className="p-2.5 bg-white border-2 border-green-300 rounded-lg text-gray-900 text-sm"
-                        placeholder="Longitude"
-                        placeholderTextColor="#9ca3af"
-                        value={regData.longitude}
-                        onChangeText={(value) =>
-                          handleRegDataChange("longitude", value)
-                        }
-                        keyboardType="decimal-pad"
-                      />
-                    </View>
-                  </View>
+                  <ModernInput
+                    label="FULL NAME *"
+                    placeholder="Enter your full name"
+                    value={regData.fullName}
+                    onChangeText={(val) => setRegData({ ...regData, fullName: val })}
+                    IconComponent={User}
+                    accentColor="#10B981"
+                    autoCapitalize="words"
+                  />
 
-                  {locationError ? (
-                    <Text className="text-red-600 text-xs mt-2">
-                      {locationError}
+                  <ModernInput
+                    label="PHONE NUMBER *"
+                    placeholder="10-digit mobile number"
+                    value={regData.phone}
+                    onChangeText={(val) => setRegData({ ...regData, phone: val })}
+                    keyboardType="phone-pad"
+                    IconComponent={Phone}
+                    accentColor="#10B981"
+                  />
+
+                  <ModernInput
+                    label="EMAIL ADDRESS *"
+                    placeholder="name@example.com"
+                    value={regData.email}
+                    onChangeText={(val) => setRegData({ ...regData, email: val })}
+                    keyboardType="email-address"
+                    IconComponent={Mail}
+                    accentColor="#10B981"
+                  />
+
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 10, marginBottom: 14 }}>
+                    Address & City Jurisdiction
+                  </Text>
+
+                  <ModernInput
+                    label="STREET / RESIDENTIAL ADDRESS *"
+                    placeholder="Flat / House No, Street, Landmark"
+                    value={regData.address}
+                    onChangeText={(val) => setRegData({ ...regData, address: val })}
+                    IconComponent={Building2}
+                    accentColor="#10B981"
+                  />
+
+                  {/* City Selector */}
+                  <View style={{ marginBottom: 16 }}>
+                    <Text style={{ fontSize: 13, fontWeight: "700", color: "#475569", marginBottom: 6 }}>
+                      MUNICIPAL CITY JURISDICTION *
                     </Text>
-                  ) : null}
-                </View>
-
-                {/* Register Button */}
-                <TouchableOpacity
-                  className="bg-green-500 p-5 rounded-2xl items-center shadow-lg mb-3"
-                  onPress={handleRegister}
-                  disabled={loading}
-                  activeOpacity={0.8}
-                >
-                  {loading ? (
-                    <ActivityIndicator color="white" />
-                  ) : (
-                    <View className="flex-row items-center">
-                      <Text className="text-white font-bold text-base mr-2">
-                        Register Now
-                      </Text>
-                      <Text className="text-white text-lg">→</Text>
+                    <View
+                      style={{
+                        backgroundColor: "#F8FAFC",
+                        borderRadius: 16,
+                        borderWidth: 1.5,
+                        borderColor: "#E2E8F0",
+                        overflow: "hidden",
+                      }}
+                    >
+                      {loadingCities ? (
+                        <View style={{ padding: 14, flexDirection: "row", alignItems: "center" }}>
+                          <ActivityIndicator size="small" color="#10B981" />
+                          <Text style={{ marginLeft: 10, color: "#64748B", fontSize: 14 }}>Loading registered cities...</Text>
+                        </View>
+                      ) : (
+                        <Picker
+                          selectedValue={regData.officeId}
+                          onValueChange={(itemValue, itemIndex) => {
+                            if (itemIndex > 0) {
+                              const selectedObj = officeList[itemIndex - 1];
+                              setRegData({
+                                ...regData,
+                                officeId: itemValue,
+                                cityName: selectedObj ? selectedObj.name : "",
+                              });
+                            } else {
+                              setRegData({ ...regData, officeId: "", cityName: "" });
+                            }
+                          }}
+                          style={{ color: "#0F172A" }}
+                        >
+                          <Picker.Item label="-- Select Municipal Corporation --" value="" color="#94A3B8" />
+                          {officeList.map((office) => (
+                            <Picker.Item key={office.id} label={`📍 ${office.name}`} value={office.id} />
+                          ))}
+                        </Picker>
+                      )}
                     </View>
-                  )}
-                </TouchableOpacity>
-              </View>
-            </AnimatedCard>
-          )}
+                  </View>
 
-          {/* Info Box */}
-          <AnimatedCard delay={400}>
-            <View className="bg-green-50 border-l-4 border-green-500 rounded-2xl p-5 mb-6">
-              <View className="flex-row items-start">
-                <View className="bg-green-100 rounded-full p-2 mr-3">
-                  <Text className="text-2xl">💡</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-green-900 font-bold text-base mb-2">
-                    {isLogin ? "Quick Tip" : "Registration Info"}
+                  <ModernInput
+                    label="POSTAL PINCODE *"
+                    placeholder="e.g. 452001"
+                    value={regData.pincode}
+                    onChangeText={(val) => setRegData({ ...regData, pincode: val })}
+                    keyboardType="numeric"
+                    IconComponent={MapPin}
+                    accentColor="#10B981"
+                  />
+
+                  {/* Location Coordinate Detector */}
+                  <View style={{ backgroundColor: "#F0FDF4", padding: 14, borderRadius: 16, borderWidth: 1, borderColor: "#BBF7D0", marginBottom: 16 }}>
+                    <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", marginBottom: 8 }}>
+                      <View style={{ flexDirection: "row", alignItems: "center" }}>
+                        <Navigation size={18} color="#059669" />
+                        <Text style={{ fontSize: 13, fontWeight: "700", color: "#065F46", marginLeft: 6 }}>
+                          Auto GPS Verification
+                        </Text>
+                      </View>
+                      <TouchableOpacity
+                        onPress={fetchCurrentLocation}
+                        disabled={locationLoading}
+                        style={{ backgroundColor: "#10B981", paddingHorizontal: 10, paddingVertical: 5, borderRadius: 8, flexDirection: "row", alignItems: "center" }}
+                      >
+                        {locationLoading ? (
+                          <ActivityIndicator size="small" color="#FFF" />
+                        ) : (
+                          <>
+                            <RefreshCw size={12} color="#FFF" style={{ marginRight: 4 }} />
+                            <Text style={{ color: "#FFF", fontSize: 11, fontWeight: "700" }}>Detect GPS</Text>
+                          </>
+                        )}
+                      </TouchableOpacity>
+                    </View>
+
+                    {regData.latitude && regData.longitude ? (
+                      <View style={{ flexDirection: "row", backgroundColor: "#DCFCE7", padding: 8, borderRadius: 10 }}>
+                        <Text style={{ fontSize: 12, color: "#166534", fontWeight: "600" }}>
+                          📍 Coordinates: {regData.latitude}, {regData.longitude}
+                        </Text>
+                      </View>
+                    ) : (
+                      <Text style={{ fontSize: 12, color: "#059669" }}>
+                        Tap &apos;Detect GPS&apos; to link your residential location.
+                      </Text>
+                    )}
+                    {locationError ? (
+                      <Text style={{ color: "#DC2626", fontSize: 11, marginTop: 4 }}>{locationError}</Text>
+                    ) : null}
+                  </View>
+
+                  <Text style={{ fontSize: 14, fontWeight: "700", color: "#0F172A", marginTop: 4, marginBottom: 14 }}>
+                    Security Password
                   </Text>
-                  <Text className="text-green-700 text-sm leading-5">
-                    {isLogin
-                      ? "File complaints, track status, and contribute to a cleaner city"
-                      : "All fields marked with * are required. Make sure to provide accurate location data."}
-                  </Text>
+
+                  <ModernInput
+                    label="CREATE PASSWORD *"
+                    placeholder="At least 6 characters"
+                    value={regData.password}
+                    onChangeText={(val) => setRegData({ ...regData, password: val })}
+                    secureTextEntry
+                    IconComponent={Lock}
+                    accentColor="#10B981"
+                  />
+
+                  <ModernInput
+                    label="CONFIRM PASSWORD *"
+                    placeholder="Re-enter password"
+                    value={regData.confirmPassword}
+                    onChangeText={(val) => setRegData({ ...regData, confirmPassword: val })}
+                    secureTextEntry
+                    IconComponent={ShieldCheck}
+                    accentColor="#10B981"
+                  />
+
+                  {/* Register Submit Button */}
+                  <ScalePressable onPress={handleRegister} disabled={loading} style={{ marginTop: 8 }}>
+                    <LinearGradient
+                      colors={["#10B981", "#059669"]}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={{
+                        borderRadius: 16,
+                        paddingVertical: 15,
+                        alignItems: "center",
+                        justifyContent: "center",
+                        flexDirection: "row",
+                        shadowColor: "#10B981",
+                        shadowOffset: { width: 0, height: 6 },
+                        shadowOpacity: 0.35,
+                        shadowRadius: 12,
+                        elevation: 5,
+                      }}
+                    >
+                      {loading ? (
+                        <ActivityIndicator color="#FFFFFF" />
+                      ) : (
+                        <>
+                          <Text style={{ fontSize: 16, fontWeight: "700", color: "#FFFFFF", marginRight: 8 }}>
+                            Complete Registration
+                          </Text>
+                          <CheckCircle2 size={18} color="#FFFFFF" />
+                        </>
+                      )}
+                    </LinearGradient>
+                  </ScalePressable>
                 </View>
+              )}
+            </View>
+          </FadeInView>
+
+          {/* Trust Badge */}
+          <FadeInView delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#F1F5F9",
+                borderRadius: 16,
+                padding: 14,
+                borderWidth: 1,
+                borderColor: "#E2E8F0",
+              }}
+            >
+              <ShieldCheck size={22} color="#059669" style={{ marginRight: 12 }} />
+              <View style={{ flex: 1 }}>
+                <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155" }}>
+                  Verified Civic System
+                </Text>
+                <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                  Direct automated escalation to city sanitation officers.
+                </Text>
               </View>
             </View>
-          </AnimatedCard>
-        </View>
-      </ScrollView>
+          </FadeInView>
+        </ScrollView>
+      </KeyboardAvoidingView>
     </SafeAreaView>
   );
 };
 
+// =========================================================================
+// 🚛 VEHICLE STAFF LOGIN SCREEN (MODERN LIGHT THEME)
+// =========================================================================
 const VehicleLogin = ({ goBack, onLoginSuccess }) => {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const handleLogin = async () => {
     setLoading(true);
-    await processStrictLogin(
-      id,
-      password,
-      "/staff/login",
-      "vehicle",
-      onLoginSuccess,
-    );
+    await processStrictLogin(id, password, "/staff/login", "vehicle", onLoginSuccess);
     setLoading(false);
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#FFFBEB" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#FFFBEB" />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Navigation */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
+          <ScalePressable
+            onPress={goBack}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              backgroundColor: "#FFFFFF",
+              justifyContent: "center",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: "#FDE68A",
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 2,
+            }}
+          >
+            <ChevronLeft size={22} color="#92400E" />
+          </ScalePressable>
+
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: "#FEF3C7", paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: "#FCD34D" }}>
+            <View style={{ width: 8, height: 8, borderRadius: 4, backgroundColor: "#D97706", marginRight: 6 }} />
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#92400E" }}>Fleet & Drivers</Text>
+          </View>
+        </View>
+
         {/* Header */}
-        <View className="pt-6 pb-4 px-6 bg-amber-500">
-          <AnimatedCard delay={0}>
-            <TouchableOpacity
-              onPress={goBack}
-              className="flex-row items-center justify-center mb-6 self-start bg-white/20 px-5 py-3 rounded-full"
-              activeOpacity={0.8}
-            >
-              <Text className="text-white text-xl font-bold mr-2 mt-[-2px]">
-                ←
-              </Text>
-
-              <Text className="text-white font-semibold text-base">Back</Text>
-            </TouchableOpacity>
-          </AnimatedCard>
-
-          <AnimatedCard delay={100}>
-            <View className="items-center mb-6">
-              <FloatingElement delay={200}>
-                <View className="bg-white w-24 h-24 rounded-3xl justify-center items-center mb-5 shadow-xl">
-                  <Text className="text-6xl">🚛</Text>
-                </View>
-              </FloatingElement>
-              <Text className="text-white text-4xl font-bold mb-2">
+        <FadeInView delay={100} style={{ paddingHorizontal: 24, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <FloatingBadge delay={150}>
+              <LinearGradient
+                colors={["#F59E0B", "#D97706"]}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 18,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 14,
+                  shadowColor: "#F59E0B",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 12,
+                  elevation: 6,
+                }}
+              >
+                <Truck size={28} color="#FFFFFF" />
+              </LinearGradient>
+            </FloatingBadge>
+            <View>
+              <Text style={{ fontSize: 26, fontWeight: "800", color: "#78350F", letterSpacing: -0.5 }}>
                 Vehicle Staff
               </Text>
-              <View className="bg-white/20 px-4 py-2 rounded-full">
-                <Text className="text-white text-sm font-semibold">
-                  Collection Team
-                </Text>
-              </View>
+              <Text style={{ fontSize: 14, color: "#92400E", fontWeight: "500", marginTop: 2 }}>
+                Collection team & driver operations
+              </Text>
             </View>
-          </AnimatedCard>
-        </View>
+          </View>
+        </FadeInView>
 
-        {/* Form Container */}
-        <View className="flex-1 px-6 pt-8 bg-white">
-          <AnimatedCard delay={200}>
-            <View className="bg-white rounded-3xl p-6 shadow-xl border-2 border-amber-200 mb-6">
-              <View className="bg-amber-500 h-1 rounded-full mb-6" />
+        {/* Card Form */}
+        <FadeInView delay={200} style={{ paddingHorizontal: 20 }}>
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 24,
+              padding: 22,
+              borderWidth: 1,
+              borderColor: "#FDE68A",
+              shadowColor: "#B45309",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.06,
+              shadowRadius: 20,
+              elevation: 4,
+            }}
+          >
+            <ModernInput
+              label="STAFF IDENTIFIER / PHONE"
+              placeholder="Enter your registered staff ID"
+              value={id}
+              onChangeText={setId}
+              keyboardType="numeric"
+              IconComponent={User}
+              accentColor="#D97706"
+            />
 
-              {/* ID Input */}
-              <View className="mb-5">
-                <Text className="text-amber-600 font-bold mb-3 text-xs uppercase tracking-wider">
-                  Staff ID
-                </Text>
-                <View className="bg-amber-50 rounded-2xl border-2 border-amber-300 overflow-hidden">
-                  <TextInput
-                    className="p-4 text-base text-gray-900 font-medium"
-                    placeholder="Enter staff ID"
-                    placeholderTextColor="#9ca3af"
-                    value={id}
-                    onChangeText={setId}
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
+            <ModernInput
+              label="PASSWORD"
+              placeholder="Enter your password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              keyboardType="numeric"
+              IconComponent={Lock}
+              accentColor="#D97706"
+              rightAction={
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                  {showPassword ? (
+                    <EyeOff size={18} color="#64748B" />
+                  ) : (
+                    <Eye size={18} color="#64748B" />
+                  )}
+                </TouchableOpacity>
+              }
+            />
 
-              {/* Password Input */}
-              <View className="mb-6">
-                <Text className="text-amber-600 font-bold mb-3 text-xs uppercase tracking-wider">
-                  Password
-                </Text>
-                <View className="bg-amber-50 rounded-2xl border-2 border-amber-300 overflow-hidden">
-                  <TextInput
-                    className="p-4 text-base text-gray-900 font-medium"
-                    placeholder="Enter password"
-                    placeholderTextColor="#9ca3af"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                    keyboardType="numeric"
-                  />
-                </View>
-              </View>
-
-              {/* Login Button */}
-              <TouchableOpacity
-                className="bg-amber-500 p-5 rounded-2xl items-center shadow-lg mb-3"
-                onPress={handleLogin}
-                disabled={loading}
-                activeOpacity={0.8}
+            {/* Login Action */}
+            <ScalePressable onPress={handleLogin} disabled={loading} style={{ marginTop: 8 }}>
+              <LinearGradient
+                colors={["#F59E0B", "#D97706"]}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  borderRadius: 16,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  shadowColor: "#D97706",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 5,
+                }}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <View className="flex-row items-center">
-                    <Text className="text-white font-bold text-base mr-2">
-                      Start Duty
+                  <>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#FFFFFF", marginRight: 8 }}>
+                      Start Collection Duty
                     </Text>
-                    <Text className="text-white text-lg">→</Text>
-                  </View>
+                    <ArrowRight size={18} color="#FFFFFF" />
+                  </>
                 )}
-              </TouchableOpacity>
-            </View>
-          </AnimatedCard>
+              </LinearGradient>
+            </ScalePressable>
+          </View>
+        </FadeInView>
 
-          {/* Info Box */}
-          <AnimatedCard delay={300}>
-            <View className="bg-amber-50 border-l-4 border-amber-500 rounded-2xl p-5 mb-6">
-              <View className="flex-row items-start">
-                <View className="bg-amber-100 rounded-full p-2 mr-3">
-                  <Text className="text-2xl">⚡</Text>
-                </View>
-                <View className="flex-1">
-                  <Text className="text-amber-900 font-bold text-base mb-2">
-                    Remember
-                  </Text>
-                  <Text className="text-amber-700 text-sm leading-5">
-                    Mark attendance after login and follow assigned routes
-                  </Text>
-                </View>
-              </View>
+        {/* Operational Notice */}
+        <FadeInView delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#FEF3C7",
+              borderRadius: 16,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: "#FCD34D",
+            }}
+          >
+            <Compass size={22} color="#B45309" style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#78350F" }}>
+                Live GPS Routing Active
+              </Text>
+              <Text style={{ fontSize: 12, color: "#92400E", marginTop: 2 }}>
+                Ensure device GPS remains enabled to sync waste collection progress with headquarters.
+              </Text>
             </View>
-          </AnimatedCard>
-        </View>
+          </View>
+        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
+// =========================================================================
+// 🏢 OFFICE STAFF & SYSTEM ADMIN LOGIN SCREEN (MODERN LIGHT THEME)
+// =========================================================================
 const AdminLogin = ({ goBack, onLoginSuccess, isOffice }) => {
   const [id, setId] = useState("");
   const [password, setPassword] = useState("");
+  const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
 
   const theme = isOffice
     ? {
-        headerBg: "bg-indigo-600",
-        titleColor: "text-white",
-        badgeBg: "bg-white/20",
-        badgeText: "text-white",
-        topBar: "bg-indigo-600",
-        border: "border-indigo-200",
-        inputBg: "bg-indigo-50",
-        inputBorder: "border-indigo-300",
-        label: "text-indigo-600",
-        button: "bg-indigo-600",
-        infoBg: "bg-indigo-50",
-        infoBorder: "border-indigo-500",
-        infoTitle: "text-indigo-900",
-        infoText: "text-indigo-700",
-        iconBg: "bg-indigo-100",
-        icon: "🏢",
-        title: "Office Staff",
-        subtitle: "Management Portal",
+        screenBg: "#EEF2FF",
+        borderTone: "#C7D2FE",
+        badgeBg: "#E0E7FF",
+        badgeText: "#4338CA",
+        accent: "#4F46E5",
+        gradient: ["#6366F1", "#4F46E5"],
+        title: "Office Operations",
+        subtitle: "Municipal Staff Management Portal",
+        icon: Building2,
       }
     : {
-        headerBg: "bg-slate-800",
-        titleColor: "text-white",
-        badgeBg: "bg-white/20",
-        badgeText: "text-white",
-        topBar: "bg-slate-800",
-        border: "border-slate-200",
-        inputBg: "bg-slate-50",
-        inputBorder: "border-slate-300",
-        label: "text-slate-600",
-        button: "bg-slate-800",
-        infoBg: "bg-slate-50",
-        infoBorder: "border-slate-500",
-        infoTitle: "text-slate-900",
-        infoText: "text-slate-700",
-        iconBg: "bg-slate-100",
-        icon: "🔐",
+        screenBg: "#F8FAFC",
+        borderTone: "#CBD5E1",
+        badgeBg: "#E2E8F0",
+        badgeText: "#0F172A",
+        accent: "#0F172A",
+        gradient: ["#334155", "#0F172A"],
         title: "System Admin",
-        subtitle: "Control Center",
+        subtitle: "Central Control & Governance",
+        icon: ShieldCheck,
       };
 
   const handleLogin = async () => {
@@ -985,163 +1177,187 @@ const AdminLogin = ({ goBack, onLoginSuccess, isOffice }) => {
     setLoading(false);
   };
 
+  const IconComp = theme.icon;
+
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="light-content" backgroundColor="#1e293b" />
-      <ScrollView className="flex-1" showsVerticalScrollIndicator={false}>
-        {/* Header */}
-        <View className={`pt-6 pb-4 px-6 ${theme.headerBg}`}>
-          <AnimatedCard delay={0}>
-            <TouchableOpacity
-              onPress={goBack}
-              className="flex-row items-center justify-center mb-6 self-start bg-white/20 px-5 py-3 rounded-full"
-              activeOpacity={0.8}
-            >
-              <Text className="text-white text-xl font-bold mr-2 mt-[-2px]">
-                ←
-              </Text>
+    <SafeAreaView style={{ flex: 1, backgroundColor: theme.screenBg }}>
+      <StatusBar barStyle="dark-content" backgroundColor={theme.screenBg} />
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 40 }}>
+        {/* Top Header Navigation */}
+        <View style={{ flexDirection: "row", alignItems: "center", justifyContent: "space-between", paddingHorizontal: 20, paddingTop: 12, paddingBottom: 16 }}>
+          <ScalePressable
+            onPress={goBack}
+            style={{
+              width: 44,
+              height: 44,
+              borderRadius: 14,
+              backgroundColor: "#FFFFFF",
+              justifyContent: "center",
+              alignItems: "center",
+              borderWidth: 1,
+              borderColor: theme.borderTone,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: 2 },
+              shadowOpacity: 0.05,
+              shadowRadius: 6,
+              elevation: 2,
+            }}
+          >
+            <ChevronLeft size={22} color={theme.accent} />
+          </ScalePressable>
 
-              <Text className="text-white font-semibold text-base">Return</Text>
-            </TouchableOpacity>
-          </AnimatedCard>
+          <View style={{ flexDirection: "row", alignItems: "center", backgroundColor: theme.badgeBg, paddingHorizontal: 12, paddingVertical: 6, borderRadius: 20, borderWidth: 1, borderColor: theme.borderTone }}>
+            <KeyRound size={12} color={theme.badgeText} style={{ marginRight: 6 }} />
+            <Text style={{ fontSize: 12, fontWeight: "700", color: theme.badgeText }}>
+              {isOffice ? "Operations Portal" : "Admin Console"}
+            </Text>
+          </View>
+        </View>
 
-          <AnimatedCard delay={100}>
-            <View className="items-center mb-6">
-              <FloatingElement delay={400}>
-                <View className="bg-white w-24 h-24 rounded-3xl justify-center items-center mb-5 shadow-xl">
-                  <Text className="text-6xl">{theme.icon}</Text>
-                </View>
-              </FloatingElement>
-              <Text className={`${theme.titleColor} text-4xl font-bold mb-2`}>
+        {/* Hero Title */}
+        <FadeInView delay={100} style={{ paddingHorizontal: 24, marginBottom: 20 }}>
+          <View style={{ flexDirection: "row", alignItems: "center" }}>
+            <FloatingBadge delay={200}>
+              <LinearGradient
+                colors={theme.gradient}
+                style={{
+                  width: 56,
+                  height: 56,
+                  borderRadius: 18,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 14,
+                  shadowColor: theme.accent,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 12,
+                  elevation: 6,
+                }}
+              >
+                <IconComp size={28} color="#FFFFFF" />
+              </LinearGradient>
+            </FloatingBadge>
+            <View>
+              <Text style={{ fontSize: 26, fontWeight: "800", color: "#0F172A", letterSpacing: -0.5 }}>
                 {theme.title}
               </Text>
-              <View className={`${theme.badgeBg} px-4 py-2 rounded-full`}>
-                <Text className={`${theme.badgeText} text-sm font-semibold`}>
-                  {theme.subtitle}
-                </Text>
-              </View>
+              <Text style={{ fontSize: 14, color: "#64748B", fontWeight: "500", marginTop: 2 }}>
+                {theme.subtitle}
+              </Text>
             </View>
-          </AnimatedCard>
-        </View>
+          </View>
+        </FadeInView>
 
-        {/* Form Container */}
-        <View className="flex-1 px-6 pt-8 bg-white">
-          <AnimatedCard delay={200}>
-            <View
-              className={`bg-white rounded-3xl p-6 shadow-xl border-2 ${theme.border} mb-6`}
-            >
-              <View className={`${theme.topBar} h-1 rounded-full mb-6`} />
+        {/* Card Form */}
+        <FadeInView delay={200} style={{ paddingHorizontal: 20 }}>
+          <View
+            style={{
+              backgroundColor: "#FFFFFF",
+              borderRadius: 24,
+              padding: 22,
+              borderWidth: 1,
+              borderColor: theme.borderTone,
+              shadowColor: "#0F172A",
+              shadowOffset: { width: 0, height: 8 },
+              shadowOpacity: 0.06,
+              shadowRadius: 20,
+              elevation: 4,
+            }}
+          >
+            <ModernInput
+              label="USERNAME / OFFICIAL EMAIL"
+              placeholder="Enter official credentials"
+              value={id}
+              onChangeText={setId}
+              IconComponent={User}
+              accentColor={theme.accent}
+            />
 
-              {/* Username Input */}
-              <View className="mb-5">
-                <Text
-                  className={`${theme.label} font-bold mb-3 text-xs uppercase tracking-wider`}
-                >
-                  Username
-                </Text>
-                <View
-                  className={`${theme.inputBg} rounded-2xl border-2 ${theme.inputBorder} overflow-hidden`}
-                >
-                  <TextInput
-                    className="p-4 text-base text-gray-900 font-medium"
-                    placeholder="Enter username"
-                    placeholderTextColor="#9ca3af"
-                    value={id}
-                    onChangeText={setId}
-                  />
-                </View>
-              </View>
+            <ModernInput
+              label="SECURITY PASSWORD"
+              placeholder="Enter secret password"
+              value={password}
+              onChangeText={setPassword}
+              secureTextEntry={!showPassword}
+              IconComponent={Lock}
+              accentColor={theme.accent}
+              rightAction={
+                <TouchableOpacity onPress={() => setShowPassword(!showPassword)} style={{ padding: 4 }}>
+                  {showPassword ? (
+                    <EyeOff size={18} color="#64748B" />
+                  ) : (
+                    <Eye size={18} color="#64748B" />
+                  )}
+                </TouchableOpacity>
+              }
+            />
 
-              {/* Password Input */}
-              <View className="mb-6">
-                <Text
-                  className={`${theme.label} font-bold mb-3 text-xs uppercase tracking-wider`}
-                >
-                  Password
-                </Text>
-                <View
-                  className={`${theme.inputBg} rounded-2xl border-2 ${theme.inputBorder} overflow-hidden`}
-                >
-                  <TextInput
-                    className="p-4 text-base text-gray-900 font-medium"
-                    placeholder="Enter password"
-                    placeholderTextColor="#9ca3af"
-                    value={password}
-                    onChangeText={setPassword}
-                    secureTextEntry
-                  />
-                </View>
-              </View>
-
-              {/* Login Button */}
-              <TouchableOpacity
-                className={`${theme.button} p-5 rounded-2xl items-center shadow-lg mb-3`}
-                onPress={handleLogin}
-                disabled={loading}
-                activeOpacity={0.8}
+            {/* Login Action */}
+            <ScalePressable onPress={handleLogin} disabled={loading} style={{ marginTop: 8 }}>
+              <LinearGradient
+                colors={theme.gradient}
+                start={{ x: 0, y: 0 }}
+                end={{ x: 1, y: 0 }}
+                style={{
+                  borderRadius: 16,
+                  paddingVertical: 15,
+                  alignItems: "center",
+                  justifyContent: "center",
+                  flexDirection: "row",
+                  shadowColor: theme.accent,
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.35,
+                  shadowRadius: 12,
+                  elevation: 5,
+                }}
               >
                 {loading ? (
-                  <ActivityIndicator color="white" />
+                  <ActivityIndicator color="#FFFFFF" />
                 ) : (
-                  <View className="flex-row items-center">
-                    <Text className="text-white font-bold text-base mr-2">
-                      AUTHENTICATE
+                  <>
+                    <Text style={{ fontSize: 16, fontWeight: "700", color: "#FFFFFF", marginRight: 8 }}>
+                      Authenticate Session
                     </Text>
-                    <Text className="text-white text-lg">→</Text>
-                  </View>
+                    <ArrowRight size={18} color="#FFFFFF" />
+                  </>
                 )}
-              </TouchableOpacity>
-            </View>
-          </AnimatedCard>
+              </LinearGradient>
+            </ScalePressable>
+          </View>
+        </FadeInView>
 
-          {/* Security Notice */}
-          <AnimatedCard delay={300}>
-            <View
-              className={`${theme.infoBg} border-l-4 ${theme.infoBorder} rounded-2xl p-5 mb-6`}
-            >
-              <View className="flex-row items-start">
-                <View className={`${theme.iconBg} rounded-full p-2 mr-3`}>
-                  <Text className="text-2xl">🔒</Text>
-                </View>
-                <View className="flex-1">
-                  <Text
-                    className={`${theme.infoTitle} font-bold text-base mb-2`}
-                  >
-                    Secure Session
-                  </Text>
-                  <Text className={`${theme.infoText} text-sm leading-5`}>
-                    Your connection is encrypted and monitored for security
-                  </Text>
-                </View>
-              </View>
+        {/* Security Warning */}
+        <FadeInView delay={300} style={{ paddingHorizontal: 20, marginTop: 20 }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              backgroundColor: "#FFFFFF",
+              borderRadius: 16,
+              padding: 14,
+              borderWidth: 1,
+              borderColor: theme.borderTone,
+            }}
+          >
+            <ShieldCheck size={22} color={theme.accent} style={{ marginRight: 12 }} />
+            <View style={{ flex: 1 }}>
+              <Text style={{ fontSize: 13, fontWeight: "700", color: "#334155" }}>
+                Encrypted Session
+              </Text>
+              <Text style={{ fontSize: 12, color: "#64748B", marginTop: 2 }}>
+                All administrative access is monitored and logged in compliance with municipal IT policies.
+              </Text>
             </View>
-          </AnimatedCard>
-        </View>
+          </View>
+        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
 };
 
-// --- PLACEHOLDER DASHBOARDS (UNCHANGED) ---
-const Citizen = ({ goBack }) => (
-  <SafeAreaView className="flex-1 bg-green-50 justify-center items-center">
-    <Text className="text-2xl font-bold">Citizen Dashboard</Text>
-    <TouchableOpacity onPress={goBack} className="mt-4 bg-red-500 p-3 rounded">
-      <Text className="text-white">Logout</Text>
-    </TouchableOpacity>
-  </SafeAreaView>
-);
-
-const Vehicle = ({ goBack }) => (
-  <SafeAreaView className="flex-1 bg-amber-50 justify-center items-center">
-    <Text className="text-2xl font-bold">Vehicle Dashboard</Text>
-    <TouchableOpacity onPress={goBack} className="mt-4 bg-red-500 p-3 rounded">
-      <Text className="text-white">Logout</Text>
-    </TouchableOpacity>
-  </SafeAreaView>
-);
-
-// --- MAIN APP WITH COLORFUL HOME SCREEN ---
+// =========================================================================
+// 🚀 MAIN APPLICATION & ENHANCED HOME PORTAL SCREEN
+// =========================================================================
 export default function App() {
   const [screen, setScreen] = useState("home");
   const [loading, setLoading] = useState(false);
@@ -1155,25 +1371,17 @@ export default function App() {
       const role = user.role ? user.role.toLowerCase() : "";
       const isAdmin = role === "admin";
 
-      if (targetDashboard === "adminDashboard") {
-        if (!isAdmin) {
-          Alert.alert("Access Denied", "Only for System Administrators.");
-          return;
-        }
+      if (targetDashboard === "adminDashboard" && !isAdmin) {
+        Alert.alert("Access Denied", "Only for System Administrators.");
+        return;
       }
-
-      if (targetDashboard === "officeDashboard") {
-        if (role !== "office" && !isAdmin) {
-          Alert.alert("Access Denied", "Only for Office Staff.");
-          return;
-        }
+      if (targetDashboard === "officeDashboard" && role !== "office" && !isAdmin) {
+        Alert.alert("Access Denied", "Only for Office Staff.");
+        return;
       }
-
-      if (targetDashboard === "vehicle") {
-        if (!["driver", "helper", "supervisor"].includes(role) && !isAdmin) {
-          Alert.alert("Access Denied", "Only for Vehicle Staff.");
-          return;
-        }
+      if (targetDashboard === "vehicle" && !["driver", "helper", "supervisor"].includes(role) && !isAdmin) {
+        Alert.alert("Access Denied", "Only for Vehicle Staff.");
+        return;
       }
 
       setScreen(targetDashboard);
@@ -1187,44 +1395,39 @@ export default function App() {
     setScreen("home");
   };
 
-  if (loading)
+  if (loading) {
     return (
-      <View className="flex-1 justify-center items-center bg-white">
-        <ActivityIndicator size="large" color="#10b981" />
+      <View style={{ flex: 1, justifyContent: "center", alignItems: "center", backgroundColor: "#FFFFFF" }}>
+        <ActivityIndicator size="large" color="#10B981" />
       </View>
     );
-
-  // Navigation routing (unchanged logic)
-  if (screen === "adminDashboard") {
-    return <AdminPage isOffice={false} goBack={handleLogout} />;
   }
 
-  if (screen === "officeDashboard") {
-    return <OfficeDashboard isOffice={true} goBack={handleLogout} />;
-  }
-
+  // Dashboard Routers
+  if (screen === "adminDashboard") return <AdminPage isOffice={false} goBack={handleLogout} />;
+  if (screen === "officeDashboard") return <OfficeDashboard isOffice={true} goBack={handleLogout} />;
   if (screen === "citizen") return <CitizenDashboard goBack={handleLogout} />;
   if (screen === "vehicle") return <StaffDashboard goBack={handleLogout} />;
-  if (screen === "register")
-    return <UserRegister goBack={() => setScreen("citizenLogin")} />;
+  if (screen === "register") return <UserRegister goBack={() => setScreen("citizenLogin")} />;
 
-  // Login Screens
-  if (screen === "citizenLogin")
+  // Login Views
+  if (screen === "citizenLogin") {
     return (
       <CitizenLogin
         goBack={() => setScreen("home")}
         onLoginSuccess={(next) => setScreen(next)}
-        onRegisterPress={() => setScreen("register")}
       />
     );
-  if (screen === "vehicleLogin")
+  }
+  if (screen === "vehicleLogin") {
     return (
       <VehicleLogin
         goBack={() => setScreen("home")}
         onLoginSuccess={(next) => setScreen(next)}
       />
     );
-  if (screen === "officeLogin")
+  }
+  if (screen === "officeLogin") {
     return (
       <AdminLogin
         isOffice={true}
@@ -1232,7 +1435,8 @@ export default function App() {
         onLoginSuccess={(next) => setScreen(next)}
       />
     );
-  if (screen === "adminLogin")
+  }
+  if (screen === "adminLogin") {
     return (
       <AdminLogin
         isOffice={false}
@@ -1240,191 +1444,275 @@ export default function App() {
         onLoginSuccess={(next) => setScreen(next)}
       />
     );
+  }
 
-  // --- VIBRANT HOME SCREEN ---
-  const RoleButton = ({
+  // =========================================================================
+  // 🌟 MODERN LIGHT THEMED HOME PORTAL SELECTION
+  // =========================================================================
+  const ModernRoleCard = ({
     title,
-    icon,
-    colorClass,
-    bgLight,
-    description,
-    delay,
+    subtitle,
+    badge,
+    icon: IconComponent,
+    gradientColors,
+    accentColor,
+    borderColor,
     targetDashboard,
     targetLogin,
+    delay,
   }) => {
-    const scaleAnim = useRef(new Animated.Value(1)).current;
-
-    const handlePressIn = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 0.97,
-        useNativeDriver: true,
-      }).start();
-    };
-
-    const handlePressOut = () => {
-      Animated.spring(scaleAnim, {
-        toValue: 1,
-        friction: 4,
-        tension: 50,
-        useNativeDriver: true,
-      }).start();
-    };
-
     return (
-      <AnimatedCard delay={delay}>
-        <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
-          <TouchableOpacity
-            onPress={() => navigateWithGuard(targetDashboard, targetLogin)}
-            onPressIn={handlePressIn}
-            onPressOut={handlePressOut}
-            activeOpacity={1}
-            className={`bg-white rounded-3xl mb-4 shadow-lg border-2 ${bgLight} overflow-hidden`}
+      <FadeInView delay={delay} style={{ marginBottom: 14 }}>
+        <ScalePressable
+          onPress={() => navigateWithGuard(targetDashboard, targetLogin)}
+          style={{
+            backgroundColor: "#FFFFFF",
+            borderRadius: 22,
+            padding: 16,
+            borderWidth: 1.5,
+            borderColor,
+            shadowColor: accentColor,
+            shadowOffset: { width: 0, height: 4 },
+            shadowOpacity: 0.08,
+            shadowRadius: 14,
+            elevation: 3,
+            flexDirection: "row",
+            alignItems: "center",
+          }}
+        >
+          {/* Icon Badge */}
+          <LinearGradient
+            colors={gradientColors}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={{
+              width: 54,
+              height: 54,
+              borderRadius: 16,
+              justifyContent: "center",
+              alignItems: "center",
+              marginRight: 14,
+              shadowColor: accentColor,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.25,
+              shadowRadius: 8,
+              elevation: 4,
+            }}
           >
-            <View className="flex-row items-center p-5">
-              {/* Icon Container */}
-              <View
-                className={`${colorClass} w-16 h-16 rounded-2xl justify-center items-center mr-4 shadow-md`}
-              >
-                <Text className="text-3xl">{icon}</Text>
-              </View>
+            <IconComponent size={26} color="#FFFFFF" />
+          </LinearGradient>
 
-              {/* Content */}
-              <View className="flex-1">
-                <Text className="text-gray-900 text-lg font-bold mb-1">
-                  {title}
-                </Text>
-                <Text className="text-gray-600 text-sm">{description}</Text>
-              </View>
-
-              {/* Arrow */}
-              <View
-                className={`${colorClass} w-11 h-11 rounded-xl justify-center items-center shadow-sm`}
-              >
-                <Text className="text-white font-bold text-xl">→</Text>
-              </View>
+          {/* Description */}
+          <View style={{ flex: 1 }}>
+            <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 2 }}>
+              <Text style={{ fontSize: 17, fontWeight: "800", color: "#0F172A", marginRight: 6 }}>
+                {title}
+              </Text>
+              {badge ? (
+                <View style={{ backgroundColor: `${accentColor}15`, paddingHorizontal: 7, paddingVertical: 2, borderRadius: 6 }}>
+                  <Text style={{ fontSize: 10, fontWeight: "700", color: accentColor }}>{badge}</Text>
+                </View>
+              ) : null}
             </View>
-          </TouchableOpacity>
-        </Animated.View>
-      </AnimatedCard>
+            <Text style={{ fontSize: 13, color: "#64748B", fontWeight: "500" }}>{subtitle}</Text>
+          </View>
+
+          {/* Enter Pill */}
+          <View
+            style={{
+              width: 36,
+              height: 36,
+              borderRadius: 12,
+              backgroundColor: `${accentColor}12`,
+              justifyContent: "center",
+              alignItems: "center",
+            }}
+          >
+            <ArrowRight size={18} color={accentColor} />
+          </View>
+        </ScalePressable>
+      </FadeInView>
     );
   };
 
   return (
-    <SafeAreaView className="flex-1 bg-white">
-      <StatusBar barStyle="dark-content" backgroundColor="#ffffff" />
+    <SafeAreaView style={{ flex: 1, backgroundColor: "#F8FAFC" }}>
+      <StatusBar barStyle="dark-content" backgroundColor="#F8FAFC" />
 
-      {/* Header with Green Accent */}
-      <View className="pt-12 pb-6 px-6 bg-green-500">
-        <AnimatedCard delay={0}>
-          <View className="items-center mb-4">
-            <FloatingElement delay={0}>
-              <View className="bg-white w-20 h-20 rounded-3xl justify-center items-center mb-4 shadow-xl">
-                <Text className="text-4xl">🌿</Text>
-              </View>
-            </FloatingElement>
-            <Text className="text-white text-5xl font-bold mb-2">
-              SafaiMitra
-            </Text>
-            <View className="bg-white/20 px-5 py-2 rounded-full">
-              <Text className="text-white text-sm font-bold">
-                Clean City Initiative
+      <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={{ paddingBottom: 30 }}>
+        {/* Brand Header */}
+        <FadeInView delay={50} style={{ paddingHorizontal: 22, paddingTop: 16, paddingBottom: 10 }}>
+          <View style={{ flexDirection: "row", justifyContent: "space-between", alignItems: "center", marginBottom: 16 }}>
+            {/* Live System Indicator */}
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                backgroundColor: "#ECFDF5",
+                paddingHorizontal: 10,
+                paddingVertical: 5,
+                borderRadius: 20,
+                borderWidth: 1,
+                borderColor: "#A7F3D0",
+              }}
+            >
+              <View style={{ width: 7, height: 7, borderRadius: 4, backgroundColor: "#10B981", marginRight: 6 }} />
+              <Text style={{ fontSize: 11, fontWeight: "700", color: "#047857" }}>
+                GovTech Network 24/7
               </Text>
             </View>
+
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              <Sparkles size={16} color="#10B981" style={{ marginRight: 4 }} />
+              <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>v2.0 Clean City</Text>
+            </View>
           </View>
-        </AnimatedCard>
-      </View>
 
-      {/* Decorative Divider */}
-      <View className="bg-green-500 h-1" />
-
-      {/* Content Container */}
-      <ScrollView
-        className="flex-1 px-6 pt-8 bg-white"
-        showsVerticalScrollIndicator={false}
-      >
-        <AnimatedCard delay={150}>
-          <View className="mb-6">
-            <Text className="text-gray-900 text-2xl font-bold mb-2">
-              Choose Your Portal
-            </Text>
-            <Text className="text-gray-600 text-sm">
-              Select your role to access the system
-            </Text>
-          </View>
-        </AnimatedCard>
-
-        {/* Role Buttons */}
-        <RoleButton
-          title="Citizen Portal"
-          description="File & Track Complaints"
-          icon="👤"
-          colorClass="bg-green-500"
-          bgLight="border-green-200"
-          targetDashboard="citizen"
-          targetLogin="citizenLogin"
-          delay={200}
-        />
-
-        <RoleButton
-          title="Vehicle Staff"
-          description="Route & Collection Duty"
-          icon="🚛"
-          colorClass="bg-amber-500"
-          bgLight="border-amber-200"
-          targetDashboard="vehicle"
-          targetLogin="vehicleLogin"
-          delay={250}
-        />
-
-        <RoleButton
-          title="Office Staff"
-          description="Operations Management"
-          icon="🏢"
-          colorClass="bg-indigo-600"
-          bgLight="border-indigo-200"
-          targetDashboard="officeDashboard"
-          targetLogin="officeLogin"
-          delay={300}
-        />
-
-        <RoleButton
-          title="System Admin"
-          description="Full System Control"
-          icon="🔐"
-          colorClass="bg-slate-800"
-          bgLight="border-slate-200"
-          targetDashboard="adminDashboard"
-          targetLogin="adminLogin"
-          delay={350}
-        />
-
-        {/* Footer */}
-        <View className="mt-6 mb-10">
-          <AnimatedCard delay={400}>
-            <View className="items-center mb-4">
-              <TouchableOpacity
-                onPress={handleLogout}
-                className="bg-gray-100 rounded-full px-8 py-3 border border-gray-200"
+          {/* Main Logo & Title */}
+          <View style={{ flexDirection: "row", alignItems: "center", marginBottom: 8 }}>
+            <FloatingBadge delay={0}>
+              <LinearGradient
+                colors={["#10B981", "#059669"]}
+                style={{
+                  width: 52,
+                  height: 52,
+                  borderRadius: 18,
+                  justifyContent: "center",
+                  alignItems: "center",
+                  marginRight: 12,
+                  shadowColor: "#10B981",
+                  shadowOffset: { width: 0, height: 6 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 10,
+                  elevation: 5,
+                }}
               >
-                <Text className="text-gray-700 text-sm font-bold">
-                  Reset Session
-                </Text>
-              </TouchableOpacity>
+                <Text style={{ fontSize: 26 }}>🌿</Text>
+              </LinearGradient>
+            </FloatingBadge>
+            <View>
+              <Text style={{ fontSize: 28, fontWeight: "900", color: "#0F172A", letterSpacing: -0.5 }}>
+                SafaiMitra
+              </Text>
+              <Text style={{ fontSize: 13, fontWeight: "600", color: "#059669" }}>
+                Smart Waste Management System
+              </Text>
             </View>
-          </AnimatedCard>
+          </View>
+        </FadeInView>
 
-          <AnimatedCard delay={450}>
-            <View className="items-center">
-              <View className="bg-green-500 h-1 w-32 rounded-full mb-3" />
-              <Text className="text-gray-400 text-xs font-semibold mb-1">
-                VERSION 2.0
-              </Text>
-              <Text className="text-gray-400 text-xs">
-                Powered by SafaiMitra
-              </Text>
+        {/* Feature Highlights Banner */}
+        <FadeInView delay={120} style={{ paddingHorizontal: 20, marginBottom: 18 }}>
+          <LinearGradient
+            colors={["#ECFDF5", "#F0FDF4"]}
+            style={{
+              borderRadius: 20,
+              padding: 16,
+              borderWidth: 1,
+              borderColor: "#D1FAE5",
+              flexDirection: "row",
+              justifyContent: "space-between",
+            }}
+          >
+            <View style={{ alignItems: "center", flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#065F46" }}>100%</Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#047857", marginTop: 1 }}>Digital</Text>
             </View>
-          </AnimatedCard>
+            <View style={{ width: 1, backgroundColor: "#A7F3D0" }} />
+            <View style={{ alignItems: "center", flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#065F46" }}>AI Photo</Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#047857", marginTop: 1 }}>Verified</Text>
+            </View>
+            <View style={{ width: 1, backgroundColor: "#A7F3D0" }} />
+            <View style={{ alignItems: "center", flex: 1 }}>
+              <Text style={{ fontSize: 15, fontWeight: "800", color: "#065F46" }}>JAES 24h</Text>
+              <Text style={{ fontSize: 11, fontWeight: "600", color: "#047857", marginTop: 1 }}>Escalation</Text>
+            </View>
+          </LinearGradient>
+        </FadeInView>
+
+        {/* Portal Options Section */}
+        <View style={{ paddingHorizontal: 20 }}>
+          <Text style={{ fontSize: 16, fontWeight: "800", color: "#0F172A", marginBottom: 12, paddingHorizontal: 4 }}>
+            Select Access Portal
+          </Text>
+
+          <ModernRoleCard
+            title="Citizen Portal"
+            subtitle="File complaints & track live trucks"
+            badge="Public"
+            icon={User}
+            gradientColors={["#10B981", "#059669"]}
+            accentColor="#10B981"
+            borderColor="#D1FAE5"
+            targetDashboard="citizen"
+            targetLogin="citizenLogin"
+            delay={180}
+          />
+
+          <ModernRoleCard
+            title="Vehicle Staff"
+            subtitle="Driver navigation & route pickups"
+            badge="Field"
+            icon={Truck}
+            gradientColors={["#F59E0B", "#D97706"]}
+            accentColor="#D97706"
+            borderColor="#FEF3C7"
+            targetDashboard="vehicle"
+            targetLogin="vehicleLogin"
+            delay={240}
+          />
+
+          <ModernRoleCard
+            title="Office Staff"
+            subtitle="Operations, complaints & staff duty"
+            badge="Municipal"
+            icon={Building2}
+            gradientColors={["#6366F1", "#4F46E5"]}
+            accentColor="#4F46E5"
+            borderColor="#E0E7FF"
+            targetDashboard="officeDashboard"
+            targetLogin="officeLogin"
+            delay={300}
+          />
+
+          <ModernRoleCard
+            title="System Admin"
+            subtitle="Central administrative oversight"
+            badge="Root"
+            icon={ShieldCheck}
+            gradientColors={["#334155", "#0F172A"]}
+            accentColor="#0F172A"
+            borderColor="#E2E8F0"
+            targetDashboard="adminDashboard"
+            targetLogin="adminLogin"
+            delay={360}
+          />
         </View>
+
+        {/* Footer & Reset Button */}
+        <FadeInView delay={420} style={{ alignItems: "center", marginTop: 16, paddingHorizontal: 20 }}>
+          <TouchableOpacity
+            onPress={handleLogout}
+            style={{
+              paddingHorizontal: 20,
+              paddingVertical: 10,
+              borderRadius: 20,
+              backgroundColor: "#FFFFFF",
+              borderWidth: 1,
+              borderColor: "#E2E8F0",
+              marginBottom: 16,
+            }}
+          >
+            <Text style={{ fontSize: 12, fontWeight: "700", color: "#64748B" }}>
+              🔄 Reset App Session
+            </Text>
+          </TouchableOpacity>
+
+          <Text style={{ fontSize: 11, fontWeight: "600", color: "#94A3B8" }}>
+            SafaiMitra Swachh Bharat Initiative • 2026
+          </Text>
+        </FadeInView>
       </ScrollView>
     </SafeAreaView>
   );
