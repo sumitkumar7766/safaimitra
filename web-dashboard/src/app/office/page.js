@@ -443,29 +443,36 @@ function OfficeDashboard() {
     2: "Area Supervisor",
     3: "Zone Officer",
     4: "Municipal Officer",
-    5: "City Commissioner"
+    5: "City Commissioner",
   };
 
   const getEscalationBadgeColor = (level) => {
     switch (level) {
-      case 1: return "bg-gray-100 text-gray-800 border-gray-200";
-      case 2: return "bg-yellow-100 text-yellow-800 border-yellow-200";
-      case 3: return "bg-orange-100 text-orange-800 border-orange-200";
-      case 4: return "bg-red-100 text-red-800 border-red-200";
-      case 5: return "bg-red-200 text-red-900 border-red-300 font-extrabold animate-pulse";
-      default: return "bg-gray-100 text-gray-800";
+      case 1:
+        return "bg-gray-100 text-gray-800 border-gray-200";
+      case 2:
+        return "bg-yellow-100 text-yellow-800 border-yellow-200";
+      case 3:
+        return "bg-orange-100 text-orange-800 border-orange-200";
+      case 4:
+        return "bg-red-100 text-red-800 border-red-200";
+      case 5:
+        return "bg-red-200 text-red-900 border-red-300 font-extrabold animate-pulse";
+      default:
+        return "bg-gray-100 text-gray-800";
     }
   };
 
   const getRemainingTime = (comp) => {
-    if (comp.status === "resolved" || comp.status === "closed") return "Stopped";
+    if (comp.status === "resolved" || comp.status === "closed")
+      return "Stopped";
     if (!comp.nextEscalationAt) return "Max Escalation (Commissioner)";
-    
+
     const now = new Date();
     const next = new Date(comp.nextEscalationAt);
     const diffMs = next - now;
     if (diffMs <= 0) return "Escalating...";
-    
+
     const hours = Math.floor(diffMs / (1000 * 60 * 60));
     const mins = Math.floor((diffMs % (1000 * 60 * 60)) / (1000 * 60));
     return `${hours}h ${mins}m remaining`;
@@ -546,24 +553,25 @@ function OfficeDashboard() {
         foodService: true,
         foodType: "Full Meal",
         wasteTypes: ["Wet", "Dry", "Food", "Plastic"],
-        notes: "Need extra dustbins near the main dining hall and catering stage."
+        notes:
+          "Need extra dustbins near the main dining hall and catering stage.",
       },
       location: {
         address: "Grand Palace Garden, Ring Road, Indore",
         latitude: 22.7196,
-        longitude: 75.8577
+        longitude: 75.8577,
       },
       documents: {
         eventProof: {
           url: "https://images.unsplash.com/photo-1511795409834-ef04bbd61622?w=800",
           originalFilename: "wedding_invitation.pdf",
-          verificationStatus: "VERIFIED"
+          verificationStatus: "VERIFIED",
         },
         identityProof: {
           url: "https://images.unsplash.com/photo-1589829545856-d10d557cf95f?w=800",
           originalFilename: "aadhaar_card.pdf",
-          verificationStatus: "VERIFIED"
-        }
+          verificationStatus: "VERIFIED",
+        },
       },
       aiAnalysis: {
         estimatedWasteKg: 638,
@@ -576,22 +584,30 @@ function OfficeDashboard() {
         algorithm: "RandomForestRegressor",
         trainingSampleCount: 46,
         validationMae: 117.25,
-        reasoning: "Model v1.0.0 (RandomForestRegressor) predicted 638 kg waste for 800 participants (Marriage). Municipal engine recommends 13 segregated dustbins (6 Wet, 5 Dry, 2 General) with 2x daily municipal collection.",
-        warnings: ["High organic/wet waste load. Frequent emptying of wet bins required.", "Plastic waste flagged. Provide segregated dry collection containers."]
+        reasoning:
+          "Model v1.0.0 (RandomForestRegressor) predicted 638 kg waste for 800 participants (Marriage). Municipal engine recommends 13 segregated dustbins (6 Wet, 5 Dry, 2 General) with 2x daily municipal collection.",
+        warnings: [
+          "High organic/wet waste load. Frequent emptying of wet bins required.",
+          "Plastic waste flagged. Provide segregated dry collection containers.",
+        ],
       },
       adminDecision: {
         status: "PENDING",
         approvedBins: { wet: 6, dry: 5, general: 2, total: 13 },
-        approvedCollectionFrequency: 2
+        approvedCollectionFrequency: 2,
       },
       allocation: {
-        vehicleId: { _id: "v-01", vehicleNumber: "MP-09-EV-4421", model: "Electric Compactor" },
+        vehicleId: {
+          _id: "v-01",
+          vehicleNumber: "MP-09-EV-4421",
+          model: "Electric Compactor",
+        },
         staffId: { _id: "s-01", name: "Ramesh Solanki", phone: "9876543210" },
         collectionTimetable: "Morning 08:00 AM & Evening 06:00 PM",
-        allocatedDustbinIds: ["DB-IND-01", "DB-IND-02", "DB-IND-03"]
+        allocatedDustbinIds: ["DB-IND-01", "DB-IND-02", "DB-IND-03"],
       },
       status: "PENDING_ADMIN_REVIEW",
-      createdAt: new Date().toISOString()
+      createdAt: new Date().toISOString(),
     },
     {
       _id: "evt-002",
@@ -610,19 +626,20 @@ function OfficeDashboard() {
         venueType: "Open Ground",
         foodService: false,
         wasteTypes: ["Dry", "Plastic", "Bottles"],
-        notes: "Major water bottle recycling collection needed along the 10K route."
+        notes:
+          "Major water bottle recycling collection needed along the 10K route.",
       },
       location: {
         address: "Nehru Stadium, Residency Area, Indore",
-        latitude: 22.7150,
-        longitude: 75.8700
+        latitude: 22.715,
+        longitude: 75.87,
       },
       documents: {
         eventProof: {
           url: "https://images.unsplash.com/photo-1461896836934-ffe607ba8211?w=800",
           originalFilename: "marathon_permission.pdf",
-          verificationStatus: "VERIFIED"
-        }
+          verificationStatus: "VERIFIED",
+        },
       },
       aiAnalysis: {
         estimatedWasteKg: 679,
@@ -635,22 +652,30 @@ function OfficeDashboard() {
         algorithm: "RandomForestRegressor",
         trainingSampleCount: 46,
         validationMae: 117.25,
-        reasoning: "Model v1.0.0 (RandomForestRegressor) predicted 679 kg waste for 5000 participants (Marathon/Sports). Municipal engine recommends 19 segregated dustbins (3 Wet, 12 Dry, 4 General) with 2x daily municipal collection.",
-        warnings: ["High crowd density. Dedicated dry collection vehicle recommended."]
+        reasoning:
+          "Model v1.0.0 (RandomForestRegressor) predicted 679 kg waste for 5000 participants (Marathon/Sports). Municipal engine recommends 19 segregated dustbins (3 Wet, 12 Dry, 4 General) with 2x daily municipal collection.",
+        warnings: [
+          "High crowd density. Dedicated dry collection vehicle recommended.",
+        ],
       },
       adminDecision: {
         status: "APPROVED",
         approvedBins: { wet: 3, dry: 12, general: 4, total: 19 },
         approvedCollectionFrequency: 2,
-        comments: "Authorized 19 dustbins with dedicated dry waste recycling truck."
+        comments:
+          "Authorized 19 dustbins with dedicated dry waste recycling truck.",
       },
       allocation: {
-        vehicleId: { _id: "v-02", vehicleNumber: "MP-09-TR-108", model: "Tata Ace Tipper" },
+        vehicleId: {
+          _id: "v-02",
+          vehicleNumber: "MP-09-TR-108",
+          model: "Tata Ace Tipper",
+        },
         staffId: { _id: "s-02", name: "Sunil Sharma", phone: "9827011223" },
-        collectionTimetable: "Hourly collection along route checkpoints"
+        collectionTimetable: "Hourly collection along route checkpoints",
       },
       status: "APPROVED",
-      createdAt: new Date(Date.now() - 86400000).toISOString()
+      createdAt: new Date(Date.now() - 86400000).toISOString(),
     },
     {
       _id: "evt-003",
@@ -669,19 +694,19 @@ function OfficeDashboard() {
         venueType: "Open Ground",
         foodService: true,
         foodType: "Snacks & Stalls",
-        wasteTypes: ["Wet", "Dry", "Food", "Packaging"]
+        wasteTypes: ["Wet", "Dry", "Food", "Packaging"],
       },
       location: {
         address: "Dussehra Maidan, Annapurna Road, Indore",
-        latitude: 22.6980,
-        longitude: 75.8350
+        latitude: 22.698,
+        longitude: 75.835,
       },
       documents: {
         eventProof: {
           url: "https://images.unsplash.com/photo-1514525253161-7a46d19cd819?w=800",
           originalFilename: "mela_permission.pdf",
-          verificationStatus: "VERIFIED"
-        }
+          verificationStatus: "VERIFIED",
+        },
       },
       aiAnalysis: {
         estimatedWasteKg: 485,
@@ -694,24 +719,38 @@ function OfficeDashboard() {
         algorithm: "RandomForestRegressor",
         trainingSampleCount: 46,
         validationMae: 117.25,
-        reasoning: "Model v1.0.0 (RandomForestRegressor) predicted 485 kg waste for 2500 participants (Festival). Municipal engine recommends 14 segregated dustbins (6 Wet, 5 Dry, 3 General) with 2x daily municipal collection.",
-        warnings: ["Food stalls present. Deploy wet waste bins near stall clusters."]
+        reasoning:
+          "Model v1.0.0 (RandomForestRegressor) predicted 485 kg waste for 2500 participants (Festival). Municipal engine recommends 14 segregated dustbins (6 Wet, 5 Dry, 3 General) with 2x daily municipal collection.",
+        warnings: [
+          "Food stalls present. Deploy wet waste bins near stall clusters.",
+        ],
       },
       adminDecision: {
         status: "APPROVED",
         approvedBins: { wet: 6, dry: 5, general: 3, total: 14 },
-        approvedCollectionFrequency: 2
+        approvedCollectionFrequency: 2,
       },
       allocation: {
-        vehicleId: { _id: "v-01", vehicleNumber: "MP-09-EV-4421", model: "Electric Compactor" },
+        vehicleId: {
+          _id: "v-01",
+          vehicleNumber: "MP-09-EV-4421",
+          model: "Electric Compactor",
+        },
         staffId: { _id: "s-01", name: "Ramesh Solanki", phone: "9876543210" },
-        collectionTimetable: "Evening 07:00 PM & Night 11:30 PM"
+        collectionTimetable: "Evening 07:00 PM & Night 11:30 PM",
       },
       status: "ALLOCATED",
-      createdAt: new Date(Date.now() - 172800000).toISOString()
-    }
+      createdAt: new Date(Date.now() - 172800000).toISOString(),
+    },
   ]);
-  const [eventMetrics, setEventMetrics] = useState({ total: 3, pending: 1, approved: 1, allocated: 1, rejected: 0, highRisk: 3 });
+  const [eventMetrics, setEventMetrics] = useState({
+    total: 3,
+    pending: 1,
+    approved: 1,
+    allocated: 1,
+    rejected: 0,
+    highRisk: 3,
+  });
   const [selectedEventRequest, setSelectedEventRequest] = useState(null);
   const [showEventDecisionModal, setShowEventDecisionModal] = useState(false);
   const [eventDecisionType, setEventDecisionType] = useState("approve"); // "approve", "modify", "reject", "allocate"
@@ -722,7 +761,9 @@ function OfficeDashboard() {
   const [decisionReason, setDecisionReason] = useState("");
   const [allocVehicleId, setAllocVehicleId] = useState("");
   const [allocStaffId, setAllocStaffId] = useState("");
-  const [allocSchedule, setAllocSchedule] = useState("Morning 08:00 AM & Evening 06:00 PM");
+  const [allocSchedule, setAllocSchedule] = useState(
+    "Morning 08:00 AM & Evening 06:00 PM",
+  );
   const [decisionSubmitting, setDecisionSubmitting] = useState(false);
   const [eventFilterStatus, setEventFilterStatus] = useState("ALL");
   const [eventFilterType, setEventFilterType] = useState("ALL");
@@ -800,15 +841,12 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
-      const res = await fetch(
-        `${API_BASE_URL}/dustbin/list/${userData._id}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_BASE_URL}/dustbin/list/${userData._id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       if (data.success) setDustbins(data.dustbins);
     } catch (err) {
@@ -820,15 +858,12 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
-      const res = await fetch(
-        `${API_BASE_URL}/vehicle/list/${userData._id}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_BASE_URL}/vehicle/list/${userData._id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       if (data.success) setVehicles(data.vehicles);
     } catch (err) {
@@ -840,15 +875,12 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
-      const res = await fetch(
-        `${API_BASE_URL}/staff/list/${userData._id}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_BASE_URL}/staff/list/${userData._id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       if (data.success) setStaff(data.staff);
     } catch (err) {
@@ -860,15 +892,12 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
-      const res = await fetch(
-        `${API_BASE_URL}/route/list/${userData._id}`,
-        {
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_BASE_URL}/route/list/${userData._id}`, {
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       if (data.success) setRoutes(data.routes);
     } catch (err) {
@@ -884,12 +913,9 @@ function OfficeDashboard() {
         setLoading(false);
         return;
       }
-      const res = await axios.get(
-        `${API_BASE_URL}/complaint/all/${officeId}`,
-        {
-          headers: { Authorization: `Bearer ${token}` },
-        },
-      );
+      const res = await axios.get(`${API_BASE_URL}/complaint/all/${officeId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
       if (res.data.success) setComplaints(res.data.complaints);
     } catch (error) {
       console.error("Error fetching complaints:", error);
@@ -919,7 +945,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(`${API_BASE_URL}/citizen-system/appeals`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.success) setAppeals(res.data.appeals);
     } catch (err) {
@@ -931,7 +957,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(`${API_BASE_URL}/citizen-system/audit-logs`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.success) setAuditLogs(res.data.logs);
     } catch (err) {
@@ -943,7 +969,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.get(`${API_BASE_URL}/citizen-system/citizens`, {
-        headers: { Authorization: `Bearer ${token}` }
+        headers: { Authorization: `Bearer ${token}` },
       });
       if (res.data.success) setCitizens(res.data.citizens);
     } catch (err) {
@@ -954,9 +980,12 @@ function OfficeDashboard() {
   const fetchEventRequests = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get(`${API_BASE_URL}/api/admin/event-dustbin-requests`, {
-        headers: { Authorization: `Bearer ${token}` },
-      });
+      const res = await axios.get(
+        `${API_BASE_URL}/api/admin/event-dustbin-requests`,
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (res.data.success) {
         setEventRequests(res.data.requests || []);
         if (res.data.metrics) setEventMetrics(res.data.metrics);
@@ -978,13 +1007,21 @@ function OfficeDashboard() {
               adminDecision: {
                 ...req.adminDecision,
                 status: "APPROVED",
-                approvedBins: { ...(req.aiAnalysis?.recommendedBins || { wet: 2, dry: 2, general: 1, total: 5 }) },
-                approvedCollectionFrequency: req.aiAnalysis?.collectionFrequency || 1,
+                approvedBins: {
+                  ...(req.aiAnalysis?.recommendedBins || {
+                    wet: 2,
+                    dry: 2,
+                    general: 1,
+                    total: 5,
+                  }),
+                },
+                approvedCollectionFrequency:
+                  req.aiAnalysis?.collectionFrequency || 1,
                 comments: decisionReason || "Approved AI recommendation",
               },
             }
-          : req
-      )
+          : req,
+      ),
     );
     setEventMetrics((prev) => ({
       ...prev,
@@ -998,7 +1035,7 @@ function OfficeDashboard() {
         await axios.post(
           `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/approve`,
           { comment: decisionReason },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
       alert("🎉 Event dustbin quota approved successfully!");
@@ -1022,7 +1059,8 @@ function OfficeDashboard() {
     }
     setDecisionSubmitting(true);
     // Optimistic state update
-    const totalBins = Number(modWetBins) + Number(modDryBins) + Number(modGeneralBins);
+    const totalBins =
+      Number(modWetBins) + Number(modDryBins) + Number(modGeneralBins);
     setEventRequests((prev) =>
       prev.map((req) =>
         req._id === requestId
@@ -1041,8 +1079,8 @@ function OfficeDashboard() {
                 comments: decisionReason,
               },
             }
-          : req
-      )
+          : req,
+      ),
     );
     setEventMetrics((prev) => ({
       ...prev,
@@ -1062,7 +1100,7 @@ function OfficeDashboard() {
             collectionFrequency: modFrequency,
             reason: decisionReason,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
       alert("✅ Event dustbin quota modified and approved!");
@@ -1097,8 +1135,8 @@ function OfficeDashboard() {
                 rejectionReason: decisionReason,
               },
             }
-          : req
-      )
+          : req,
+      ),
     );
     setEventMetrics((prev) => ({
       ...prev,
@@ -1112,7 +1150,7 @@ function OfficeDashboard() {
         await axios.post(
           `${API_BASE_URL}/api/admin/event-dustbin-requests/${requestId}/reject`,
           { reason: decisionReason },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
       alert("Event request rejected.");
@@ -1152,12 +1190,13 @@ function OfficeDashboard() {
               allocation: {
                 vehicleId: selectedVeh,
                 staffId: selectedStf,
-                collectionTimetable: allocSchedule || "Morning 08:00 AM & Evening 06:00 PM",
+                collectionTimetable:
+                  allocSchedule || "Morning 08:00 AM & Evening 06:00 PM",
                 allocatedDustbinIds: ["DB-01", "DB-02", "DB-03"],
               },
             }
-          : req
-      )
+          : req,
+      ),
     );
     setEventMetrics((prev) => ({
       ...prev,
@@ -1174,15 +1213,19 @@ function OfficeDashboard() {
             staffId: allocStaffId || selectedStf._id,
             collectionSchedule: allocSchedule,
           },
-          { headers: { Authorization: `Bearer ${token}` } }
+          { headers: { Authorization: `Bearer ${token}` } },
         );
       }
-      alert("🚚 Resources allocated! Vehicle and sanitation staff deployed for the event.");
+      alert(
+        "🚚 Resources allocated! Vehicle and sanitation staff deployed for the event.",
+      );
       setShowEventDecisionModal(false);
       fetchEventRequests();
     } catch (err) {
       console.log("Allocate request local sync:", err.message);
-      alert("🚚 Resources allocated! Vehicle and sanitation staff deployed for the event.");
+      alert(
+        "🚚 Resources allocated! Vehicle and sanitation staff deployed for the event.",
+      );
       setShowEventDecisionModal(false);
     } finally {
       setDecisionSubmitting(false);
@@ -1357,17 +1400,14 @@ function OfficeDashboard() {
             ? formData.assignedVehicleId
             : null,
       };
-      const res = await fetch(
-        `${API_BASE_URL}/staff/update/${editStaffId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch(`${API_BASE_URL}/staff/update/${editStaffId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
       if (!data.success) {
         alert(data.message || "Update failed");
@@ -1445,17 +1485,14 @@ function OfficeDashboard() {
         description: formData.routeDescription,
         assignedVehicleId: formData.assignedVehicleId || null,
       };
-      const res = await fetch(
-        `${API_BASE_URL}/route/update/${editRouteId}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
+      const res = await fetch(`${API_BASE_URL}/route/update/${editRouteId}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify(payload),
+      });
       const data = await res.json();
       if (!data.success) {
         alert(data.message || "Route update failed");
@@ -1772,16 +1809,13 @@ function OfficeDashboard() {
     if (!confirm("Delete this vehicle?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${API_BASE_URL}/vehicle/delete/${vehicleId}`,
-        {
-          method: "DELETE",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
+      const res = await fetch(`${API_BASE_URL}/vehicle/delete/${vehicleId}`, {
+        method: "DELETE",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+      });
       const data = await res.json();
       if (!data.success) {
         alert(data.message || "Failed to delete");
@@ -1850,9 +1884,13 @@ function OfficeDashboard() {
     setVEvidenceUrl("");
     setVLegalReview(false);
     try {
-      const targetId = report.allComplaintIds ? report.allComplaintIds[0] : (report._id || report.id);
+      const targetId = report.allComplaintIds
+        ? report.allComplaintIds[0]
+        : report._id || report.id;
       if (targetId) {
-        const res = await axios.get(`${API_BASE_URL}/complaint/detail/${targetId}`);
+        const res = await axios.get(
+          `${API_BASE_URL}/complaint/detail/${targetId}`,
+        );
         if (res.data.success) {
           setDetailedReport(res.data.complaint);
         }
@@ -1867,16 +1905,20 @@ function OfficeDashboard() {
     if (!detailedReport?._id) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.post(`${API_BASE_URL}/citizen-system/complaint/verify`, {
-        complaintId: detailedReport._id,
-        verificationStatus: vStatus,
-        verificationReason: vReason,
-        verificationNotes: vNotes,
-        verificationEvidenceUrl: vEvidenceUrl,
-        legalReviewRequired: vLegalReview
-      }, {
-        headers: { Authorization: `Bearer ${token}` }
-      });
+      const res = await axios.post(
+        `${API_BASE_URL}/citizen-system/complaint/verify`,
+        {
+          complaintId: detailedReport._id,
+          verificationStatus: vStatus,
+          verificationReason: vReason,
+          verificationNotes: vNotes,
+          verificationEvidenceUrl: vEvidenceUrl,
+          legalReviewRequired: vLegalReview,
+        },
+        {
+          headers: { Authorization: `Bearer ${token}` },
+        },
+      );
       if (res.data.success) {
         alert("Complaint verified and scores updated successfully!");
         setModalVisible(false);
@@ -1990,17 +2032,14 @@ function OfficeDashboard() {
     if (!confirm("Mark this bin as CLEAN?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(
-        `${API_BASE_URL}/dustbin/update-status/${id}`,
-        {
-          method: "PUT",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify({ status: "clean" }),
+      const res = await fetch(`${API_BASE_URL}/dustbin/update-status/${id}`, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
         },
-      );
+        body: JSON.stringify({ status: "clean" }),
+      });
       const data = await res.json();
       if (!data.success) {
         alert(data.message || "Failed to update");
@@ -2169,7 +2208,12 @@ function OfficeDashboard() {
                           <span
                             className={`px-3 py-1 inline-flex text-xs leading-5 font-bold rounded-full border ${getEscalationBadgeColor(complaint.currentEscalationLevel || 1)}`}
                           >
-                            Level {complaint.currentEscalationLevel || 1}: {authorityNames[complaint.currentEscalationLevel || 1]}
+                            Level {complaint.currentEscalationLevel || 1}:{" "}
+                            {
+                              authorityNames[
+                                complaint.currentEscalationLevel || 1
+                              ]
+                            }
                           </span>
                           {complaint.status !== "resolved" && (
                             <span className="text-[10px] text-gray-500 font-semibold mt-1">
@@ -2226,7 +2270,7 @@ function OfficeDashboard() {
 
     const filteredList = escalations.filter((c) => {
       const isResolved = c.status === "resolved" || c.status === "closed";
-      
+
       if (viewMode === "pending") {
         return c.status === "pending";
       } else if (viewMode === "in_progress") {
@@ -2236,7 +2280,8 @@ function OfficeDashboard() {
       } else if (viewMode === "near_deadline") {
         if (isResolved) return false;
         if (!c.nextEscalationAt) return false;
-        const diffHours = (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
+        const diffHours =
+          (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
         return diffHours > 0 && diffHours <= 4;
       } else if (viewMode === "public_escalation_eligible") {
         return !isResolved && c.publicEscalationEligible === true;
@@ -2246,41 +2291,80 @@ function OfficeDashboard() {
       return true;
     });
 
-    const totalActive = escalations.filter(c => c.status !== "resolved" && c.status !== "closed").length;
-    const level5Count = escalations.filter(c => c.status !== "resolved" && c.status !== "closed" && c.currentEscalationLevel === 5).length;
-    const nearDeadlineCount = escalations.filter(c => {
-      if (c.status === "resolved" || c.status === "closed" || !c.nextEscalationAt) return false;
-      const diff = (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
+    const totalActive = escalations.filter(
+      (c) => c.status !== "resolved" && c.status !== "closed",
+    ).length;
+    const level5Count = escalations.filter(
+      (c) =>
+        c.status !== "resolved" &&
+        c.status !== "closed" &&
+        c.currentEscalationLevel === 5,
+    ).length;
+    const nearDeadlineCount = escalations.filter((c) => {
+      if (
+        c.status === "resolved" ||
+        c.status === "closed" ||
+        !c.nextEscalationAt
+      )
+        return false;
+      const diff =
+        (new Date(c.nextEscalationAt) - new Date()) / (1000 * 60 * 60);
       return diff > 0 && diff <= 4;
     }).length;
-    const publicEligibleCount = escalations.filter(c => c.status !== "resolved" && c.status !== "closed" && c.publicEscalationEligible === true).length;
+    const publicEligibleCount = escalations.filter(
+      (c) =>
+        c.status !== "resolved" &&
+        c.status !== "closed" &&
+        c.publicEscalationEligible === true,
+    ).length;
 
     return (
       <div className="space-y-6">
         <div className="grid grid-cols-1 md:grid-cols-4 gap-4">
           <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-blue-500">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Total Active Complaints</h4>
-            <p className="text-3xl font-black text-gray-900 mt-2">{totalActive}</p>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Total Active Complaints
+            </h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">
+              {totalActive}
+            </p>
           </div>
           <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-yellow-500">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Critical (Level 5)</h4>
-            <p className="text-3xl font-black text-gray-900 mt-2">{level5Count}</p>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Critical (Level 5)
+            </h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">
+              {level5Count}
+            </p>
           </div>
           <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-orange-500">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Near Escalation (&lt;4h)</h4>
-            <p className="text-3xl font-black text-gray-900 mt-2">{nearDeadlineCount}</p>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Near Escalation (&lt;4h)
+            </h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">
+              {nearDeadlineCount}
+            </p>
           </div>
           <div className="bg-white p-5 rounded-2xl shadow-md border-l-4 border-red-500">
-            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">Public Share Eligible</h4>
-            <p className="text-3xl font-black text-gray-900 mt-2">{publicEligibleCount}</p>
+            <h4 className="text-xs font-bold text-gray-500 uppercase tracking-wider">
+              Public Share Eligible
+            </h4>
+            <p className="text-3xl font-black text-gray-900 mt-2">
+              {publicEligibleCount}
+            </p>
           </div>
         </div>
 
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800">⚠️ Escalation Monitoring Dashboard</h3>
-              <p className="text-sm text-gray-600 mt-1">Monitor SLA times, automatic escalations, and citizen accountability status.</p>
+              <h3 className="text-2xl font-bold text-gray-800">
+                ⚠️ Escalation Monitoring Dashboard
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Monitor SLA times, automatic escalations, and citizen
+                accountability status.
+              </p>
             </div>
             <div className="flex flex-wrap gap-2 bg-gray-100 p-1.5 rounded-xl">
               {[
@@ -2288,8 +2372,11 @@ function OfficeDashboard() {
                 { mode: "in_progress", label: "⚙️ In Progress" },
                 { mode: "escalated", label: "🔥 Escalated" },
                 { mode: "near_deadline", label: "🕒 Near Deadline" },
-                { mode: "public_escalation_eligible", label: "📢 Public Eligible" },
-                { mode: "resolved", label: "✅ Resolved" }
+                {
+                  mode: "public_escalation_eligible",
+                  label: "📢 Public Eligible",
+                },
+                { mode: "resolved", label: "✅ Resolved" },
               ].map((btn) => (
                 <button
                   key={btn.mode}
@@ -2308,20 +2395,39 @@ function OfficeDashboard() {
             <table className="w-full">
               <thead className="bg-gray-50 border-b border-gray-200">
                 <tr>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Complaint ID</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Grievance Type</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Escalation Level</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Responsible Authority</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Time Remaining</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Days Pending</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Complaint ID
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Grievance Type
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Escalation Level
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Responsible Authority
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Time Remaining
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Days Pending
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Status
+                  </th>
+                  <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                    Actions
+                  </th>
                 </tr>
               </thead>
               <tbody className="divide-y divide-gray-200 bg-white">
                 {filteredList.length === 0 ? (
                   <tr>
-                    <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                    <td
+                      colSpan="8"
+                      className="px-6 py-12 text-center text-gray-400"
+                    >
                       No complaints found in this category.
                     </td>
                   </tr>
@@ -2329,29 +2435,51 @@ function OfficeDashboard() {
                   filteredList.map((comp) => {
                     let currentAuth = "Unassigned";
                     if (comp.currentEscalationLevel === 1) {
-                      currentAuth = comp.driverId ? `Driver: ${comp.driverId.name}` : (comp.vehicle !== "Not Assigned" ? comp.vehicle : "Assigned Driver");
+                      currentAuth = comp.driverId
+                        ? `Driver: ${comp.driverId.name}`
+                        : comp.vehicle !== "Not Assigned"
+                          ? comp.vehicle
+                          : "Assigned Driver";
                     } else if (comp.currentEscalationLevel === 2) {
-                      currentAuth = comp.supervisorId ? `Supervisor: ${comp.supervisorId.name}` : "Area Supervisor";
+                      currentAuth = comp.supervisorId
+                        ? `Supervisor: ${comp.supervisorId.name}`
+                        : "Area Supervisor";
                     } else if (comp.currentEscalationLevel === 3) {
-                      currentAuth = comp.zoneOfficerId ? `Zone Officer: ${comp.zoneOfficerId.name}` : "Zone Officer";
+                      currentAuth = comp.zoneOfficerId
+                        ? `Zone Officer: ${comp.zoneOfficerId.name}`
+                        : "Zone Officer";
                     } else if (comp.currentEscalationLevel === 4) {
-                      currentAuth = comp.municipalOfficerId ? `Municipal Officer: ${comp.municipalOfficerId.name}` : "Municipal Officer";
+                      currentAuth = comp.municipalOfficerId
+                        ? `Municipal Officer: ${comp.municipalOfficerId.name}`
+                        : "Municipal Officer";
                     } else if (comp.currentEscalationLevel === 5) {
-                      currentAuth = comp.commissionerId ? `Commissioner: ${comp.commissionerId.name}` : "City Commissioner";
+                      currentAuth = comp.commissionerId
+                        ? `Commissioner: ${comp.commissionerId.name}`
+                        : "City Commissioner";
                     }
 
                     return (
-                      <tr key={comp._id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={comp._id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-blue-600 font-mono">
                           #SM{comp._id.slice(-6).toUpperCase()}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="text-sm font-semibold text-gray-900">{comp.complaintType}</div>
-                          <div className="text-xs text-gray-500">{comp.area}</div>
+                          <div className="text-sm font-semibold text-gray-900">
+                            {comp.complaintType}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {comp.area}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-3 py-1 rounded-full text-xs font-bold border ${getEscalationBadgeColor(comp.currentEscalationLevel)}`}>
-                            Level {comp.currentEscalationLevel}: {authorityNames[comp.currentEscalationLevel || 1]}
+                          <span
+                            className={`px-3 py-1 rounded-full text-xs font-bold border ${getEscalationBadgeColor(comp.currentEscalationLevel)}`}
+                          >
+                            Level {comp.currentEscalationLevel}:{" "}
+                            {authorityNames[comp.currentEscalationLevel || 1]}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-700 font-medium">
@@ -2364,7 +2492,9 @@ function OfficeDashboard() {
                           {comp.pendingDays || 0} days
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${comp.status === "resolved" ? "bg-green-100 text-green-700 border border-green-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-[10px] font-black uppercase tracking-wider ${comp.status === "resolved" ? "bg-green-100 text-green-700 border border-green-200" : "bg-amber-100 text-amber-700 border border-amber-200"}`}
+                          >
                             {comp.status}
                           </span>
                         </td>
@@ -2405,12 +2535,16 @@ function OfficeDashboard() {
       if (!suspendingCitizen) return;
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/suspend`, {
-          citizenId: suspendingCitizen._id,
-          suspensionReason,
-          verificationEvidence: suspensionEvidence,
-          evidenceUrl: suspensionEvidenceUrl
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.post(
+          `${API_BASE_URL}/citizen-system/citizen/suspend`,
+          {
+            citizenId: suspendingCitizen._id,
+            suspensionReason,
+            verificationEvidence: suspensionEvidence,
+            evidenceUrl: suspensionEvidenceUrl,
+          },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
 
         if (res.data.success) {
           alert("Citizen suspended successfully!");
@@ -2428,14 +2562,20 @@ function OfficeDashboard() {
     };
 
     const handleUnsuspend = async (citizenId) => {
-      const reason = prompt("Please provide a reason for unsuspending this citizen:");
+      const reason = prompt(
+        "Please provide a reason for unsuspending this citizen:",
+      );
       if (!reason) return;
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/unsuspend`, {
-          citizenId,
-          reason
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.post(
+          `${API_BASE_URL}/citizen-system/citizen/unsuspend`,
+          {
+            citizenId,
+            reason,
+          },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
 
         if (res.data.success) {
           alert("Citizen unsuspended successfully!");
@@ -2455,11 +2595,15 @@ function OfficeDashboard() {
       }
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post(`${API_BASE_URL}/citizen-system/appeal/resolve`, {
-          appealId,
-          action, // "accept" or "reject"
-          adminNotes: appealNotes
-        }, { headers: { Authorization: `Bearer ${token}` } });
+        const res = await axios.post(
+          `${API_BASE_URL}/citizen-system/appeal/resolve`,
+          {
+            appealId,
+            action, // "accept" or "reject"
+            adminNotes: appealNotes,
+          },
+          { headers: { Authorization: `Bearer ${token}` } },
+        );
 
         if (res.data.success) {
           alert(`Appeal ${action}ed successfully!`);
@@ -2481,8 +2625,13 @@ function OfficeDashboard() {
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex flex-col md:flex-row items-center justify-between gap-4">
             <div>
-              <h3 className="text-2xl font-bold text-gray-800 font-black tracking-tight">🛡️ Citizen Moderation Panel</h3>
-              <p className="text-sm text-gray-600 mt-1">Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs.</p>
+              <h3 className="text-2xl font-bold text-gray-800 font-black tracking-tight">
+                🛡️ Citizen Moderation Panel
+              </h3>
+              <p className="text-sm text-gray-600 mt-1">
+                Moderate citizens, manage strikes, suspensions, resolve appeals,
+                and view logs.
+              </p>
             </div>
             <div className="flex bg-gray-100 p-1.5 rounded-xl gap-2 flex-wrap">
               <button
@@ -2501,7 +2650,8 @@ function OfficeDashboard() {
                 onClick={() => setModerationTab("appeals")}
                 className={`px-4 py-2 rounded-lg text-xs font-bold transition-all ${moderationTab === "appeals" ? "bg-white text-blue-600 shadow-md" : "text-gray-500 hover:text-gray-700"}`}
               >
-                ⚖️ Pending Appeals ({appeals.filter(a => a.status === "pending").length})
+                ⚖️ Pending Appeals (
+                {appeals.filter((a) => a.status === "pending").length})
               </button>
               <button
                 onClick={() => setModerationTab("logs")}
@@ -2517,34 +2667,67 @@ function OfficeDashboard() {
         {moderationTab === "leaderboard" && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
             <div className="p-6 border-b bg-gray-50/50">
-              <h4 className="text-lg font-bold text-gray-800">Citizens Leaderboard & Moderation List</h4>
-              <p className="text-xs text-gray-500 mt-1">Sorted by Trust Score. View citizen level, valid/false complaints, active strikes, and suspend eligible misusers.</p>
+              <h4 className="text-lg font-bold text-gray-800">
+                Citizens Leaderboard & Moderation List
+              </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Sorted by Trust Score. View citizen level, valid/false
+                complaints, active strikes, and suspend eligible misusers.
+              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Citizen Name</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">City / Pincode</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Trust Score</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Level</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Valid / False</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Strikes</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Status</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Actions</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Citizen Name
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      City / Pincode
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Trust Score
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Level
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Valid / False
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Strikes
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Status
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Actions
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white">
                   {citizens.length === 0 ? (
                     <tr>
-                      <td colSpan="8" className="px-6 py-12 text-center text-gray-400">No citizens registered yet.</td>
+                      <td
+                        colSpan="8"
+                        className="px-6 py-12 text-center text-gray-400"
+                      >
+                        No citizens registered yet.
+                      </td>
                     </tr>
                   ) : (
                     citizens.map((cit) => (
-                      <tr key={cit._id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={cit._id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <div className="font-bold text-gray-900">{cit.fullName}</div>
-                          <div className="text-xs text-gray-500">{cit.phone} | {cit.email}</div>
+                          <div className="font-bold text-gray-900">
+                            {cit.fullName}
+                          </div>
+                          <div className="text-xs text-gray-500">
+                            {cit.phone} | {cit.email}
+                          </div>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-medium">
                           🏙️ {cit.cityName || "N/A"} ({cit.pincode})
@@ -2553,23 +2736,37 @@ function OfficeDashboard() {
                           ⭐️ {cit.trustScore}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-1 rounded-full text-xs font-bold border bg-blue-50 text-blue-800 border-blue-200`}>
+                          <span
+                            className={`px-2 py-1 rounded-full text-xs font-bold border bg-blue-50 text-blue-800 border-blue-200`}
+                          >
                             {cit.citizenLevel || "Beginner Citizen"}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-700">
-                          <span className="text-green-600">✅ {cit.validComplaints}</span> / <span className="text-red-500">❌ {cit.falseComplaints}</span>
+                          <span className="text-green-600">
+                            ✅ {cit.validComplaints}
+                          </span>{" "}
+                          /{" "}
+                          <span className="text-red-500">
+                            ❌ {cit.falseComplaints}
+                          </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2.5 py-1 rounded-lg text-xs font-black border ${cit.strikeCount >= 3 ? "bg-red-100 text-red-800 border-red-200 animate-pulse" : cit.strikeCount > 0 ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-gray-50 text-gray-600"}`}>
+                          <span
+                            className={`px-2.5 py-1 rounded-lg text-xs font-black border ${cit.strikeCount >= 3 ? "bg-red-100 text-red-800 border-red-200 animate-pulse" : cit.strikeCount > 0 ? "bg-amber-100 text-amber-800 border-amber-200" : "bg-gray-50 text-gray-600"}`}
+                          >
                             Strike {cit.strikeCount || 0}/3
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {cit.isSuspended ? (
-                            <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 text-xs font-bold uppercase animate-pulse">Suspended</span>
+                            <span className="px-2 py-0.5 rounded bg-red-100 text-red-700 border border-red-200 text-xs font-bold uppercase animate-pulse">
+                              Suspended
+                            </span>
                           ) : (
-                            <span className="px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200 text-xs font-bold uppercase">Active</span>
+                            <span className="px-2 py-0.5 rounded bg-green-100 text-green-700 border border-green-200 text-xs font-bold uppercase">
+                              Active
+                            </span>
                           )}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-sm">
@@ -2602,45 +2799,81 @@ function OfficeDashboard() {
         {moderationTab === "appeals" && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
             <div className="p-6 border-b bg-gray-50/50">
-              <h4 className="text-lg font-bold text-gray-800">Suspended Citizen Appeals</h4>
-              <p className="text-xs text-gray-500 mt-1">Review appeal explanations, supporting documents, and either Accept (restores account) or Reject appeals.</p>
+              <h4 className="text-lg font-bold text-gray-800">
+                Suspended Citizen Appeals
+              </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Review appeal explanations, supporting documents, and either
+                Accept (restores account) or Reject appeals.
+              </p>
             </div>
             <div className="divide-y divide-gray-200">
               {appeals.length === 0 ? (
-                <div className="p-12 text-center text-gray-400">No appeals submitted yet.</div>
+                <div className="p-12 text-center text-gray-400">
+                  No appeals submitted yet.
+                </div>
               ) : (
                 appeals.map((app) => (
-                  <div key={app._id} className="p-6 hover:bg-gray-50 transition-colors flex flex-col md:flex-row gap-6">
+                  <div
+                    key={app._id}
+                    className="p-6 hover:bg-gray-50 transition-colors flex flex-col md:flex-row gap-6"
+                  >
                     <div className="w-full md:w-1/3 space-y-2">
-                      <h5 className="font-bold text-gray-800 text-base">👤 {app.citizenId?.fullName || "Citizen"}</h5>
-                      <p className="text-xs text-gray-500">Email: {app.citizenId?.email}</p>
-                      <p className="text-xs text-gray-500">Phone: {app.citizenId?.phone}</p>
+                      <h5 className="font-bold text-gray-800 text-base">
+                        👤 {app.citizenId?.fullName || "Citizen"}
+                      </h5>
+                      <p className="text-xs text-gray-500">
+                        Email: {app.citizenId?.email}
+                      </p>
+                      <p className="text-xs text-gray-500">
+                        Phone: {app.citizenId?.phone}
+                      </p>
                       <div className="flex gap-2 mt-2">
-                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-bold">Score: {app.citizenId?.trustScore}</span>
-                        <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-100 rounded text-xs font-bold">{app.citizenId?.strikeCount || 0} Strikes</span>
+                        <span className="px-2 py-0.5 bg-blue-50 text-blue-700 border border-blue-100 rounded text-xs font-bold">
+                          Score: {app.citizenId?.trustScore}
+                        </span>
+                        <span className="px-2 py-0.5 bg-red-50 text-red-700 border border-red-100 rounded text-xs font-bold">
+                          {app.citizenId?.strikeCount || 0} Strikes
+                        </span>
                       </div>
                       <div className="mt-2 text-xs">
-                        <span className="font-bold text-gray-700">Suspension Reason:</span>
-                        <p className="text-red-600 italic bg-red-50 p-2 rounded mt-1">"{app.citizenId?.suspensionReason || "N/A"}"</p>
+                        <span className="font-bold text-gray-700">
+                          Suspension Reason:
+                        </span>
+                        <p className="text-red-600 italic bg-red-50 p-2 rounded mt-1">
+                          "{app.citizenId?.suspensionReason || "N/A"}"
+                        </p>
                       </div>
                     </div>
                     <div className="w-full md:w-2/3 space-y-3">
                       <div className="bg-gray-50 p-4 rounded-xl border border-gray-100">
-                        <span className="text-xs font-bold text-gray-400 uppercase">Appeal Reason / Explanation:</span>
-                        <p className="text-sm text-gray-700 mt-1 leading-relaxed">"{app.reason}"</p>
+                        <span className="text-xs font-bold text-gray-400 uppercase">
+                          Appeal Reason / Explanation:
+                        </span>
+                        <p className="text-sm text-gray-700 mt-1 leading-relaxed">
+                          "{app.reason}"
+                        </p>
                       </div>
                       {app.evidenceUrl && (
                         <div className="text-xs">
-                          <span className="font-bold text-gray-700">Appeal Evidence:</span>
-                          <a href={app.evidenceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline font-semibold block mt-1">
+                          <span className="font-bold text-gray-700">
+                            Appeal Evidence:
+                          </span>
+                          <a
+                            href={app.evidenceUrl}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="text-blue-600 underline font-semibold block mt-1"
+                          >
                             📄 View Appeal Attachment Documents
                           </a>
                         </div>
                       )}
-                      
+
                       <div className="flex items-center justify-between border-t pt-4">
                         <div className="text-xs text-gray-400">
-                          Submitted At: {new Date(app.createdAt).toLocaleString("en-IN")}
+                          Submitted At:{" "}
+                          {new Date(app.createdAt).toLocaleString("en-IN")}
                         </div>
                         <div>
                           {app.status === "pending" ? (
@@ -2653,7 +2886,9 @@ function OfficeDashboard() {
                               </button>
                             </div>
                           ) : (
-                            <span className={`px-3 py-1 rounded text-xs font-black uppercase tracking-wider ${app.status === "accepted" ? "bg-green-100 text-green-700 border border-green-200" : "bg-red-100 text-red-700 border border-red-200"}`}>
+                            <span
+                              className={`px-3 py-1 rounded text-xs font-black uppercase tracking-wider ${app.status === "accepted" ? "bg-green-100 text-green-700 border border-green-200" : "bg-red-100 text-red-700 border border-red-200"}`}
+                            >
                               {app.status.toUpperCase()}
                             </span>
                           )}
@@ -2671,29 +2906,54 @@ function OfficeDashboard() {
         {moderationTab === "logs" && (
           <div className="bg-white rounded-xl shadow-lg overflow-hidden border border-gray-200">
             <div className="p-6 border-b bg-gray-50/50">
-              <h4 className="text-lg font-bold text-gray-800">Admin Moderation Audit Logs</h4>
-              <p className="text-xs text-gray-500 mt-1">Audit log records of points, strikes, suspensions, legal reviews, and appeal decisions.</p>
+              <h4 className="text-lg font-bold text-gray-800">
+                Admin Moderation Audit Logs
+              </h4>
+              <p className="text-xs text-gray-500 mt-1">
+                Audit log records of points, strikes, suspensions, legal
+                reviews, and appeal decisions.
+              </p>
             </div>
             <div className="overflow-x-auto">
               <table className="w-full text-sm text-left text-gray-500">
                 <thead className="bg-gray-50 border-b border-gray-200">
                   <tr>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Timestamp</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Moderator</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Action</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Target Citizen</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Reason & Details</th>
-                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">Evidence Reference</th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Timestamp
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Moderator
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Action
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Target Citizen
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Reason & Details
+                    </th>
+                    <th className="px-6 py-4 text-left text-xs font-bold text-gray-500 uppercase tracking-wider">
+                      Evidence Reference
+                    </th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-gray-200 bg-white text-sm text-gray-600">
                   {auditLogs.length === 0 ? (
                     <tr>
-                      <td colSpan="6" className="px-6 py-12 text-center text-gray-400">No logs captured yet.</td>
+                      <td
+                        colSpan="6"
+                        className="px-6 py-12 text-center text-gray-400"
+                      >
+                        No logs captured yet.
+                      </td>
                     </tr>
                   ) : (
                     auditLogs.map((log) => (
-                      <tr key={log._id} className="hover:bg-gray-50 transition-colors">
+                      <tr
+                        key={log._id}
+                        className="hover:bg-gray-50 transition-colors"
+                      >
                         <td className="px-6 py-4 whitespace-nowrap text-xs text-gray-400">
                           {new Date(log.createdAt).toLocaleString("en-IN")}
                         </td>
@@ -2701,28 +2961,49 @@ function OfficeDashboard() {
                           🛡️ {log.adminName}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
-                          <span className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
-                            log.action === "SUSPENSION" ? "bg-red-100 text-red-700" :
-                            log.action === "LEGAL_REVIEW" ? "bg-purple-100 text-purple-700" :
-                            log.action === "VERIFICATION_DECISION" ? "bg-blue-100 text-blue-700" : "bg-gray-100 text-gray-700"
-                          }`}>
+                          <span
+                            className={`px-2 py-0.5 rounded text-[10px] font-black uppercase tracking-wider ${
+                              log.action === "SUSPENSION"
+                                ? "bg-red-100 text-red-700"
+                                : log.action === "LEGAL_REVIEW"
+                                  ? "bg-purple-100 text-purple-700"
+                                  : log.action === "VERIFICATION_DECISION"
+                                    ? "bg-blue-100 text-blue-700"
+                                    : "bg-gray-100 text-gray-700"
+                            }`}
+                          >
                             {log.action}
                           </span>
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap">
                           {log.citizenId ? (
                             <div>
-                              <div className="font-semibold text-gray-800">{log.citizenId.fullName}</div>
-                              <div className="text-[10px] text-gray-400">{log.citizenId.email}</div>
+                              <div className="font-semibold text-gray-800">
+                                {log.citizenId.fullName}
+                              </div>
+                              <div className="text-[10px] text-gray-400">
+                                {log.citizenId.email}
+                              </div>
                             </div>
-                          ) : "System"}
+                          ) : (
+                            "System"
+                          )}
                         </td>
-                        <td className="px-6 py-4 font-medium text-gray-700 max-w-xs truncate" title={log.reason}>
+                        <td
+                          className="px-6 py-4 font-medium text-gray-700 max-w-xs truncate"
+                          title={log.reason}
+                        >
                           {log.reason}
                         </td>
                         <td className="px-6 py-4 whitespace-nowrap text-xs font-bold">
-                          {log.evidenceReference && log.evidenceReference !== "No Attachment" ? (
-                            <a href={log.evidenceReference} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                          {log.evidenceReference &&
+                          log.evidenceReference !== "No Attachment" ? (
+                            <a
+                              href={log.evidenceReference}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="text-blue-600 underline"
+                            >
                               Attachment 📄
                             </a>
                           ) : (
@@ -2748,8 +3029,12 @@ function OfficeDashboard() {
                   <span>Total Requests</span>
                   <span className="text-lg">🎪</span>
                 </div>
-                <div className="text-2xl font-black text-gray-900 mt-2">{eventMetrics.total || 0}</div>
-                <div className="text-[11px] text-gray-400 mt-1">All temporary event bookings</div>
+                <div className="text-2xl font-black text-gray-900 mt-2">
+                  {eventMetrics.total || 0}
+                </div>
+                <div className="text-[11px] text-gray-400 mt-1">
+                  All temporary event bookings
+                </div>
               </div>
 
               <div className="bg-amber-50/60 p-5 rounded-2xl border border-amber-200 shadow-sm hover:shadow-md transition-all">
@@ -2757,8 +3042,12 @@ function OfficeDashboard() {
                   <span>Pending Review</span>
                   <span className="text-lg animate-bounce">⏳</span>
                 </div>
-                <div className="text-2xl font-black text-amber-900 mt-2">{eventMetrics.pending || 0}</div>
-                <div className="text-[11px] text-amber-600 mt-1 font-semibold">Requires Admin Decision</div>
+                <div className="text-2xl font-black text-amber-900 mt-2">
+                  {eventMetrics.pending || 0}
+                </div>
+                <div className="text-[11px] text-amber-600 mt-1 font-semibold">
+                  Requires Admin Decision
+                </div>
               </div>
 
               <div className="bg-emerald-50/60 p-5 rounded-2xl border border-emerald-200 shadow-sm hover:shadow-md transition-all">
@@ -2766,8 +3055,12 @@ function OfficeDashboard() {
                   <span>Approved Events</span>
                   <span className="text-lg">✅</span>
                 </div>
-                <div className="text-2xl font-black text-emerald-900 mt-2">{eventMetrics.approved || 0}</div>
-                <div className="text-[11px] text-emerald-600 mt-1">Dustbins quota granted</div>
+                <div className="text-2xl font-black text-emerald-900 mt-2">
+                  {eventMetrics.approved || 0}
+                </div>
+                <div className="text-[11px] text-emerald-600 mt-1">
+                  Dustbins quota granted
+                </div>
               </div>
 
               <div className="bg-blue-50/60 p-5 rounded-2xl border border-blue-200 shadow-sm hover:shadow-md transition-all">
@@ -2775,8 +3068,12 @@ function OfficeDashboard() {
                   <span>Allocated Fleet</span>
                   <span className="text-lg">🚚</span>
                 </div>
-                <div className="text-2xl font-black text-blue-900 mt-2">{eventMetrics.allocated || 0}</div>
-                <div className="text-[11px] text-blue-600 mt-1">Vehicles & staff assigned</div>
+                <div className="text-2xl font-black text-blue-900 mt-2">
+                  {eventMetrics.allocated || 0}
+                </div>
+                <div className="text-[11px] text-blue-600 mt-1">
+                  Vehicles & staff assigned
+                </div>
               </div>
 
               <div className="bg-red-50/60 p-5 rounded-2xl border border-red-200 shadow-sm hover:shadow-md transition-all">
@@ -2784,8 +3081,12 @@ function OfficeDashboard() {
                   <span>High Waste Risk</span>
                   <span className="text-lg">🔥</span>
                 </div>
-                <div className="text-2xl font-black text-red-900 mt-2">{eventMetrics.highRisk || 0}</div>
-                <div className="text-[11px] text-red-600 mt-1 font-semibold">&gt;400 kg expected waste</div>
+                <div className="text-2xl font-black text-red-900 mt-2">
+                  {eventMetrics.highRisk || 0}
+                </div>
+                <div className="text-[11px] text-red-600 mt-1 font-semibold">
+                  &gt;400 kg expected waste
+                </div>
               </div>
             </div>
 
@@ -2800,7 +3101,9 @@ function OfficeDashboard() {
                     onChange={(e) => setEventSearch(e.target.value)}
                     className="w-full pl-9 pr-4 py-2.5 bg-gray-50 border border-gray-200 rounded-xl text-xs font-medium text-gray-800 focus:bg-white focus:border-emerald-500 outline-none transition-all"
                   />
-                  <span className="absolute left-3 top-3 text-gray-400 text-xs">🔍</span>
+                  <span className="absolute left-3 top-3 text-gray-400 text-xs">
+                    🔍
+                  </span>
                 </div>
 
                 {/* Status Filter */}
@@ -2810,7 +3113,9 @@ function OfficeDashboard() {
                   className="bg-gray-50 border border-gray-200 rounded-xl px-3 py-2.5 text-xs font-bold text-gray-700 outline-none focus:border-emerald-500"
                 >
                   <option value="ALL">All Statuses</option>
-                  <option value="PENDING_ADMIN_REVIEW">⏳ Pending Review</option>
+                  <option value="PENDING_ADMIN_REVIEW">
+                    ⏳ Pending Review
+                  </option>
                   <option value="APPROVED">✅ Approved</option>
                   <option value="MODIFIED">✏️ Modified</option>
                   <option value="ALLOCATED">🚚 Allocated</option>
@@ -2862,9 +3167,12 @@ function OfficeDashboard() {
             <div className="bg-white rounded-2xl shadow-sm border border-gray-200 overflow-hidden">
               <div className="p-5 border-b border-gray-100 flex items-center justify-between">
                 <div>
-                  <h4 className="text-base font-black text-gray-900">Event Dustbin Requirements Queue</h4>
+                  <h4 className="text-base font-black text-gray-900">
+                    Event Dustbin Requirements Queue
+                  </h4>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Municipal temporary dustbin allocation powered by deterministic waste engine &amp; AI Document Verification.
+                    Municipal temporary dustbin allocation powered by
+                    deterministic waste engine &amp; AI Document Verification.
                   </p>
                 </div>
                 <span className="text-xs font-black bg-emerald-50 text-emerald-700 px-3 py-1 rounded-full border border-emerald-200">
@@ -2889,72 +3197,123 @@ function OfficeDashboard() {
                   <tbody className="divide-y divide-gray-100 bg-white">
                     {eventRequests
                       .filter((req) => {
-                        if (eventFilterStatus !== "ALL" && req.status !== eventFilterStatus) return false;
-                        if (eventFilterType !== "ALL" && req.event?.type !== eventFilterType) return false;
-                        if (eventFilterRisk !== "ALL" && req.aiAnalysis?.wasteRisk !== eventFilterRisk) return false;
+                        if (
+                          eventFilterStatus !== "ALL" &&
+                          req.status !== eventFilterStatus
+                        )
+                          return false;
+                        if (
+                          eventFilterType !== "ALL" &&
+                          req.event?.type !== eventFilterType
+                        )
+                          return false;
+                        if (
+                          eventFilterRisk !== "ALL" &&
+                          req.aiAnalysis?.wasteRisk !== eventFilterRisk
+                        )
+                          return false;
                         if (eventSearch.trim()) {
                           const q = eventSearch.toLowerCase();
-                          const matchId = req.requestId?.toLowerCase().includes(q);
-                          const matchName = req.event?.name?.toLowerCase().includes(q);
-                          const matchCitizen = req.citizenName?.toLowerCase().includes(q);
-                          const matchAddr = req.location?.address?.toLowerCase().includes(q);
-                          if (!matchId && !matchName && !matchCitizen && !matchAddr) return false;
+                          const matchId = req.requestId
+                            ?.toLowerCase()
+                            .includes(q);
+                          const matchName = req.event?.name
+                            ?.toLowerCase()
+                            .includes(q);
+                          const matchCitizen = req.citizenName
+                            ?.toLowerCase()
+                            .includes(q);
+                          const matchAddr = req.location?.address
+                            ?.toLowerCase()
+                            .includes(q);
+                          if (
+                            !matchId &&
+                            !matchName &&
+                            !matchCitizen &&
+                            !matchAddr
+                          )
+                            return false;
                         }
                         return true;
                       })
                       .map((req) => (
-                        <tr key={req._id} className="hover:bg-gray-50/80 transition-colors">
+                        <tr
+                          key={req._id}
+                          className="hover:bg-gray-50/80 transition-colors"
+                        >
                           <td className="px-5 py-4 whitespace-nowrap">
                             <span className="font-mono text-xs font-black text-emerald-700 bg-emerald-50 px-2 py-1 rounded-md border border-emerald-200">
                               {req.requestId}
                             </span>
                             <div className="text-[11px] text-gray-400 mt-1">
-                              {new Date(req.createdAt).toLocaleDateString("en-IN", {
-                                month: "short",
-                                day: "numeric",
-                                hour: "2-digit",
-                                minute: "2-digit",
-                              })}
+                              {new Date(req.createdAt).toLocaleDateString(
+                                "en-IN",
+                                {
+                                  month: "short",
+                                  day: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                },
+                              )}
                             </div>
                           </td>
 
                           <td className="px-5 py-4">
-                            <div className="font-bold text-gray-900 text-sm">{req.event?.name}</div>
+                            <div className="font-bold text-gray-900 text-sm">
+                              {req.event?.name}
+                            </div>
                             <div className="text-xs text-gray-500 mt-0.5 flex items-center gap-1.5">
                               <span className="bg-gray-100 text-gray-700 px-1.5 py-0.5 rounded text-[10px] font-bold">
                                 {req.event?.type}
                               </span>
-                              <span>👤 {req.citizenName} ({req.citizenPhone})</span>
+                              <span>
+                                👤 {req.citizenName} ({req.citizenPhone})
+                              </span>
                             </div>
                           </td>
 
                           <td className="px-5 py-4">
                             <div className="font-semibold text-gray-800 text-xs">
-                              📅 {req.event?.date} ({req.event?.startTime} - {req.event?.endTime})
+                              📅 {req.event?.date} ({req.event?.startTime} -{" "}
+                              {req.event?.endTime})
                             </div>
-                            <div className="text-xs text-gray-500 mt-0.5 truncate max-w-xs" title={req.location?.address}>
+                            <div
+                              className="text-xs text-gray-500 mt-0.5 truncate max-w-xs"
+                              title={req.location?.address}
+                            >
                               📍 {req.location?.address}
                             </div>
                           </td>
 
                           <td className="px-5 py-4 whitespace-nowrap">
-                            <div className="font-black text-gray-800 text-xs">👥 {req.event?.expectedGuests} Guests</div>
+                            <div className="font-black text-gray-800 text-xs">
+                              👥 {req.event?.expectedGuests} Guests
+                            </div>
                             <div className="text-[11px] text-gray-500 mt-0.5">
-                              {req.event?.foodService ? `🍽️ ${req.event?.foodType || "Meals"}` : "🚫 No Catering"}
+                              {req.event?.foodService
+                                ? `🍽️ ${req.event?.foodType || "Meals"}`
+                                : "🚫 No Catering"}
                             </div>
                           </td>
 
                           <td className="px-5 py-4 whitespace-nowrap">
                             <div className="flex items-center gap-1.5">
                               <span className="text-xs font-black text-emerald-800 bg-emerald-50 px-2 py-0.5 rounded border border-emerald-200">
-                                {req.adminDecision?.approvedBins?.total || req.aiAnalysis?.recommendedBins?.total || 3} Bins
+                                {req.adminDecision?.approvedBins?.total ||
+                                  req.aiAnalysis?.recommendedBins?.total ||
+                                  3}{" "}
+                                Bins
                               </span>
                               <span className="text-[10px] text-gray-500 font-semibold">
-                                ({req.aiAnalysis?.recommendedBins?.wet || 1}W / {req.aiAnalysis?.recommendedBins?.dry || 1}D / {req.aiAnalysis?.recommendedBins?.general || 1}G)
+                                ({req.aiAnalysis?.recommendedBins?.wet || 1}W /{" "}
+                                {req.aiAnalysis?.recommendedBins?.dry || 1}D /{" "}
+                                {req.aiAnalysis?.recommendedBins?.general || 1}
+                                G)
                               </span>
                             </div>
                             <div className="text-[10px] text-gray-400 mt-1">
-                              ~{req.aiAnalysis?.estimatedWasteKg || 0} kg waste • {req.aiAnalysis?.collectionFrequency || 1}x/day
+                              ~{req.aiAnalysis?.estimatedWasteKg || 0} kg waste
+                              • {req.aiAnalysis?.collectionFrequency || 1}x/day
                             </div>
                           </td>
 
@@ -2964,10 +3323,10 @@ function OfficeDashboard() {
                                 req.aiAnalysis?.wasteRisk === "CRITICAL"
                                   ? "bg-red-100 text-red-800 border-red-200 animate-pulse"
                                   : req.aiAnalysis?.wasteRisk === "HIGH"
-                                  ? "bg-orange-100 text-orange-800 border-orange-200"
-                                  : req.aiAnalysis?.wasteRisk === "MEDIUM"
-                                  ? "bg-amber-100 text-amber-800 border-amber-200"
-                                  : "bg-green-100 text-green-800 border-green-200"
+                                    ? "bg-orange-100 text-orange-800 border-orange-200"
+                                    : req.aiAnalysis?.wasteRisk === "MEDIUM"
+                                      ? "bg-amber-100 text-amber-800 border-amber-200"
+                                      : "bg-green-100 text-green-800 border-green-200"
                               }`}
                             >
                               {req.aiAnalysis?.wasteRisk || "MEDIUM"} RISK
@@ -2977,15 +3336,16 @@ function OfficeDashboard() {
                           <td className="px-5 py-4 whitespace-nowrap">
                             <span
                               className={`px-2.5 py-1 rounded-lg text-[10px] font-black uppercase tracking-wider border ${
-                                req.status === "APPROVED" || req.status === "ALLOCATED"
+                                req.status === "APPROVED" ||
+                                req.status === "ALLOCATED"
                                   ? "bg-emerald-100 text-emerald-800 border-emerald-200"
                                   : req.status === "MODIFIED"
-                                  ? "bg-blue-100 text-blue-800 border-blue-200"
-                                  : req.status === "REJECTED"
-                                  ? "bg-red-100 text-red-800 border-red-200"
-                                  : req.status === "COMPLETED"
-                                  ? "bg-purple-100 text-purple-800 border-purple-200"
-                                  : "bg-amber-100 text-amber-800 border-amber-200 animate-pulse"
+                                    ? "bg-blue-100 text-blue-800 border-blue-200"
+                                    : req.status === "REJECTED"
+                                      ? "bg-red-100 text-red-800 border-red-200"
+                                      : req.status === "COMPLETED"
+                                        ? "bg-purple-100 text-purple-800 border-purple-200"
+                                        : "bg-amber-100 text-amber-800 border-amber-200 animate-pulse"
                               }`}
                             >
                               {req.status?.replace(/_/g, " ")}
@@ -2996,12 +3356,24 @@ function OfficeDashboard() {
                             <button
                               onClick={() => {
                                 setSelectedEventRequest(req);
-                                setModWetBins(req.aiAnalysis?.recommendedBins?.wet || 2);
-                                setModDryBins(req.aiAnalysis?.recommendedBins?.dry || 2);
-                                setModGeneralBins(req.aiAnalysis?.recommendedBins?.general || 1);
-                                setModFrequency(req.aiAnalysis?.collectionFrequency || 1);
+                                setModWetBins(
+                                  req.aiAnalysis?.recommendedBins?.wet || 2,
+                                );
+                                setModDryBins(
+                                  req.aiAnalysis?.recommendedBins?.dry || 2,
+                                );
+                                setModGeneralBins(
+                                  req.aiAnalysis?.recommendedBins?.general || 1,
+                                );
+                                setModFrequency(
+                                  req.aiAnalysis?.collectionFrequency || 1,
+                                );
                                 setDecisionReason("");
-                                setEventDecisionType(req.status === "APPROVED" ? "allocate" : "approve");
+                                setEventDecisionType(
+                                  req.status === "APPROVED"
+                                    ? "allocate"
+                                    : "approve",
+                                );
                                 setShowEventDecisionModal(true);
                               }}
                               className="px-3.5 py-1.5 bg-emerald-600 hover:bg-emerald-700 text-white rounded-xl text-xs font-black transition-all shadow-sm flex items-center gap-1 ml-auto"
@@ -3014,7 +3386,10 @@ function OfficeDashboard() {
                       ))}
                     {eventRequests.length === 0 && (
                       <tr>
-                        <td colSpan="8" className="px-6 py-12 text-center text-gray-400">
+                        <td
+                          colSpan="8"
+                          className="px-6 py-12 text-center text-gray-400"
+                        >
                           No event dustbin requests received yet.
                         </td>
                       </tr>
@@ -3052,8 +3427,11 @@ function OfficeDashboard() {
                     </span>
                   </div>
                   <p className="text-xs text-gray-500 mt-0.5">
-                    Submitted by {selectedEventRequest.citizenName} ({selectedEventRequest.citizenPhone}) • Status:{" "}
-                    <span className="font-bold text-gray-700">{selectedEventRequest.status}</span>
+                    Submitted by {selectedEventRequest.citizenName} (
+                    {selectedEventRequest.citizenPhone}) • Status:{" "}
+                    <span className="font-bold text-gray-700">
+                      {selectedEventRequest.status}
+                    </span>
                   </p>
                 </div>
               </div>
@@ -3069,29 +3447,43 @@ function OfficeDashboard() {
                     <div className="grid grid-cols-2 gap-3 text-xs">
                       <div>
                         <span className="text-gray-400">Event Type:</span>
-                        <p className="font-bold text-gray-800">{selectedEventRequest.event?.type}</p>
+                        <p className="font-bold text-gray-800">
+                          {selectedEventRequest.event?.type}
+                        </p>
                       </div>
                       <div>
                         <span className="text-gray-400">Expected Guests:</span>
-                        <p className="font-bold text-gray-800">👥 {selectedEventRequest.event?.expectedGuests} Persons</p>
+                        <p className="font-bold text-gray-800">
+                          👥 {selectedEventRequest.event?.expectedGuests}{" "}
+                          Persons
+                        </p>
                       </div>
                       <div>
                         <span className="text-gray-400">Date:</span>
-                        <p className="font-bold text-gray-800">📅 {selectedEventRequest.event?.date}</p>
+                        <p className="font-bold text-gray-800">
+                          📅 {selectedEventRequest.event?.date}
+                        </p>
                       </div>
                       <div>
-                        <span className="text-gray-400">Time &amp; Duration:</span>
+                        <span className="text-gray-400">
+                          Time &amp; Duration:
+                        </span>
                         <p className="font-bold text-gray-800">
-                          ⏰ {selectedEventRequest.event?.startTime} - {selectedEventRequest.event?.endTime} ({selectedEventRequest.event?.durationHours} hrs)
+                          ⏰ {selectedEventRequest.event?.startTime} -{" "}
+                          {selectedEventRequest.event?.endTime} (
+                          {selectedEventRequest.event?.durationHours} hrs)
                         </p>
                       </div>
                       <div className="col-span-2">
                         <span className="text-gray-400">Venue Address:</span>
                         <p className="font-bold text-gray-800">
-                          📍 {selectedEventRequest.location?.address} ({selectedEventRequest.event?.venueType})
+                          📍 {selectedEventRequest.location?.address} (
+                          {selectedEventRequest.event?.venueType})
                         </p>
                         <p className="text-[11px] text-gray-400 mt-0.5">
-                          GPS: {selectedEventRequest.location?.latitude?.toFixed(6)}, {selectedEventRequest.location?.longitude?.toFixed(6)}
+                          GPS:{" "}
+                          {selectedEventRequest.location?.latitude?.toFixed(6)},{" "}
+                          {selectedEventRequest.location?.longitude?.toFixed(6)}
                         </p>
                       </div>
                       <div>
@@ -3105,7 +3497,8 @@ function OfficeDashboard() {
                       <div>
                         <span className="text-gray-400">Waste Types:</span>
                         <p className="font-bold text-gray-800">
-                          {selectedEventRequest.event?.wasteTypes?.join(", ") || "Wet, Dry"}
+                          {selectedEventRequest.event?.wasteTypes?.join(", ") ||
+                            "Wet, Dry"}
                         </p>
                       </div>
                     </div>
@@ -3122,9 +3515,13 @@ function OfficeDashboard() {
                         <div className="flex items-center gap-3">
                           <span className="text-xl">📄</span>
                           <div>
-                            <p className="text-xs font-bold text-gray-800">Event Proof / Invitation Card</p>
+                            <p className="text-xs font-bold text-gray-800">
+                              Event Proof / Invitation Card
+                            </p>
                             <p className="text-[10px] text-emerald-600 font-semibold">
-                              Status: {selectedEventRequest.documents?.eventProof?.verificationStatus || "VERIFIED"}
+                              Status:{" "}
+                              {selectedEventRequest.documents?.eventProof
+                                ?.verificationStatus || "VERIFIED"}
                             </p>
                           </div>
                         </div>
@@ -3146,12 +3543,18 @@ function OfficeDashboard() {
                           <div className="flex items-center gap-3">
                             <span className="text-xl">🪪</span>
                             <div>
-                              <p className="text-xs font-bold text-gray-800">Identity Proof (Aadhaar / ID)</p>
-                              <p className="text-[10px] text-emerald-600 font-semibold">Attached by citizen</p>
+                              <p className="text-xs font-bold text-gray-800">
+                                Identity Proof (Aadhaar / ID)
+                              </p>
+                              <p className="text-[10px] text-emerald-600 font-semibold">
+                                Attached by citizen
+                              </p>
                             </div>
                           </div>
                           <a
-                            href={selectedEventRequest.documents.identityProof.url}
+                            href={
+                              selectedEventRequest.documents.identityProof.url
+                            }
                             target="_blank"
                             rel="noopener noreferrer"
                             className="px-3 py-1 bg-blue-50 text-blue-700 hover:bg-blue-100 rounded-lg text-xs font-black transition-all"
@@ -3170,12 +3573,21 @@ function OfficeDashboard() {
                     </h4>
                     <div className="space-y-1.5 max-h-36 overflow-y-auto pr-1">
                       {selectedEventRequest.auditLog?.map((log, i) => (
-                        <div key={i} className="text-[11px] bg-white p-2 rounded-lg border border-gray-100">
+                        <div
+                          key={i}
+                          className="text-[11px] bg-white p-2 rounded-lg border border-gray-100"
+                        >
                           <div className="flex justify-between text-gray-400">
-                            <span className="font-bold text-gray-700">{log.user || "System"} • {log.action}</span>
-                            <span>{new Date(log.timestamp).toLocaleString("en-IN")}</span>
+                            <span className="font-bold text-gray-700">
+                              {log.user || "System"} • {log.action}
+                            </span>
+                            <span>
+                              {new Date(log.timestamp).toLocaleString("en-IN")}
+                            </span>
                           </div>
-                          <p className="text-gray-600 mt-0.5">{log.reason || log.newValue}</p>
+                          <p className="text-gray-600 mt-0.5">
+                            {log.reason || log.newValue}
+                          </p>
                         </div>
                       ))}
                     </div>
@@ -3195,11 +3607,13 @@ function OfficeDashboard() {
                       </div>
                       <span
                         className={`px-2.5 py-0.5 rounded-full text-[10px] font-black uppercase tracking-wider border ${
-                          selectedEventRequest.aiAnalysis?.wasteRisk === "CRITICAL"
+                          selectedEventRequest.aiAnalysis?.wasteRisk ===
+                          "CRITICAL"
                             ? "bg-red-500 text-white border-red-400"
-                            : selectedEventRequest.aiAnalysis?.wasteRisk === "HIGH"
-                            ? "bg-orange-500 text-white border-orange-400"
-                            : "bg-emerald-500 text-white border-emerald-400"
+                            : selectedEventRequest.aiAnalysis?.wasteRisk ===
+                                "HIGH"
+                              ? "bg-orange-500 text-white border-orange-400"
+                              : "bg-emerald-500 text-white border-emerald-400"
                         }`}
                       >
                         {selectedEventRequest.aiAnalysis?.wasteRisk} RISK
@@ -3209,25 +3623,42 @@ function OfficeDashboard() {
                     {/* ML Model & Data Coverage Badges */}
                     <div className="flex flex-wrap items-center gap-2 mb-3 text-[10px]">
                       <span className="bg-emerald-800/80 px-2 py-0.5 rounded-md font-mono text-emerald-200 border border-emerald-700">
-                        🤖 {selectedEventRequest.aiAnalysis?.algorithm || "RandomForestRegressor"} ({selectedEventRequest.aiAnalysis?.modelVersion || "v1.0.0"})
+                        🤖{" "}
+                        {selectedEventRequest.aiAnalysis?.algorithm ||
+                          "RandomForestRegressor"}{" "}
+                        (
+                        {selectedEventRequest.aiAnalysis?.modelVersion ||
+                          "v1.0.0"}
+                        )
                       </span>
                       <span className="bg-teal-800/80 px-2 py-0.5 rounded-md font-bold text-teal-200 border border-teal-700">
-                        📊 Trained on {selectedEventRequest.aiAnalysis?.trainingSampleCount || 46} real events
+                        📊 Trained on{" "}
+                        {selectedEventRequest.aiAnalysis?.trainingSampleCount ||
+                          46}{" "}
+                        real events
                       </span>
                       <span className="bg-indigo-800/80 px-2 py-0.5 rounded-md font-bold text-indigo-200 border border-indigo-700">
-                        🎯 MAE: {selectedEventRequest.aiAnalysis?.validationMae || 117.25} kg
+                        🎯 MAE:{" "}
+                        {selectedEventRequest.aiAnalysis?.validationMae ||
+                          117.25}{" "}
+                        kg
                       </span>
-                      <span className={`px-2 py-0.5 rounded-md font-black tracking-wider uppercase border ${
-                        selectedEventRequest.aiAnalysis?.dataCoverage === "LOW DATA COVERAGE"
-                          ? "bg-amber-500/30 text-amber-200 border-amber-500/50"
-                          : "bg-emerald-500/30 text-emerald-200 border-emerald-500/50"
-                      }`}>
-                        {selectedEventRequest.aiAnalysis?.dataCoverage || "GOOD COVERAGE"}
+                      <span
+                        className={`px-2 py-0.5 rounded-md font-black tracking-wider uppercase border ${
+                          selectedEventRequest.aiAnalysis?.dataCoverage ===
+                          "LOW DATA COVERAGE"
+                            ? "bg-amber-500/30 text-amber-200 border-amber-500/50"
+                            : "bg-emerald-500/30 text-emerald-200 border-emerald-500/50"
+                        }`}
+                      >
+                        {selectedEventRequest.aiAnalysis?.dataCoverage ||
+                          "GOOD COVERAGE"}
                       </span>
                     </div>
 
                     <div className="text-2xl font-black text-white mb-1">
-                      ~{selectedEventRequest.aiAnalysis?.estimatedWasteKg} kg Expected Waste
+                      ~{selectedEventRequest.aiAnalysis?.estimatedWasteKg} kg
+                      Expected Waste
                     </div>
                     <p className="text-xs text-emerald-300 font-medium mb-4">
                       {selectedEventRequest.aiAnalysis?.reasoning}
@@ -3237,42 +3668,75 @@ function OfficeDashboard() {
                     <div className="grid grid-cols-4 gap-2 bg-white/10 p-3 rounded-xl backdrop-blur-sm border border-white/15 text-center">
                       <div>
                         <div className="text-base font-black text-emerald-300">
-                          {selectedEventRequest.aiAnalysis?.recommendedBins?.wet || 1}
+                          {selectedEventRequest.aiAnalysis?.recommendedBins
+                            ?.wet || 1}
                         </div>
-                        <div className="text-[10px] font-bold text-emerald-200">Wet Bins</div>
+                        <div className="text-[10px] font-bold text-emerald-200">
+                          Wet Bins
+                        </div>
                       </div>
                       <div>
                         <div className="text-base font-black text-blue-300">
-                          {selectedEventRequest.aiAnalysis?.recommendedBins?.dry || 1}
+                          {selectedEventRequest.aiAnalysis?.recommendedBins
+                            ?.dry || 1}
                         </div>
-                        <div className="text-[10px] font-bold text-blue-200">Dry Bins</div>
+                        <div className="text-[10px] font-bold text-blue-200">
+                          Dry Bins
+                        </div>
                       </div>
                       <div>
                         <div className="text-base font-black text-amber-300">
-                          {selectedEventRequest.aiAnalysis?.recommendedBins?.general || 1}
+                          {selectedEventRequest.aiAnalysis?.recommendedBins
+                            ?.general || 1}
                         </div>
-                        <div className="text-[10px] font-bold text-amber-200">General</div>
+                        <div className="text-[10px] font-bold text-amber-200">
+                          General
+                        </div>
                       </div>
                       <div className="border-l border-white/20 pl-2">
                         <div className="text-base font-black text-yellow-300">
-                          {selectedEventRequest.aiAnalysis?.recommendedBins?.total || 3}
+                          {selectedEventRequest.aiAnalysis?.recommendedBins
+                            ?.total || 3}
                         </div>
-                        <div className="text-[10px] font-black text-yellow-200">Total Bins</div>
+                        <div className="text-[10px] font-black text-yellow-200">
+                          Total Bins
+                        </div>
                       </div>
                     </div>
 
                     <div className="flex justify-between items-center mt-3 text-[11px] text-emerald-200">
-                      <span>Collection Frequency: <strong className="text-white">{selectedEventRequest.aiAnalysis?.collectionFrequency || 1}x daily</strong></span>
-                      <span>Confidence: <strong className="text-white">{selectedEventRequest.aiAnalysis?.confidenceScore} ({selectedEventRequest.aiAnalysis?.confidenceScoreNumeric}%)</strong></span>
+                      <span>
+                        Collection Frequency:{" "}
+                        <strong className="text-white">
+                          {selectedEventRequest.aiAnalysis
+                            ?.collectionFrequency || 1}
+                          x daily
+                        </strong>
+                      </span>
+                      <span>
+                        Confidence:{" "}
+                        <strong className="text-white">
+                          {selectedEventRequest.aiAnalysis?.confidenceScore} (
+                          {
+                            selectedEventRequest.aiAnalysis
+                              ?.confidenceScoreNumeric
+                          }
+                          %)
+                        </strong>
+                      </span>
                     </div>
 
                     {selectedEventRequest.aiAnalysis?.warnings?.length > 0 && (
                       <div className="mt-3 bg-red-500/20 border border-red-500/30 p-2.5 rounded-xl text-[11px] text-red-200">
-                        <strong className="text-red-100">⚠️ Operational Alerts:</strong>
+                        <strong className="text-red-100">
+                          ⚠️ Operational Alerts:
+                        </strong>
                         <ul className="list-disc list-inside mt-0.5 space-y-0.5">
-                          {selectedEventRequest.aiAnalysis.warnings.map((w, i) => (
-                            <li key={i}>{w}</li>
-                          ))}
+                          {selectedEventRequest.aiAnalysis.warnings.map(
+                            (w, i) => (
+                              <li key={i}>{w}</li>
+                            ),
+                          )}
                         </ul>
                       </div>
                     )}
@@ -3327,7 +3791,16 @@ function OfficeDashboard() {
                     {eventDecisionType === "approve" && (
                       <div className="space-y-3">
                         <div className="bg-emerald-50 p-3 rounded-xl border border-emerald-200 text-xs text-emerald-800 font-medium">
-                          Approving will authorize <strong>{selectedEventRequest.aiAnalysis?.recommendedBins?.total || 3} dustbins</strong> with {selectedEventRequest.aiAnalysis?.collectionFrequency || 1}x daily municipal collection.
+                          Approving will authorize{" "}
+                          <strong>
+                            {selectedEventRequest.aiAnalysis?.recommendedBins
+                              ?.total || 3}{" "}
+                            dustbins
+                          </strong>{" "}
+                          with{" "}
+                          {selectedEventRequest.aiAnalysis
+                            ?.collectionFrequency || 1}
+                          x daily municipal collection.
                         </div>
                         <input
                           type="text"
@@ -3338,10 +3811,14 @@ function OfficeDashboard() {
                         />
                         <button
                           disabled={decisionSubmitting}
-                          onClick={() => handleApproveEvent(selectedEventRequest._id)}
+                          onClick={() =>
+                            handleApproveEvent(selectedEventRequest._id)
+                          }
                           className="w-full py-3 bg-emerald-600 hover:bg-emerald-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
                         >
-                          {decisionSubmitting ? "Approving..." : "Confirm & Approve Event Request 🚀"}
+                          {decisionSubmitting
+                            ? "Approving..."
+                            : "Confirm & Approve Event Request 🚀"}
                         </button>
                       </div>
                     )}
@@ -3351,53 +3828,73 @@ function OfficeDashboard() {
                       <div className="space-y-3">
                         <div className="grid grid-cols-3 gap-2">
                           <div>
-                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Wet Bins</label>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                              Wet Bins
+                            </label>
                             <input
                               type="number"
                               min="0"
                               value={modWetBins}
-                              onChange={(e) => setModWetBins(Number(e.target.value))}
+                              onChange={(e) =>
+                                setModWetBins(Number(e.target.value))
+                              }
                               className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Dry Bins</label>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                              Dry Bins
+                            </label>
                             <input
                               type="number"
                               min="0"
                               value={modDryBins}
-                              onChange={(e) => setModDryBins(Number(e.target.value))}
+                              onChange={(e) =>
+                                setModDryBins(Number(e.target.value))
+                              }
                               className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
                             />
                           </div>
                           <div>
-                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">General Bins</label>
+                            <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                              General Bins
+                            </label>
                             <input
                               type="number"
                               min="0"
                               value={modGeneralBins}
-                              onChange={(e) => setModGeneralBins(Number(e.target.value))}
+                              onChange={(e) =>
+                                setModGeneralBins(Number(e.target.value))
+                              }
                               className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
                             />
                           </div>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Daily Collection Frequency</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Daily Collection Frequency
+                          </label>
                           <select
                             value={modFrequency}
-                            onChange={(e) => setModFrequency(Number(e.target.value))}
+                            onChange={(e) =>
+                              setModFrequency(Number(e.target.value))
+                            }
                             className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
                           >
                             <option value={1}>1 time / day</option>
                             <option value={2}>2 times / day</option>
                             <option value={3}>3 times / day</option>
-                            <option value={4}>4 times / day (Continuous pickup)</option>
+                            <option value={4}>
+                              4 times / day (Continuous pickup)
+                            </option>
                           </select>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Modification Reason (Mandatory) *</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Modification Reason (Mandatory) *
+                          </label>
                           <textarea
                             required
                             placeholder="Reason for modifying bin count (e.g. Venue has extra existing dustbins on site)..."
@@ -3410,10 +3907,14 @@ function OfficeDashboard() {
 
                         <button
                           disabled={decisionSubmitting}
-                          onClick={() => handleModifyEvent(selectedEventRequest._id)}
+                          onClick={() =>
+                            handleModifyEvent(selectedEventRequest._id)
+                          }
                           className="w-full py-3 bg-blue-600 hover:bg-blue-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
                         >
-                          {decisionSubmitting ? "Updating..." : `Save & Approve Modified ${modWetBins + modDryBins + modGeneralBins} Bins ✏️`}
+                          {decisionSubmitting
+                            ? "Updating..."
+                            : `Save & Approve Modified ${modWetBins + modDryBins + modGeneralBins} Bins ✏️`}
                         </button>
                       </div>
                     )}
@@ -3422,23 +3923,30 @@ function OfficeDashboard() {
                     {eventDecisionType === "allocate" && (
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Assign Collection Vehicle</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Assign Collection Vehicle
+                          </label>
                           <select
                             value={allocVehicleId}
                             onChange={(e) => setAllocVehicleId(e.target.value)}
                             className="w-full p-2 bg-gray-50 border border-gray-200 rounded-xl text-xs font-bold text-gray-800 outline-none"
                           >
-                            <option value="">-- Select Municipal Vehicle --</option>
+                            <option value="">
+                              -- Select Municipal Vehicle --
+                            </option>
                             {vehicles.map((v) => (
                               <option key={v._id} value={v._id}>
-                                🚚 {v.vehicleNumber} ({v.model || "Compactor Truck"})
+                                🚚 {v.vehicleNumber} (
+                                {v.model || "Compactor Truck"})
                               </option>
                             ))}
                           </select>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Assign Sanitation Field Staff</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Assign Sanitation Field Staff
+                          </label>
                           <select
                             value={allocStaffId}
                             onChange={(e) => setAllocStaffId(e.target.value)}
@@ -3447,14 +3955,17 @@ function OfficeDashboard() {
                             <option value="">-- Select Staff Officer --</option>
                             {staff.map((s) => (
                               <option key={s._id} value={s._id}>
-                                👤 {s.name} ({s.phone || "Sanitation Supervisor"})
+                                👤 {s.name} (
+                                {s.phone || "Sanitation Supervisor"})
                               </option>
                             ))}
                           </select>
                         </div>
 
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Collection Timetable Schedule</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Collection Timetable Schedule
+                          </label>
                           <input
                             type="text"
                             value={allocSchedule}
@@ -3465,10 +3976,14 @@ function OfficeDashboard() {
 
                         <button
                           disabled={decisionSubmitting}
-                          onClick={() => handleAllocateEvent(selectedEventRequest._id)}
+                          onClick={() =>
+                            handleAllocateEvent(selectedEventRequest._id)
+                          }
                           className="w-full py-3 bg-purple-600 hover:bg-purple-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
                         >
-                          {decisionSubmitting ? "Deploying..." : "Deploy Fleet & Assign Resources 🚚"}
+                          {decisionSubmitting
+                            ? "Deploying..."
+                            : "Deploy Fleet & Assign Resources 🚚"}
                         </button>
                       </div>
                     )}
@@ -3477,7 +3992,9 @@ function OfficeDashboard() {
                     {eventDecisionType === "reject" && (
                       <div className="space-y-3">
                         <div>
-                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">Rejection Reason *</label>
+                          <label className="block text-[10px] font-black text-gray-500 uppercase mb-1">
+                            Rejection Reason *
+                          </label>
                           <textarea
                             required
                             placeholder="State reason for rejection (e.g. Incomplete invitation proof, illegal commercial event)..."
@@ -3489,10 +4006,14 @@ function OfficeDashboard() {
                         </div>
                         <button
                           disabled={decisionSubmitting}
-                          onClick={() => handleRejectEvent(selectedEventRequest._id)}
+                          onClick={() =>
+                            handleRejectEvent(selectedEventRequest._id)
+                          }
                           className="w-full py-3 bg-red-600 hover:bg-red-700 text-white font-black text-xs rounded-xl transition-all shadow-md"
                         >
-                          {decisionSubmitting ? "Rejecting..." : "Reject Event Dustbin Request ❌"}
+                          {decisionSubmitting
+                            ? "Rejecting..."
+                            : "Reject Event Dustbin Request ❌"}
                         </button>
                       </div>
                     )}
@@ -3513,16 +4034,26 @@ function OfficeDashboard() {
               >
                 ✕
               </button>
-              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚠️ Suspend Citizen Account</h4>
-              <p className="text-xs text-gray-500 mb-4">Suspended users cannot submit complaints, earn rewards, or appear in leaderboards.</p>
-              
+              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">
+                ⚠️ Suspend Citizen Account
+              </h4>
+              <p className="text-xs text-gray-500 mb-4">
+                Suspended users cannot submit complaints, earn rewards, or
+                appear in leaderboards.
+              </p>
+
               <form onSubmit={handleSuspend} className="space-y-4">
                 <div className="bg-white-50 p-3 rounded-lg border text-black text-xs mb-2">
-                  <span className="font-bold text-black">Citizen Name:</span> {suspendingCitizen.fullName}<br />
-                  <span className="font-bold text-black">Strikes:</span> {suspendingCitizen.strikeCount}/3 consecutive
+                  <span className="font-bold text-black">Citizen Name:</span>{" "}
+                  {suspendingCitizen.fullName}
+                  <br />
+                  <span className="font-bold text-black">Strikes:</span>{" "}
+                  {suspendingCitizen.strikeCount}/3 consecutive
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Suspension Reason *</label>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                    Suspension Reason *
+                  </label>
                   <textarea
                     required
                     placeholder="Enter official suspension reason (e.g. Uploaded 3 misleading fake images consecutively)"
@@ -3533,7 +4064,9 @@ function OfficeDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Evidence Notes *</label>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                    Verification Evidence Notes *
+                  </label>
                   <input
                     type="text"
                     required
@@ -3544,7 +4077,9 @@ function OfficeDashboard() {
                   />
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Evidence URL / Image Reference (Optional)</label>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                    Evidence URL / Image Reference (Optional)
+                  </label>
                   <input
                     type="text"
                     placeholder="Enter evidence URL (e.g. site inspection photo URL)"
@@ -3574,15 +4109,22 @@ function OfficeDashboard() {
               >
                 ✕
               </button>
-              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚖️ Resolve Citizen Appeal</h4>
-              
+              <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">
+                ⚖️ Resolve Citizen Appeal
+              </h4>
+
               <div className="space-y-4">
                 <div className="bg-gray-50 p-3 rounded-lg border text-xs text-black">
-                  <span className="font-bold">Citizen:</span> {resolvingAppeal.citizenId?.fullName}<br />
-                  <span className="font-bold">Appeal explanation:</span> "{resolvingAppeal.reason}"
+                  <span className="font-bold">Citizen:</span>{" "}
+                  {resolvingAppeal.citizenId?.fullName}
+                  <br />
+                  <span className="font-bold">Appeal explanation:</span> "
+                  {resolvingAppeal.reason}"
                 </div>
                 <div>
-                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">Admin Resolution Notes *</label>
+                  <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                    Admin Resolution Notes *
+                  </label>
                   <textarea
                     required
                     placeholder="Provide details on why you are accepting or rejecting the appeal (e.g. Appeal accepted. User uploaded correct proof. Account restored.)"
@@ -3594,13 +4136,17 @@ function OfficeDashboard() {
                 </div>
                 <div className="grid grid-cols-2 gap-3">
                   <button
-                    onClick={() => handleResolveAppeal(resolvingAppeal._id, "accept")}
+                    onClick={() =>
+                      handleResolveAppeal(resolvingAppeal._id, "accept")
+                    }
                     className="py-3 bg-green-600 hover:bg-green-700 text-white rounded-xl font-bold text-xs shadow-md"
                   >
                     Accept Appeal ✅
                   </button>
                   <button
-                    onClick={() => handleResolveAppeal(resolvingAppeal._id, "reject")}
+                    onClick={() =>
+                      handleResolveAppeal(resolvingAppeal._id, "reject")
+                    }
                     className="py-3 bg-red-600 hover:bg-red-700 text-white rounded-xl font-bold text-xs shadow-md"
                   >
                     Reject Appeal ❌
@@ -4215,7 +4761,11 @@ function OfficeDashboard() {
           <ul className="space-y-2">
             {[
               { view: "dashboard", icon: Activity, label: "Dashboard" },
-              { view: "escalations", icon: AlertCircle, label: "Escalation Monitor" },
+              {
+                view: "escalations",
+                icon: AlertCircle,
+                label: "Escalation Monitor",
+              },
               { view: "complaints", icon: MessageSquare, label: "Complaints" },
               { view: "reviews", icon: Star, label: "Reviews" },
               { view: "routes", icon: MapPin, label: "Routes" },
@@ -4279,7 +4829,8 @@ function OfficeDashboard() {
                 {currentView === "vehicles" &&
                   "Track and manage collection vehicles"}
                 {currentView === "staff" && "Manage staff members and roles"}
-                {currentView === "moderation" && "Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs"}
+                {currentView === "moderation" &&
+                  "Moderate citizens, manage strikes, suspensions, resolve appeals, and view logs"}
                 {currentView === "settings" && "Configure system settings"}
               </p>
             </div>
@@ -4667,7 +5218,9 @@ function OfficeDashboard() {
                       <option value="helper">Helper</option>
                       <option value="supervisor">Area Supervisor</option>
                       <option value="zone_officer">Zone Officer</option>
-                      <option value="municipal_officer">Municipal Officer</option>
+                      <option value="municipal_officer">
+                        Municipal Officer
+                      </option>
                       <option value="commissioner">City Commissioner</option>
                     </select>
                   </div>
@@ -5329,7 +5882,7 @@ function OfficeDashboard() {
                     "
                   </p>
                 </div>
-                
+
                 <div className="pt-2">
                   <p className="text-[10px] text-gray-400 font-bold uppercase tracking-widest mb-3">
                     Dispatch Status
@@ -5366,19 +5919,60 @@ function OfficeDashboard() {
                       </p>
                       <div className="relative border-l-2 border-gray-200 pl-4 ml-2 space-y-4">
                         {[
-                          { level: 1, name: "Driver / Worker", staff: detailedReport.driverId?.name || detailedReport.vehicle || "Assigned Driver" },
-                          { level: 2, name: "Area Supervisor", staff: detailedReport.supervisorId?.name || "Area Supervisor" },
-                          { level: 3, name: "Zone Officer", staff: detailedReport.zoneOfficerId?.name || "Zone Officer" },
-                          { level: 4, name: "Municipal Officer", staff: detailedReport.municipalOfficerId?.name || "Municipal Officer" },
-                          { level: 5, name: "City Commissioner", staff: detailedReport.commissionerId?.name || "City Commissioner" }
+                          {
+                            level: 1,
+                            name: "Driver / Worker",
+                            staff:
+                              detailedReport.driverId?.name ||
+                              detailedReport.vehicle ||
+                              "Assigned Driver",
+                          },
+                          {
+                            level: 2,
+                            name: "Area Supervisor",
+                            staff:
+                              detailedReport.supervisorId?.name ||
+                              "Area Supervisor",
+                          },
+                          {
+                            level: 3,
+                            name: "Zone Officer",
+                            staff:
+                              detailedReport.zoneOfficerId?.name ||
+                              "Zone Officer",
+                          },
+                          {
+                            level: 4,
+                            name: "Municipal Officer",
+                            staff:
+                              detailedReport.municipalOfficerId?.name ||
+                              "Municipal Officer",
+                          },
+                          {
+                            level: 5,
+                            name: "City Commissioner",
+                            staff:
+                              detailedReport.commissionerId?.name ||
+                              "City Commissioner",
+                          },
                         ].map((stage) => {
-                          const isActive = detailedReport.currentEscalationLevel >= stage.level;
+                          const isActive =
+                            detailedReport.currentEscalationLevel >=
+                            stage.level;
                           return (
                             <div key={stage.level} className="relative">
-                              <span className={`absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200' : 'bg-gray-100 border-gray-300'}`}></span>
+                              <span
+                                className={`absolute -left-[25px] top-1 w-3.5 h-3.5 rounded-full border-2 ${isActive ? "bg-red-500 border-red-200" : "bg-gray-100 border-gray-300"}`}
+                              ></span>
                               <div>
-                                <p className={`text-xs font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
-                                <p className="text-[10px] text-gray-500">Responsible: {stage.staff}</p>
+                                <p
+                                  className={`text-xs font-bold ${isActive ? "text-gray-900" : "text-gray-400"}`}
+                                >
+                                  Level {stage.level}: {stage.name}
+                                </p>
+                                <p className="text-[10px] text-gray-500">
+                                  Responsible: {stage.staff}
+                                </p>
                               </div>
                             </div>
                           );
@@ -5387,7 +5981,8 @@ function OfficeDashboard() {
                     </div>
 
                     {/* Admin Verification Panel */}
-                    {detailedReport.verificationStatus && detailedReport.verificationStatus !== "none" ? (
+                    {detailedReport.verificationStatus &&
+                    detailedReport.verificationStatus !== "none" ? (
                       <div className="p-5 bg-blue-50 rounded-2xl border border-blue-100 space-y-3">
                         <p className="text-[10px] text-blue-500 font-bold uppercase tracking-widest">
                           Admin Verification Details
@@ -5396,27 +5991,44 @@ function OfficeDashboard() {
                           <div>
                             <span className="font-bold">Status:</span>{" "}
                             <span className="px-2 py-0.5 bg-blue-100 text-blue-800 rounded text-xs font-bold capitalize">
-                              {detailedReport.verificationStatus.replace("_", " ")}
+                              {detailedReport.verificationStatus.replace(
+                                "_",
+                                " ",
+                              )}
                             </span>
                           </div>
                           <div>
-                            <span className="font-bold">Reason:</span> {detailedReport.verificationReason}
+                            <span className="font-bold">Reason:</span>{" "}
+                            {detailedReport.verificationReason}
                           </div>
                           {detailedReport.verificationNotes && (
                             <div>
-                              <span className="font-bold">Notes:</span> {detailedReport.verificationNotes}
+                              <span className="font-bold">Notes:</span>{" "}
+                              {detailedReport.verificationNotes}
                             </div>
                           )}
                           {detailedReport.verificationEvidenceUrl && (
                             <div>
                               <span className="font-bold">Evidence:</span>{" "}
-                              <a href={detailedReport.verificationEvidenceUrl} target="_blank" rel="noreferrer" className="text-blue-600 underline">
+                              <a
+                                href={detailedReport.verificationEvidenceUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="text-blue-600 underline"
+                              >
                                 View Attachment
                               </a>
                             </div>
                           )}
                           <div className="text-xs text-gray-500 border-t pt-2 mt-2 text-left">
-                            Verified by <span className="font-semibold">{detailedReport.verifiedBy}</span> on {new Date(detailedReport.verificationDate).toLocaleString("en-IN")}
+                            Verified by{" "}
+                            <span className="font-semibold">
+                              {detailedReport.verifiedBy}
+                            </span>{" "}
+                            on{" "}
+                            {new Date(
+                              detailedReport.verificationDate,
+                            ).toLocaleString("en-IN")}
                           </div>
                           {detailedReport.legalReviewRequired && (
                             <div className="mt-2 px-3 py-1 bg-purple-100 text-purple-800 border border-purple-200 rounded text-xs font-bold uppercase animate-pulse">
@@ -5426,37 +6038,59 @@ function OfficeDashboard() {
                         </div>
                       </div>
                     ) : (
-                      <form onSubmit={handleVerifyComplaint} className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4">
+                      <form
+                        onSubmit={handleVerifyComplaint}
+                        className="p-5 bg-gray-50 rounded-2xl border border-gray-100 space-y-4"
+                      >
                         <p className="text-[10px] text-gray-600 font-bold uppercase tracking-widest">
                           Verify Complaint & Update Citizen Score
                         </p>
-                        
+
                         {detailedReport.imageFraudFlag && (
                           <div className="p-3 bg-red-100 text-red-800 border border-red-200 rounded-xl text-xs font-bold flex items-center gap-2 animate-pulse">
                             <span>⚠️</span>
-                            <span>IMAGE FRAUD WARNING: Duplicate Image Detected! Needs Verification.</span>
+                            <span>
+                              IMAGE FRAUD WARNING: Duplicate Image Detected!
+                              Needs Verification.
+                            </span>
                           </div>
                         )}
 
                         <div className="space-y-3 text-left">
                           <div>
-                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Decision *</label>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                              Verification Decision *
+                            </label>
                             <select
                               value={vStatus}
                               onChange={(e) => setVStatus(e.target.value)}
                               className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500 font-bold"
                             >
-                              <option value="genuine">Genuine Complaint (+10 Pts)</option>
-                              <option value="partially_valid">Partially Valid Complaint (+10 Pts)</option>
-                              <option value="duplicate">Duplicate Complaint (-20 Pts)</option>
-                              <option value="false">False Complaint (-20 Pts + Strike)</option>
-                              <option value="misleading">Misleading Complaint (-20 Pts + Strike)</option>
-                              <option value="spam">Spam Complaint (-20 Pts + Strike)</option>
+                              <option value="genuine">
+                                Genuine Complaint (+10 Pts)
+                              </option>
+                              <option value="partially_valid">
+                                Partially Valid Complaint (+10 Pts)
+                              </option>
+                              <option value="duplicate">
+                                Duplicate Complaint (-20 Pts)
+                              </option>
+                              <option value="false">
+                                False Complaint (-20 Pts + Strike)
+                              </option>
+                              <option value="misleading">
+                                Misleading Complaint (-20 Pts + Strike)
+                              </option>
+                              <option value="spam">
+                                Spam Complaint (-20 Pts + Strike)
+                              </option>
                             </select>
                           </div>
 
                           <div>
-                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Written Reason *</label>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                              Written Reason *
+                            </label>
                             <input
                               type="text"
                               required
@@ -5468,7 +6102,9 @@ function OfficeDashboard() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Verification Notes</label>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                              Verification Notes
+                            </label>
                             <textarea
                               placeholder="Additional details / investigation log"
                               value={vNotes}
@@ -5479,7 +6115,9 @@ function OfficeDashboard() {
                           </div>
 
                           <div>
-                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">Evidence Reference URL / File Link</label>
+                            <label className="block text-xs font-black text-gray-700 uppercase mb-1">
+                              Evidence Reference URL / File Link
+                            </label>
                             <input
                               type="text"
                               placeholder="e.g. http://evidence-image-url.com"
@@ -5494,10 +6132,15 @@ function OfficeDashboard() {
                               type="checkbox"
                               id="legalReviewCheck"
                               checked={vLegalReview}
-                              onChange={(e) => setVLegalReview(e.target.checked)}
+                              onChange={(e) =>
+                                setVLegalReview(e.target.checked)
+                              }
                               className="w-4 h-4 text-purple-600 focus:ring-purple-500 border-gray-300 rounded"
                             />
-                            <label htmlFor="legalReviewCheck" className="text-xs font-bold text-gray-700 uppercase cursor-pointer select-none">
+                            <label
+                              htmlFor="legalReviewCheck"
+                              className="text-xs font-bold text-gray-700 uppercase cursor-pointer select-none"
+                            >
                               ⚖️ Flag for Legal Review (Escalate Severe Misuse)
                             </label>
                           </div>
@@ -5520,8 +6163,8 @@ function OfficeDashboard() {
                     <span>🔒 Locked for Legal Review</span>
                   </div>
                 ) : (!selectedReport.vehicle ||
-                  selectedReport.vehicle === "Not Assigned") &&
-                selectedReport.status !== "resolved" ? (
+                    selectedReport.vehicle === "Not Assigned") &&
+                  selectedReport.status !== "resolved" ? (
                   <div className="space-y-4">
                     <label className="text-sm font-black text-gray-800 ml-1">
                       Quick Dispatch
@@ -5661,11 +6304,10 @@ function OfficeDashboard() {
             </form>
           </div>
         </div>
-       )}
+      )}
       {showEscalationModal && selectedEscalation && (
         <div className="fixed inset-0 bg-black/60 z-50 flex items-center justify-center p-4 overflow-y-auto">
           <div className="bg-white rounded-3xl p-6 w-full max-w-4xl max-h-[90vh] overflow-y-auto shadow-2xl relative">
-            
             <button
               onClick={() => {
                 setShowEscalationModal(false);
@@ -5677,7 +6319,8 @@ function OfficeDashboard() {
             </button>
 
             <h2 className="text-2xl font-bold text-gray-800 mb-6 flex items-center gap-2">
-              ⚠️ Escalation Detail Timeline - #SM{selectedEscalation._id.slice(-6).toUpperCase()}
+              ⚠️ Escalation Detail Timeline - #SM
+              {selectedEscalation._id.slice(-6).toUpperCase()}
             </h2>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
@@ -5690,23 +6333,52 @@ function OfficeDashboard() {
                   />
                 </div>
                 <div className="bg-gray-50 p-4 rounded-xl space-y-2">
-                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Type:</span> {selectedEscalation.complaintType}</p>
-                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Location:</span> {selectedEscalation.area}</p>
-                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Description:</span> {selectedEscalation.description}</p>
-                  <p className="text-sm text-gray-600"><span className="font-bold text-gray-700">Days Pending:</span> {selectedEscalation.pendingDays || 0} days</p>
                   <p className="text-sm text-gray-600">
-                    <span className="font-bold text-gray-700">Status:</span>{" "}
-                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold uppercase">{selectedEscalation.status}</span>
+                    <span className="font-bold text-gray-700">Type:</span>{" "}
+                    {selectedEscalation.complaintType}
                   </p>
                   <p className="text-sm text-gray-600">
-                    <span className="font-bold text-gray-700">Public Shared Eligible:</span>{" "}
-                    <span className={`px-2 py-0.5 rounded text-xs font-bold ${selectedEscalation.publicEscalationEligible ? 'bg-red-100 text-red-700' : 'bg-gray-100 text-gray-600'}`}>
-                      {selectedEscalation.publicEscalationEligible ? "YES" : "NO"}
+                    <span className="font-bold text-gray-700">Location:</span>{" "}
+                    {selectedEscalation.area}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">
+                      Description:
+                    </span>{" "}
+                    {selectedEscalation.description}
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">
+                      Days Pending:
+                    </span>{" "}
+                    {selectedEscalation.pendingDays || 0} days
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">Status:</span>{" "}
+                    <span className="px-2 py-0.5 rounded bg-blue-100 text-blue-700 text-xs font-bold uppercase">
+                      {selectedEscalation.status}
+                    </span>
+                  </p>
+                  <p className="text-sm text-gray-600">
+                    <span className="font-bold text-gray-700">
+                      Public Shared Eligible:
+                    </span>{" "}
+                    <span
+                      className={`px-2 py-0.5 rounded text-xs font-bold ${selectedEscalation.publicEscalationEligible ? "bg-red-100 text-red-700" : "bg-gray-100 text-gray-600"}`}
+                    >
+                      {selectedEscalation.publicEscalationEligible
+                        ? "YES"
+                        : "NO"}
                     </span>
                   </p>
                   <div className="pt-3">
-                    <button 
-                      onClick={() => window.open(`${API_BASE_URL}/complaint/share-card/${selectedEscalation._id}`, '_blank')}
+                    <button
+                      onClick={() =>
+                        window.open(
+                          `${API_BASE_URL}/complaint/share-card/${selectedEscalation._id}`,
+                          "_blank",
+                        )
+                      }
                       className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-bold text-xs hover:from-blue-700 hover:to-indigo-700 transition-all shadow"
                     >
                       📢 View Social Media Share Card
@@ -5716,25 +6388,68 @@ function OfficeDashboard() {
               </div>
 
               <div className="space-y-6">
-                <h3 className="text-lg font-bold text-gray-800">📊 JAES Escalation Stages</h3>
+                <h3 className="text-lg font-bold text-gray-800">
+                  📊 JAES Escalation Stages
+                </h3>
                 <div className="relative border-l-2 border-gray-200 pl-6 ml-4 space-y-6">
-                  
                   {[
-                    { level: 1, name: "Driver / Worker", staff: selectedEscalation.driverId?.name || selectedEscalation.vehicle || "Assigned Driver" },
-                    { level: 2, name: "Area Supervisor", staff: selectedEscalation.supervisorId?.name || "Area Supervisor" },
-                    { level: 3, name: "Zone Officer", staff: selectedEscalation.zoneOfficerId?.name || "Zone Officer" },
-                    { level: 4, name: "Municipal Officer", staff: selectedEscalation.municipalOfficerId?.name || "Municipal Officer" },
-                    { level: 5, name: "City Commissioner", staff: selectedEscalation.commissionerId?.name || "City Commissioner" }
+                    {
+                      level: 1,
+                      name: "Driver / Worker",
+                      staff:
+                        selectedEscalation.driverId?.name ||
+                        selectedEscalation.vehicle ||
+                        "Assigned Driver",
+                    },
+                    {
+                      level: 2,
+                      name: "Area Supervisor",
+                      staff:
+                        selectedEscalation.supervisorId?.name ||
+                        "Area Supervisor",
+                    },
+                    {
+                      level: 3,
+                      name: "Zone Officer",
+                      staff:
+                        selectedEscalation.zoneOfficerId?.name ||
+                        "Zone Officer",
+                    },
+                    {
+                      level: 4,
+                      name: "Municipal Officer",
+                      staff:
+                        selectedEscalation.municipalOfficerId?.name ||
+                        "Municipal Officer",
+                    },
+                    {
+                      level: 5,
+                      name: "City Commissioner",
+                      staff:
+                        selectedEscalation.commissionerId?.name ||
+                        "City Commissioner",
+                    },
                   ].map((stage) => {
-                    const isActive = selectedEscalation.currentEscalationLevel >= stage.level;
+                    const isActive =
+                      selectedEscalation.currentEscalationLevel >= stage.level;
                     return (
                       <div key={stage.level} className="relative">
-                        <span className={`absolute -left-[33px] top-1 w-4 h-4 rounded-full border-2 ${isActive ? 'bg-red-500 border-red-200 shadow-lg' : 'bg-gray-100 border-gray-300'}`}></span>
+                        <span
+                          className={`absolute -left-[33px] top-1 w-4 h-4 rounded-full border-2 ${isActive ? "bg-red-500 border-red-200 shadow-lg" : "bg-gray-100 border-gray-300"}`}
+                        ></span>
                         <div>
-                          <p className={`text-sm font-bold ${isActive ? 'text-gray-900' : 'text-gray-400'}`}>Level {stage.level}: {stage.name}</p>
-                          <p className="text-xs text-gray-500">Responsible: {stage.staff}</p>
+                          <p
+                            className={`text-sm font-bold ${isActive ? "text-gray-900" : "text-gray-400"}`}
+                          >
+                            Level {stage.level}: {stage.name}
+                          </p>
+                          <p className="text-xs text-gray-500">
+                            Responsible: {stage.staff}
+                          </p>
                           <p className="text-[10px] font-bold text-blue-600 mt-0.5">
-                            {isActive ? "⚠️ ACTIVE RESPONSIBILITY" : "⏳ PENDING ESCALATION"}
+                            {isActive
+                              ? "⚠️ ACTIVE RESPONSIBILITY"
+                              : "⏳ PENDING ESCALATION"}
                           </p>
                         </div>
                       </div>
@@ -5743,31 +6458,44 @@ function OfficeDashboard() {
                 </div>
 
                 <div className="mt-4 pt-4 border-t">
-                  <h4 className="text-sm font-bold text-gray-800 mb-2">📋 Audit History Trail Logs:</h4>
+                  <h4 className="text-sm font-bold text-gray-800 mb-2">
+                    📋 Audit History Trail Logs:
+                  </h4>
                   <div className="max-h-48 overflow-y-auto space-y-2 pr-2">
-                    {selectedEscalation.escalationHistory && selectedEscalation.escalationHistory.length > 0 ? (
+                    {selectedEscalation.escalationHistory &&
+                    selectedEscalation.escalationHistory.length > 0 ? (
                       selectedEscalation.escalationHistory.map((log, index) => (
-                        <div key={index} className="bg-gray-50 p-2 rounded border text-xs flex justify-between gap-4">
+                        <div
+                          key={index}
+                          className="bg-gray-50 p-2 rounded border text-xs flex justify-between gap-4"
+                        >
                           <div>
-                            <span className="font-bold text-gray-700">{log.statusChange || "Status Change"}</span>
+                            <span className="font-bold text-gray-700">
+                              {log.statusChange || "Status Change"}
+                            </span>
                             <p className="text-gray-500 mt-1">
-                              From Level {log.prevLevel} ({log.prevAuthority}) &rarr; Level {log.newLevel} ({log.newAuthority})
+                              From Level {log.prevLevel} ({log.prevAuthority})
+                              &rarr; Level {log.newLevel} ({log.newAuthority})
                             </p>
                           </div>
                           <span className="text-[10px] text-gray-400 whitespace-nowrap self-center">
-                            {new Date(log.escalationTime).toLocaleDateString()} {new Date(log.escalationTime).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
+                            {new Date(log.escalationTime).toLocaleDateString()}{" "}
+                            {new Date(log.escalationTime).toLocaleTimeString(
+                              [],
+                              { hour: "2-digit", minute: "2-digit" },
+                            )}
                           </span>
                         </div>
                       ))
                     ) : (
-                      <p className="text-xs text-gray-400">No logs captured yet.</p>
+                      <p className="text-xs text-gray-400">
+                        No logs captured yet.
+                      </p>
                     )}
                   </div>
                 </div>
-
               </div>
             </div>
-
           </div>
         </div>
       )}
@@ -5799,7 +6527,13 @@ function OfficeDashboard() {
 
 export default function OfficeDashboardWithSuspense() {
   return (
-    <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500 font-medium">Loading Dashboard...</div>}>
+    <Suspense
+      fallback={
+        <div className="min-h-screen flex items-center justify-center bg-gray-50 text-gray-500 font-medium">
+          Loading Dashboard...
+        </div>
+      }
+    >
       <OfficeDashboard />
     </Suspense>
   );
