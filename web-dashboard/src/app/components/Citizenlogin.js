@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from 'react';
 import { ChevronLeft, MapPin, Loader } from 'lucide-react';
 import axios from 'axios';
+import { API_BASE_URL } from '@/config/api';
 
 export default function CitizenLogin({ portal, onBack, router }) {
   // 1. Hydration Fix: Ensure component only renders on client
@@ -43,7 +44,7 @@ export default function CitizenLogin({ portal, onBack, router }) {
   const fetchOffices = async () => {
     setLoadingCities(true);
     try {
-      const res = await axios.get("http://localhost:5001/public-list");
+      const res = await axios.get(`${API_BASE_URL}/public-list`);
       if (res.data && res.data.success) {
         setOfficeList(res.data.cities);
       }
@@ -113,7 +114,7 @@ export default function CitizenLogin({ portal, onBack, router }) {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5001/citizen/login", {
+      const res = await axios.post(`${API_BASE_URL}/citizen/login`, {
         username: username,
         password: password,
       });
@@ -163,7 +164,7 @@ export default function CitizenLogin({ portal, onBack, router }) {
     setLoading(true);
 
     try {
-      const res = await axios.post("http://localhost:5001/citizen/register", {
+      const res = await axios.post(`${API_BASE_URL}/citizen/register`, {
         fullName: regData.fullName,
         email: regData.email,
         phone: regData.phone,

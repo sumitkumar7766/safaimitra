@@ -3,6 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { useRouter } from "next/navigation";
 import axios from "axios";
 import { Users, Building2, UserCog, Activity, Plus, Edit2, Trash2, Power, X, Menu, Settings, LogOut, User, Shield, Key, Mail, Phone, MapPin, Save, UserX } from 'lucide-react';
+import { API_BASE_URL } from '@/config/api';
 
 import dynamic from "next/dynamic";
 import { io } from "socket.io-client";
@@ -103,7 +104,7 @@ export default function OfficeDashboard() {
     // ==========================================
     useEffect(() => {
         // 1. Connect to Backend
-        const socket = io("http://localhost:5001");
+        const socket = io(API_BASE_URL);
 
         // 2. Listen for Admin Updates (Add/Delete)
         socket.on("admin_list_update", (payload) => {
@@ -150,7 +151,7 @@ export default function OfficeDashboard() {
             try {
                 const token = localStorage.getItem("token"); // ya jahan tumne save kiya ho
 
-                const res = await axios.get("http://localhost:5001/office", {
+                const res = await axios.get(`${API_BASE_URL}/office`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -185,7 +186,7 @@ export default function OfficeDashboard() {
             try {
                 const token = localStorage.getItem("token");
 
-                const res = await axios.get("http://localhost:5001/admin", {
+                const res = await axios.get(`${API_BASE_URL}/admin`, {
                     headers: {
                         Authorization: `Bearer ${token}`,
                     },
@@ -245,7 +246,7 @@ export default function OfficeDashboard() {
             const token = localStorage.getItem("token");
 
             await axios.delete(
-                `http://localhost:5001/office/delete/${officeId}`,
+                `${API_BASE_URL}/office/delete/${officeId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -273,7 +274,7 @@ export default function OfficeDashboard() {
             const token = localStorage.getItem("token");
 
             await axios.delete(
-                `http://localhost:5001/admin/delete/${adminId}`,
+                `${API_BASE_URL}/admin/delete/${adminId}`,
                 {
                     headers: {
                         Authorization: `Bearer ${token}`,
@@ -299,7 +300,7 @@ export default function OfficeDashboard() {
     const router = useRouter();
     const handleLogout = async () => {
         console.log("Logging out...");
-        await axios.post("http://localhost:5001/admin/logout");
+        await axios.post(`${API_BASE_URL}/admin/logout`);
 
         // Clear client-side data
         localStorage.removeItem("token");
@@ -350,7 +351,7 @@ export default function OfficeDashboard() {
             };
 
             const res = await axios.put(
-                `http://localhost:5001/office/update/${editOfficeId}`,
+                `${API_BASE_URL}/office/update/${editOfficeId}`,
                 payload,
                 {
                     headers: {

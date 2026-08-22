@@ -6,6 +6,7 @@ import { useRouter, useSearchParams } from "next/navigation";
 import dynamic from "next/dynamic";
 import axios from "axios";
 import { io } from "socket.io-client";
+import { API_BASE_URL } from "@/config/api";
 
 // --- ERROR FIX START ---
 // We must import hooks directly. We cannot use dynamic() for hooks like useMap.
@@ -78,6 +79,68 @@ export default function CitizenPage() {
   const [dustbins, setDustbins] = useState([]);
   const [L, setL] = useState(null);
 
+  // Citizen Scorecard and Leaderboard States
+  const [scorecard, setScorecard] = useState(null);
+  const [cityLeaderboard, setCityLeaderboard] = useState([]);
+  const [areaLeaderboard, setAreaLeaderboard] = useState([]);
+  const [appealReason, setAppealReason] = useState("");
+  const [appealEvidenceUrl, setAppealEvidenceUrl] = useState("");
+  const [appealStatus, setAppealStatus] = useState("idle");
+  const [parsedUser, setParsedUser] = useState(null);
+
+  const fetchScorecardAndLeaderboard = async () => {
+    try {
+      const userId = localStorage.getItem("userId");
+      if (!userId) return;
+      const token = localStorage.getItem("token");
+
+      const scorecardRes = await axios.get(
+        `${API_BASE_URL}/citizen-system/profile-scorecard/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (scorecardRes.data.success) {
+        setScorecard(scorecardRes.data.scorecard);
+      }
+
+      const leaderboardRes = await axios.get(
+        `${API_BASE_URL}/citizen-system/leaderboard/${userId}`,
+        { headers: { Authorization: `Bearer ${token}` } }
+      );
+      if (leaderboardRes.data.success) {
+        setCityLeaderboard(leaderboardRes.data.cityLeaderboard || []);
+        setAreaLeaderboard(leaderboardRes.data.areaLeaderboard || []);
+      }
+    } catch (err) {
+      console.error("Error fetching citizen stats:", err);
+    }
+  };
+
+  const handleAppealSubmit = async (e) => {
+    e.preventDefault();
+    if (!appealReason.trim()) return alert("Please write a reason for your appeal!");
+    setAppealStatus("submitting");
+    try {
+      const token = localStorage.getItem("token");
+      const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/appeal`, {
+        reason: appealReason,
+        evidenceUrl: appealEvidenceUrl
+      }, {
+        headers: { Authorization: `Bearer ${token}` }
+      });
+      if (res.data.success) {
+        setAppealStatus("success");
+        setAppealReason("");
+        setAppealEvidenceUrl("");
+        alert("Your appeal has been submitted successfully for verification.");
+        fetchScorecardAndLeaderboard();
+      }
+    } catch (err) {
+      console.error("Appeal Error:", err);
+      setAppealStatus("error");
+      alert(err.response?.data?.message || "Failed to submit appeal. Please try again.");
+    }
+  };
+
   // 🔥 FIX: Use useRef to persist socket across re-renders
   const socketRef = useRef(null);
 
@@ -88,7 +151,7 @@ export default function CitizenPage() {
       if (!userId) return;
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/complaint/history/${userId}`,
+        `${API_BASE_URL}/citizen/complaint/history/${userId}`,
         { headers: { Authorization: `Bearer ${token}` } },
       );
 
@@ -106,7 +169,7 @@ export default function CitizenPage() {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/active-vehicles-nearby?lat=${lat}&lng=${lng}`,
+        `${API_BASE_URL}/citizen/active-vehicles-nearby?lat=${lat}&lng=${lng}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -127,7 +190,7 @@ export default function CitizenPage() {
       const token = localStorage.getItem("token");
 
       const res = await axios.get(
-        `http://localhost:5001/citizen/area-stats?lat=${lat}&lng=${lng}`,
+        `${API_BASE_URL}/citizen/area-stats?lat=${lat}&lng=${lng}`,
         {
           headers: {
             Authorization: `Bearer ${token}`,
@@ -154,7 +217,7 @@ export default function CitizenPage() {
       }
 
       const res = await fetch(
-        `http://localhost:5001/citizen/dustbin/list/${officeId}`,
+        `${API_BASE_URL}/citizen/dustbin/list/${officeId}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -185,7 +248,7 @@ export default function CitizenPage() {
           socketRef.current = null;
         }
 
-        await axios.post("http://localhost:5001/citizen/logout");
+        await axios.post(`${API_BASE_URL}/citizen/logout`);
 
         localStorage.removeItem("token");
         localStorage.removeItem("user");
@@ -212,6 +275,7 @@ export default function CitizenPage() {
     checkLocationPermission();
     fetchDustbins();
     fetchMyComplaints();
+    fetchScorecardAndLeaderboard();
 
     // B. Leaflet Fix
     (async function initLeaflet() {
@@ -230,11 +294,15 @@ export default function CitizenPage() {
 
     // 🔥 C. FIXED SOCKET CONNECTION LOGIC
     const userStr = localStorage.getItem("user");
-    const parsedUser = userStr ? JSON.parse(userStr) : null;
+    const parsedUserObj = userStr ? JSON.parse(userStr) : null;
+    if (parsedUserObj) {
+      setParsedUser(parsedUserObj);
+    }
+    const parsedUser = parsedUserObj;
 
     if (parsedUser && parsedUser._id) {
       // Create socket connection with proper options
-      socketRef.current = io("http://localhost:5001", {
+      socketRef.current = io(API_BASE_URL, {
         transports: ["websocket", "polling"], // Allow both transport methods
         reconnection: true,
         reconnectionAttempts: 5,
@@ -263,6 +331,7 @@ export default function CitizenPage() {
         socket.emit("join_room", `citizen_${parsedUser._id}`);
         // Refresh data
         fetchMyComplaints();
+        fetchScorecardAndLeaderboard();
       });
 
       // 🔔 4. Event: Complaint Resolved
@@ -275,8 +344,9 @@ export default function CitizenPage() {
           imageUrl: data.imageUrl,
         });
 
-        // Refresh complaint list
+        // Refresh complaint list and scorecard
         fetchMyComplaints();
+        fetchScorecardAndLeaderboard();
 
         // Play sound
         try {
@@ -302,7 +372,15 @@ export default function CitizenPage() {
         fetchMyComplaints();
       });
 
-      // 🔔 7. Connection Error Handler
+      // 🔔 7. Event: Real-time Point/Verification Notifications
+      socket.on("complaint_notification", (payload) => {
+        console.log("🔔 Scorecard Notification Received:", payload);
+        alert(`🔔 Notification: ${payload.message}`);
+        fetchScorecardAndLeaderboard();
+        fetchMyComplaints();
+      });
+
+      // 🔔 8. Connection Error Handler
       socket.on("connect_error", (error) => {
         console.error("❌ Socket Connection Error:", error);
       });
@@ -613,7 +691,7 @@ export default function CitizenPage() {
         }
 
         const res = await axios.post(
-          "http://localhost:5001/api/predict/complaint",
+          `${API_BASE_URL}/api/predict/complaint`,
           formData,
           {
             headers: {
@@ -683,7 +761,7 @@ export default function CitizenPage() {
     try {
       const token = localStorage.getItem("token");
       await axios.post(
-        "http://localhost:5001/citizen/complaint/create",
+        `${API_BASE_URL}/citizen/complaint/create`,
         formData,
         {
           headers: {
@@ -755,6 +833,11 @@ export default function CitizenPage() {
   };
 
   const tryOpenCameraCitizen = () => {
+    if (scorecard?.isSuspended) {
+      alert("🚫 Access Denied: Your account is suspended due to strike violations. You cannot report issues. Please submit an appeal in the 'My Scorecard' tab.");
+      return;
+    }
+
     if (!selectedBin) {
       alert("🗑️ Please select a dustbin first");
       return;
@@ -914,7 +997,7 @@ export default function CitizenPage() {
 
         {/* Tabs */}
         <div className="container mx-auto px-5 pb-4">
-          <div className="flex gap-3">
+          <div className="flex flex-wrap md:flex-nowrap gap-3">
             <button
               onClick={() => setSelectedTab("report")}
               className={`flex-1 py-3 rounded-xl font-semibold transition-all transform ${
@@ -935,14 +1018,51 @@ export default function CitizenPage() {
             >
               🗺️ Track Status
             </button>
+            <button
+              onClick={() => {
+                setSelectedTab("ranks");
+                fetchScorecardAndLeaderboard();
+              }}
+              className={`flex-1 py-3 rounded-xl font-semibold transition-all transform ${
+                selectedTab === "ranks"
+                  ? "bg-white text-blue-800 shadow-lg scale-105"
+                  : "bg-white/10 text-white/70 hover:bg-white/20 hover:scale-102"
+              }`}
+            >
+              🏆 Leaderboard
+            </button>
+            <button
+              onClick={() => {
+                setSelectedTab("profile");
+                fetchScorecardAndLeaderboard();
+              }}
+              className={`flex-1 py-3 rounded-xl font-semibold transition-all transform ${
+                selectedTab === "profile"
+                  ? "bg-white text-blue-800 shadow-lg scale-105"
+                  : "bg-white/10 text-white/70 hover:bg-white/20 hover:scale-102"
+              }`}
+            >
+              👤 My Scorecard
+            </button>
           </div>
         </div>
       </header>
 
       {/* Main Content */}
       <main className="container mx-auto px-5 py-6 pb-32 relative z-10">
-        {selectedTab === "report" ? (
+        {selectedTab === "report" && (
           <>
+            {scorecard?.isSuspended && (
+              <div className="bg-red-100 border-2 border-red-300 rounded-3xl p-5 mb-6 text-red-900 shadow-lg flex items-center gap-4 animate-pulse relative z-20">
+                <span className="text-4xl">⚠️</span>
+                <div>
+                  <h3 className="font-extrabold text-base">YOUR ACCOUNT IS SUSPENDED</h3>
+                  <p className="text-xs text-red-800">
+                    You have been suspended from reporting new issues due to strike violations. You can appeal this suspension under the "My Scorecard" tab.
+                  </p>
+                </div>
+              </div>
+            )}
             {/* Step 1: Location Status Card */}
             <div className="bg-white rounded-3xl shadow-xl overflow-hidden mb-6 relative z-20">
               <div className="bg-blue-600 p-5">
@@ -1209,12 +1329,7 @@ export default function CitizenPage() {
                 )}
 
                 <div
-                  onClick={() => {
-                    if (selectedBin) fileInputRef.current?.click();
-                    else
-                      alert("🚫 Please select a dustbin from the map first!");
-                  }}
-                  // onClick={tryOpenCameraCitizen}
+                  onClick={tryOpenCameraCitizen}
 
                   className={`w-full h-60 rounded-2xl border-3 border-dashed overflow-hidden transition-all group
                     ${
@@ -1430,7 +1545,9 @@ export default function CitizenPage() {
               </ul>
             </div>
           </>
-        ) : (
+        )}
+
+        {selectedTab === "track" && (
           <>
             {/* 📜 Complaint History Section */}
             <div className="bg-white rounded-3xl p-6 shadow-xl mb-6 relative z-20">
@@ -1754,6 +1871,271 @@ export default function CitizenPage() {
               </p>
             </div>
           </>
+        )}
+
+        {/* ==========================================
+            🏆 CITIZEN RANKS / LEADERBOARD VIEW
+           ========================================== */}
+        {selectedTab === "ranks" && (
+          <div className="space-y-6 relative z-20 text-black">
+            {/* Header Card */}
+            <div className="bg-gradient-to-r from-blue-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl">
+              <div className="flex items-center gap-3 mb-2">
+                <span className="text-3xl">🏆</span>
+                <h2 className="text-2xl font-black tracking-tight">Citizen Leaderboard</h2>
+              </div>
+              <p className="text-blue-100 text-sm">
+                Compete with other citizens to make your area cleaner. Earn points by reporting valid waste dumps.
+              </p>
+            </div>
+
+            {/* Side by side columns */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* City Leaderboard */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <span>🌍</span> City-Wide Top 10
+                </h3>
+                {cityLeaderboard.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">No leaderboard data available.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {cityLeaderboard.map((citizen, idx) => {
+                      const isMe = citizen._id === localStorage.getItem("userId");
+                      return (
+                        <div
+                          key={citizen._id}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl transition-all ${
+                            isMe ? "bg-amber-50 border-2 border-amber-300 shadow-md animate-pulse" : "bg-gray-50 hover:bg-gray-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center font-black text-xs text-white" style={{
+                              backgroundColor: idx === 0 ? "#f59e0b" : idx === 1 ? "#9ca3af" : idx === 2 ? "#b45309" : "#374151"
+                            }}>
+                              {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                            </span>
+                            <div>
+                              <p className={`text-sm font-bold text-gray-800 ${isMe ? "text-amber-900" : ""}`}>
+                                {citizen.fullName} {isMe && <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-black uppercase">You</span>}
+                              </p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">{citizen.citizenLevel || "Beginner"}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-black text-blue-600">{citizen.trustScore} Pts</span>
+                            <p className="text-[10px] text-gray-500">{citizen.validComplaints} valid reports</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+
+              {/* Area Leaderboard */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <span>📍</span> Local Area Top 10 ({parsedUser?.cityName || address?.split(",")[0] || "My Area"})
+                </h3>
+                {areaLeaderboard.length === 0 ? (
+                  <p className="text-sm text-gray-500 text-center py-6">No local leaderboard data available.</p>
+                ) : (
+                  <div className="space-y-3">
+                    {areaLeaderboard.map((citizen, idx) => {
+                      const isMe = citizen._id === localStorage.getItem("userId");
+                      return (
+                        <div
+                          key={citizen._id}
+                          className={`flex items-center justify-between p-3.5 rounded-2xl transition-all ${
+                            isMe ? "bg-amber-50 border-2 border-amber-300 shadow-md animate-pulse" : "bg-gray-50 hover:bg-gray-100"
+                          }`}
+                        >
+                          <div className="flex items-center gap-3">
+                            <span className="w-7 h-7 rounded-full flex items-center justify-center font-black text-xs text-white" style={{
+                              backgroundColor: idx === 0 ? "#f59e0b" : idx === 1 ? "#9ca3af" : idx === 2 ? "#b45309" : "#374151"
+                            }}>
+                              {idx === 0 ? "🥇" : idx === 1 ? "🥈" : idx === 2 ? "🥉" : idx + 1}
+                            </span>
+                            <div>
+                              <p className={`text-sm font-bold text-gray-800 ${isMe ? "text-amber-900" : ""}`}>
+                                {citizen.fullName} {isMe && <span className="text-[10px] bg-amber-200 text-amber-800 px-1.5 py-0.5 rounded font-black uppercase">You</span>}
+                              </p>
+                              <p className="text-[10px] text-gray-400 font-bold uppercase">{citizen.citizenLevel || "Beginner"}</p>
+                            </div>
+                          </div>
+                          <div className="text-right">
+                            <span className="text-sm font-black text-blue-600">{citizen.trustScore} Pts</span>
+                            <p className="text-[10px] text-gray-500">{citizen.validComplaints} valid reports</p>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </div>
+            </div>
+          </div>
+        )}
+
+        {/* ==========================================
+            👤 MY SCORECARD & PROFILE DETAILS VIEW
+           ========================================== */}
+        {selectedTab === "profile" && (
+          <div className="space-y-6 relative z-20 text-black">
+            {/* Header Card */}
+            <div className="bg-gradient-to-r from-purple-600 to-indigo-700 rounded-3xl p-6 text-white shadow-xl flex flex-col md:flex-row justify-between items-start md:items-center gap-4">
+              <div>
+                <div className="flex items-center gap-3 mb-2">
+                  <span className="text-3xl">👤</span>
+                  <h2 className="text-2xl font-black tracking-tight">{parsedUser?.fullName || "My Profile"}</h2>
+                </div>
+                <p className="text-purple-100 text-sm">{parsedUser?.email || "Citizen Contributor"}</p>
+              </div>
+              <div className="bg-white/20 px-4 py-2 rounded-2xl border border-white/30 backdrop-blur-sm">
+                <span className="text-xs font-bold uppercase block tracking-wider text-purple-200">Current Level</span>
+                <span className="text-base font-black text-white">{scorecard?.citizenLevel || "Beginner Citizen"}</span>
+              </div>
+            </div>
+
+            {/* Scorecard Stats Grid */}
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 text-center">
+                <span className="text-3xl block mb-2">💎</span>
+                <span className="text-sm font-bold text-gray-500 block uppercase text-[10px]">Trust Score</span>
+                <span className="text-2xl font-black text-blue-600">{scorecard?.trustScore ?? 0} Pts</span>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 text-center">
+                <span className="text-3xl block mb-2">📈</span>
+                <span className="text-sm font-bold text-gray-500 block uppercase text-[10px]">Success Rate</span>
+                <span className="text-2xl font-black text-green-600">{scorecard?.successRate || "100%"}</span>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 text-center">
+                <span className="text-3xl block mb-2">🥇</span>
+                <span className="text-sm font-bold text-gray-500 block uppercase text-[10px]">Area Rank</span>
+                <span className="text-2xl font-black text-amber-500">{scorecard?.areaRank || "#N/A"}</span>
+              </div>
+              <div className="bg-white rounded-2xl p-5 shadow-lg border border-gray-100 text-center">
+                <span className="text-3xl block mb-2">🌍</span>
+                <span className="text-sm font-bold text-gray-500 block uppercase text-[10px]">City Rank</span>
+                <span className="text-2xl font-black text-amber-600">{scorecard?.cityRank || "#N/A"}</span>
+              </div>
+            </div>
+
+            {/* Detail stats & Strike meter */}
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+              {/* Detailed Breakdown */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
+                <h3 className="text-lg font-bold text-gray-800 mb-4">📊 Contribution History</h3>
+                <div className="space-y-4">
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600 font-medium">Valid Verified Complaints</span>
+                    <span className="text-sm font-black text-green-600">+{scorecard?.validComplaints ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2 border-b border-gray-100">
+                    <span className="text-sm text-gray-600 font-medium">False / Rejected Complaints</span>
+                    <span className="text-sm font-black text-red-500">-{scorecard?.falseComplaints ?? 0}</span>
+                  </div>
+                  <div className="flex justify-between items-center py-2">
+                    <span className="text-sm text-gray-600 font-medium">Suspension Status</span>
+                    <span className={`text-xs font-black px-2.5 py-1 rounded-full uppercase tracking-wider ${
+                      scorecard?.isSuspended ? "bg-red-100 text-red-700 animate-pulse" : "bg-green-100 text-green-700"
+                    }`}>
+                      {scorecard?.isSuspended ? "Suspended" : "Active"}
+                    </span>
+                  </div>
+                </div>
+              </div>
+
+              {/* Strike Warning Meter */}
+              <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100 flex flex-col justify-between">
+                <div>
+                  <h3 className="text-lg font-bold text-gray-800 mb-2">⚠️ Active Strikes (Policy Violations)</h3>
+                  <p className="text-xs text-gray-500 mb-4">
+                    Reporting false, duplicate, or spam complaints triggers strike penalties. Accounts with 3 consecutive strikes are suspended.
+                  </p>
+                </div>
+                
+                <div className="flex gap-3 justify-center mb-2">
+                  {[1, 2, 3].map((s) => {
+                    const active = (scorecard?.strikeCount ?? 0) >= s;
+                    return (
+                      <div
+                        key={s}
+                        className={`flex-1 py-3.5 rounded-2xl border-2 text-center text-xs font-black uppercase tracking-widest transition-all ${
+                          active
+                            ? "bg-red-500 border-red-600 text-white shadow-md animate-pulse"
+                            : "bg-gray-50 border-gray-200 text-gray-400"
+                        }`}
+                      >
+                        Strike {s}
+                      </div>
+                    );
+                  })}
+                </div>
+              </div>
+            </div>
+
+            {/* Badges showcase */}
+            <div className="bg-white rounded-3xl p-6 shadow-xl border border-gray-100">
+              <h3 className="text-lg font-bold text-gray-800 mb-4">🏅 Earned Badges & Community Titles</h3>
+              {(!scorecard?.badges || scorecard.badges.length === 0) ? (
+                <p className="text-sm text-gray-500 py-4 text-center">No badges unlocked yet. Keep reporting to earn badges!</p>
+              ) : (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
+                  {scorecard.badges.map((badge, idx) => (
+                    <div key={idx} className="bg-gradient-to-br from-purple-50 to-indigo-50 border border-purple-100 rounded-2xl p-4 text-center hover:scale-105 transition-transform duration-300">
+                      <span className="text-3xl block mb-2">⭐</span>
+                      <p className="text-xs font-bold text-purple-900">{badge}</p>
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Suspension Appeal Box */}
+            {scorecard?.isSuspended && (
+              <div className="bg-red-50 border-2 border-red-200 rounded-3xl p-6 shadow-lg">
+                <h3 className="text-lg font-bold text-red-700 mb-2 flex items-center gap-2">
+                  <span>⚖️</span> Submit Suspension Appeal
+                </h3>
+                <p className="text-xs text-red-600 mb-4">
+                  If you believe your account was suspended in error (e.g. false strikes), submit an official appeal request explaining the case and providing evidence URL reference.
+                </p>
+
+                <form onSubmit={handleAppealSubmit} className="space-y-4">
+                  <div>
+                    <label className="block text-xs font-black text-red-700 uppercase mb-1">Appeal Reason *</label>
+                    <textarea
+                      required
+                      rows="3"
+                      value={appealReason}
+                      onChange={(e) => setAppealReason(e.target.value)}
+                      placeholder="Explain in detail why your suspension should be lifted..."
+                      className="w-full bg-white text-black border border-red-200 rounded-lg p-2.5 text-sm outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <div>
+                    <label className="block text-xs font-black text-red-700 uppercase mb-1">Supporting Evidence URL (Optional)</label>
+                    <input
+                      type="text"
+                      value={appealEvidenceUrl}
+                      onChange={(e) => setAppealEvidenceUrl(e.target.value)}
+                      placeholder="e.g. http://imgur.com/my-proof-photo"
+                      className="w-full bg-white text-black border border-red-200 rounded-lg p-2.5 text-sm outline-none focus:border-red-500"
+                    />
+                  </div>
+                  <button
+                    type="submit"
+                    disabled={appealStatus === "submitting"}
+                    className="px-6 py-3 bg-red-600 hover:bg-red-700 text-white font-bold rounded-xl text-sm shadow-md transition-all active:scale-95 disabled:bg-gray-400"
+                  >
+                    {appealStatus === "submitting" ? "Submitting Appeal..." : "Submit Appeal to Municipal Body"}
+                  </button>
+                </form>
+              </div>
+            )}
+          </div>
         )}
       </main>
 

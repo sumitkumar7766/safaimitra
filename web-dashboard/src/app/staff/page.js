@@ -6,6 +6,7 @@ import { useRouter } from "next/navigation";
 import axios from "axios";
 import { io } from "socket.io-client";
 import { useMap } from "react-leaflet";
+import { API_BASE_URL } from "@/config/api";
 
 // Import Leaflet CSS
 import "leaflet/dist/leaflet.css";
@@ -143,7 +144,7 @@ export default function VehiclePage() {
     const initializeSocket = async () => {
       try {
         // 1. Get User Data to find Driver ID
-        const res = await axios.get("http://localhost:5001/staff/userdata", {
+        const res = await axios.get(`${API_BASE_URL}/staff/userdata`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -151,7 +152,7 @@ export default function VehiclePage() {
           const userId = res.data.user._id;
 
           // 2. Connect to Backend
-          newSocket = io("http://localhost:5001", {
+          newSocket = io(API_BASE_URL, {
             transports: ["websocket", "polling"],
             reconnectionAttempts: 5,
           });
@@ -281,7 +282,7 @@ export default function VehiclePage() {
         if (token) {
           try {
             await axios.post(
-              "http://localhost:5001/staff/update-vehicle-location",
+              `${API_BASE_URL}/staff/update-vehicle-location`,
               { latitude: lat, longitude: lng },
               { headers: { Authorization: `Bearer ${token}` } },
             );
@@ -301,7 +302,7 @@ export default function VehiclePage() {
     const token = localStorage.getItem("token");
     if (!token) return;
 
-    const BASE_URL = "http://localhost:5001";
+    const BASE_URL = API_BASE_URL;
 
     const sendHeartbeat = async () => {
       try {
@@ -431,7 +432,7 @@ export default function VehiclePage() {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const res = await axios.get("http://localhost:5001/staff/dashboard", {
+        const res = await axios.get(`${API_BASE_URL}/staff/dashboard`, {
           headers: { Authorization: `Bearer ${token}` },
         });
 
@@ -485,7 +486,7 @@ export default function VehiclePage() {
       try {
         const token = localStorage.getItem("token");
         if (!token) return;
-        const res = await axios.get("http://localhost:5001/staff/userdata", {
+        const res = await axios.get(`${API_BASE_URL}/staff/userdata`, {
           headers: { Authorization: `Bearer ${token}` },
         });
         if (res.data.success) setStaff(res.data.user);
@@ -555,7 +556,7 @@ export default function VehiclePage() {
       formData.append("longitude", driverLocation[1]);
 
       const res = await axios.post(
-        "http://localhost:5001/api/predict",
+        `${API_BASE_URL}/api/predict`,
         formData,
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -613,7 +614,7 @@ export default function VehiclePage() {
       formData.append("longitude", driverLocation[1]);
 
       const res = await axios.post(
-        "http://localhost:5001/dustbin/mark-clean",
+        `${API_BASE_URL}/dustbin/mark-clean`,
         formData,
         {
           headers: {
@@ -660,7 +661,7 @@ export default function VehiclePage() {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.put(
-        `http://localhost:5001/dustbin/driver-update-status/${currentStopData.id}`,
+        `${API_BASE_URL}/dustbin/driver-update-status/${currentStopData.id}`,
         { status: "skiped" },
         {
           headers: {
@@ -700,7 +701,7 @@ export default function VehiclePage() {
       const staffId = user;
       console.log("Logging out staff ID:", staffId);
 
-      await axios.post("http://localhost:5001/staff/logout", {
+      await axios.post(`${API_BASE_URL}/staff/logout`, {
         staffId,
       });
 

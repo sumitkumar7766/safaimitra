@@ -35,8 +35,8 @@ import {
 } from "lucide-react";
 import axios from "axios";
 import { useMapEvents } from "react-leaflet";
-// 👇 IMPORT SOCKET CLIENT
 import { io } from "socket.io-client";
+import { API_BASE_URL } from "@/config/api";
 
 // Dynamically import Leaflet components with no SSR
 const MapContainer = dynamic(
@@ -597,7 +597,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
       const res = await fetch(
-        `http://localhost:5001/dustbin/list/${userData._id}`,
+        `${API_BASE_URL}/dustbin/list/${userData._id}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -617,7 +617,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
       const res = await fetch(
-        `http://localhost:5001/vehicle/list/${userData._id}`,
+        `${API_BASE_URL}/vehicle/list/${userData._id}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -637,7 +637,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
       const res = await fetch(
-        `http://localhost:5001/staff/list/${userData._id}`,
+        `${API_BASE_URL}/staff/list/${userData._id}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -657,7 +657,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!userData?._id) return;
       const res = await fetch(
-        `http://localhost:5001/route/list/${userData._id}`,
+        `${API_BASE_URL}/route/list/${userData._id}`,
         {
           headers: {
             "Content-Type": "application/json",
@@ -681,7 +681,7 @@ function OfficeDashboard() {
         return;
       }
       const res = await axios.get(
-        `http://localhost:5001/complaint/all/${officeId}`,
+        `${API_BASE_URL}/complaint/all/${officeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -700,7 +700,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!officeId) return;
       const res = await axios.get(
-        `http://localhost:5001/complaint/escalations/${officeId}`,
+        `${API_BASE_URL}/complaint/escalations/${officeId}`,
         {
           headers: { Authorization: `Bearer ${token}` },
         },
@@ -714,7 +714,7 @@ function OfficeDashboard() {
   const fetchAppeals = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5001/citizen-system/appeals", {
+      const res = await axios.get(`${API_BASE_URL}/citizen-system/appeals`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) setAppeals(res.data.appeals);
@@ -726,7 +726,7 @@ function OfficeDashboard() {
   const fetchAuditLogs = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5001/citizen-system/audit-logs", {
+      const res = await axios.get(`${API_BASE_URL}/citizen-system/audit-logs`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) setAuditLogs(res.data.logs);
@@ -738,7 +738,7 @@ function OfficeDashboard() {
   const fetchCitizens = async () => {
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.get("http://localhost:5001/citizen-system/citizens", {
+      const res = await axios.get(`${API_BASE_URL}/citizen-system/citizens`, {
         headers: { Authorization: `Bearer ${token}` }
       });
       if (res.data.success) setCitizens(res.data.citizens);
@@ -753,7 +753,7 @@ function OfficeDashboard() {
       const token = localStorage.getItem("token");
       if (!token) return;
       try {
-        const res = await fetch("http://localhost:5001/office/userdata", {
+        const res = await fetch(`${API_BASE_URL}/office/userdata`, {
           method: "GET",
           headers: {
             Authorization: `Bearer ${token}`,
@@ -784,7 +784,7 @@ function OfficeDashboard() {
     fetchCitizens();
 
     // 🔥 Connect to Socket.io Server
-    const socket = io("http://localhost:5001");
+    const socket = io(API_BASE_URL);
 
     // --- Socket Listeners ---
 
@@ -907,7 +907,7 @@ function OfficeDashboard() {
             : null,
       };
       const res = await fetch(
-        `http://localhost:5001/staff/update/${editStaffId}`,
+        `${API_BASE_URL}/staff/update/${editStaffId}`,
         {
           method: "PUT",
           headers: {
@@ -962,7 +962,7 @@ function OfficeDashboard() {
         status: formData.active ? "Active" : "Inactive",
       };
       const res = await fetch(
-        `http://localhost:5001/vehicle/update/${editVehicleId}`,
+        `${API_BASE_URL}/vehicle/update/${editVehicleId}`,
         {
           method: "PUT",
           headers: {
@@ -995,7 +995,7 @@ function OfficeDashboard() {
         assignedVehicleId: formData.assignedVehicleId || null,
       };
       const res = await fetch(
-        `http://localhost:5001/route/update/${editRouteId}`,
+        `${API_BASE_URL}/route/update/${editRouteId}`,
         {
           method: "PUT",
           headers: {
@@ -1054,7 +1054,7 @@ function OfficeDashboard() {
         routeId: formData.routeId || null,
       };
       const res = await fetch(
-        `http://localhost:5001/dustbin/update/${editDustbinId}`,
+        `${API_BASE_URL}/dustbin/update/${editDustbinId}`,
         {
           method: "PUT",
           headers: {
@@ -1150,7 +1150,7 @@ function OfficeDashboard() {
   const handleLogout = async () => {
     if (confirm("Are you sure you want to logout?")) {
       console.log("Logging out...");
-      await axios.post("http://localhost:5001/office/logout");
+      await axios.post(`${API_BASE_URL}/office/logout`);
       localStorage.removeItem("token");
       localStorage.removeItem("user");
       localStorage.removeItem("role");
@@ -1199,7 +1199,7 @@ function OfficeDashboard() {
         status: formData.binStatus,
         routeId: formData.routeId || null,
       };
-      const res = await fetch("http://localhost:5001/dustbin/register", {
+      const res = await fetch(`${API_BASE_URL}/dustbin/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1221,7 +1221,7 @@ function OfficeDashboard() {
           type: formData.type || "",
           active: formData.active !== false,
         };
-        const res = await fetch("http://localhost:5001/vehicle/register", {
+        const res = await fetch(`${API_BASE_URL}/vehicle/register`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1251,7 +1251,7 @@ function OfficeDashboard() {
               ? formData.assignedVehicleId
               : null,
         };
-        const res = await fetch("http://localhost:5001/staff/register", {
+        const res = await fetch(`${API_BASE_URL}/staff/register`, {
           method: "POST",
           headers: {
             "Content-Type": "application/json",
@@ -1276,7 +1276,7 @@ function OfficeDashboard() {
         description: formData.routeDescription,
         assignedVehicleId: formData.assignedVehicleId || null,
       };
-      const res = await fetch("http://localhost:5001/route/register", {
+      const res = await fetch(`${API_BASE_URL}/route/register`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -1298,7 +1298,7 @@ function OfficeDashboard() {
     if (!confirm("Delete this dustbin?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5001/dustbin/delete/${id}`, {
+      const res = await fetch(`${API_BASE_URL}/dustbin/delete/${id}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1322,7 +1322,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://localhost:5001/vehicle/delete/${vehicleId}`,
+        `${API_BASE_URL}/vehicle/delete/${vehicleId}`,
         {
           method: "DELETE",
           headers: {
@@ -1347,7 +1347,7 @@ function OfficeDashboard() {
     if (!confirm("Delete this staff member?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5001/staff/delete/${staffId}`, {
+      const res = await fetch(`${API_BASE_URL}/staff/delete/${staffId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1370,7 +1370,7 @@ function OfficeDashboard() {
     if (!confirm("Delete this route?")) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await fetch(`http://localhost:5001/route/delete/${routeId}`, {
+      const res = await fetch(`${API_BASE_URL}/route/delete/${routeId}`, {
         method: "DELETE",
         headers: {
           "Content-Type": "application/json",
@@ -1401,7 +1401,7 @@ function OfficeDashboard() {
     try {
       const targetId = report.allComplaintIds ? report.allComplaintIds[0] : (report._id || report.id);
       if (targetId) {
-        const res = await axios.get(`http://localhost:5001/complaint/detail/${targetId}`);
+        const res = await axios.get(`${API_BASE_URL}/complaint/detail/${targetId}`);
         if (res.data.success) {
           setDetailedReport(res.data.complaint);
         }
@@ -1416,7 +1416,7 @@ function OfficeDashboard() {
     if (!detailedReport?._id) return;
     try {
       const token = localStorage.getItem("token");
-      const res = await axios.post("http://localhost:5001/citizen-system/complaint/verify", {
+      const res = await axios.post(`${API_BASE_URL}/citizen-system/complaint/verify`, {
         complaintId: detailedReport._id,
         verificationStatus: vStatus,
         verificationReason: vReason,
@@ -1462,7 +1462,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await axios.post(
-        "http://localhost:5001/complaint/assign-vehicle",
+        `${API_BASE_URL}/complaint/assign-vehicle`,
         {
           complaintIds: idsToSend,
           vehicleId: vehicleId,
@@ -1508,7 +1508,7 @@ function OfficeDashboard() {
     const token = localStorage.getItem("token");
     try {
       await axios.put(
-        `http://localhost:5001/route/remove-vehicle/${routeId}`,
+        `${API_BASE_URL}/route/remove-vehicle/${routeId}`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -1524,7 +1524,7 @@ function OfficeDashboard() {
     const token = localStorage.getItem("token");
     try {
       await axios.put(
-        `http://localhost:5001/staff/remove-vehicle/${staffId}`,
+        `${API_BASE_URL}/staff/remove-vehicle/${staffId}`,
         {},
         {
           headers: { Authorization: `Bearer ${token}` },
@@ -1540,7 +1540,7 @@ function OfficeDashboard() {
     try {
       const token = localStorage.getItem("token");
       const res = await fetch(
-        `http://localhost:5001/dustbin/update-status/${id}`,
+        `${API_BASE_URL}/dustbin/update-status/${id}`,
         {
           method: "PUT",
           headers: {
@@ -1954,7 +1954,7 @@ function OfficeDashboard() {
       if (!suspendingCitizen) return;
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post("http://localhost:5001/citizen-system/citizen/suspend", {
+        const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/suspend`, {
           citizenId: suspendingCitizen._id,
           suspensionReason,
           verificationEvidence: suspensionEvidence,
@@ -1981,7 +1981,7 @@ function OfficeDashboard() {
       if (!reason) return;
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post("http://localhost:5001/citizen-system/citizen/unsuspend", {
+        const res = await axios.post(`${API_BASE_URL}/citizen-system/citizen/unsuspend`, {
           citizenId,
           reason
         }, { headers: { Authorization: `Bearer ${token}` } });
@@ -2004,7 +2004,7 @@ function OfficeDashboard() {
       }
       try {
         const token = localStorage.getItem("token");
-        const res = await axios.post("http://localhost:5001/citizen-system/appeal/resolve", {
+        const res = await axios.post(`${API_BASE_URL}/citizen-system/appeal/resolve`, {
           appealId,
           action, // "accept" or "reject"
           adminNotes: appealNotes
@@ -2295,9 +2295,9 @@ function OfficeDashboard() {
               <p className="text-xs text-gray-500 mb-4">Suspended users cannot submit complaints, earn rewards, or appear in leaderboards.</p>
               
               <form onSubmit={handleSuspend} className="space-y-4">
-                <div className="bg-gray-50 p-3 rounded-lg border text-xs mb-2">
-                  <span className="font-bold">Citizen Name:</span> {suspendingCitizen.fullName}<br />
-                  <span className="font-bold">Strikes:</span> {suspendingCitizen.strikeCount}/3 consecutive
+                <div className="bg-white-50 p-3 rounded-lg border text-black text-xs mb-2">
+                  <span className="font-bold text-black">Citizen Name:</span> {suspendingCitizen.fullName}<br />
+                  <span className="font-bold text-black">Strikes:</span> {suspendingCitizen.strikeCount}/3 consecutive
                 </div>
                 <div>
                   <label className="block text-xs font-black text-gray-700 uppercase mb-1">Suspension Reason *</label>
@@ -2306,7 +2306,7 @@ function OfficeDashboard() {
                     placeholder="Enter official suspension reason (e.g. Uploaded 3 misleading fake images consecutively)"
                     value={suspensionReason}
                     onChange={(e) => setSuspensionReason(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                     rows="3"
                   />
                 </div>
@@ -2318,7 +2318,7 @@ function OfficeDashboard() {
                     placeholder="Describe verification evidence (e.g. Workers inspected site, confirmed fake image)"
                     value={suspensionEvidence}
                     onChange={(e) => setSuspensionEvidence(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <div>
@@ -2328,7 +2328,7 @@ function OfficeDashboard() {
                     placeholder="Enter evidence URL (e.g. site inspection photo URL)"
                     value={suspensionEvidenceUrl}
                     onChange={(e) => setSuspensionEvidenceUrl(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                   />
                 </div>
                 <button
@@ -2355,7 +2355,7 @@ function OfficeDashboard() {
               <h4 className="text-xl font-bold text-gray-800 mb-4 font-black">⚖️ Resolve Citizen Appeal</h4>
               
               <div className="space-y-4">
-                <div className="bg-gray-50 p-3 rounded-lg border text-xs">
+                <div className="bg-gray-50 p-3 rounded-lg border text-xs text-black">
                   <span className="font-bold">Citizen:</span> {resolvingAppeal.citizenId?.fullName}<br />
                   <span className="font-bold">Appeal explanation:</span> "{resolvingAppeal.reason}"
                 </div>
@@ -2366,7 +2366,7 @@ function OfficeDashboard() {
                     placeholder="Provide details on why you are accepting or rejecting the appeal (e.g. Appeal accepted. User uploaded correct proof. Account restored.)"
                     value={appealNotes}
                     onChange={(e) => setAppealNotes(e.target.value)}
-                    className="w-full bg-white border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
+                    className="w-full bg-white text-black border border-gray-200 rounded-lg p-2 text-sm outline-none focus:border-blue-500"
                     rows="3"
                   />
                 </div>
@@ -4484,7 +4484,7 @@ function OfficeDashboard() {
                   </p>
                   <div className="pt-3">
                     <button 
-                      onClick={() => window.open(`http://localhost:5001/complaint/share-card/${selectedEscalation._id}`, '_blank')}
+                      onClick={() => window.open(`${API_BASE_URL}/complaint/share-card/${selectedEscalation._id}`, '_blank')}
                       className="w-full py-2 bg-gradient-to-r from-blue-600 to-indigo-600 text-white rounded-lg font-bold text-xs hover:from-blue-700 hover:to-indigo-700 transition-all shadow"
                     >
                       📢 View Social Media Share Card

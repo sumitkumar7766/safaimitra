@@ -1,6 +1,7 @@
 const express = require("express");
 const router = express.Router();
 const mongoose = require("mongoose");
+const jwt = require("jsonwebtoken");
 const Citizen = require("../model/CitizenModel");
 const Complaint = require("../model/ComplaintModel");
 const Appeal = require("../model/AppealModel");
@@ -9,17 +10,52 @@ const AuditLog = require("../model/AuditLogModel");
 // Middleware to authorize office/admin
 const officeAuth = (req, res, next) => {
   const allowedRoles = ["office", "admin", "supervisor", "zone_officer", "municipal_officer", "commissioner"];
+  
+  // 1. Check Passport session-based auth
   if (req.isAuthenticated() && (allowedRoles.includes(req.user.role) || req.user.designation)) {
     return next();
   }
+
+  // 2. Check JWT Bearer token auth
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.SECRET_KEY);
+      if (allowedRoles.includes(decoded.role) || decoded.designation) {
+        req.user = decoded; // Attach user to request
+        return next();
+      }
+    }
+  } catch (err) {
+    console.error("Office JWT Verification Error in citizenSystem route:", err.message);
+  }
+
   return res.status(401).json({ success: false, message: "Unauthorized. Office/Admin only." });
 };
 
 // Middleware to authorize citizen
 const citizenAuth = (req, res, next) => {
+  // 1. Check Passport session-based auth
   if (req.isAuthenticated() && req.user.role === "citizen") {
     return next();
   }
+
+  // 2. Check JWT Bearer token auth
+  try {
+    const authHeader = req.headers.authorization;
+    if (authHeader && authHeader.startsWith("Bearer ")) {
+      const token = authHeader.split(" ")[1];
+      const decoded = jwt.verify(token, process.env.JWT_SECRET);
+      if (decoded.role === "Citizen" || decoded.role === "citizen") {
+        req.user = decoded; // Attach user to request
+        return next();
+      }
+    }
+  } catch (err) {
+    console.error("Citizen JWT Verification Error in citizenSystem route:", err.message);
+  }
+
   return res.status(401).json({ success: false, message: "Unauthorized. Citizen only." });
 };
 
