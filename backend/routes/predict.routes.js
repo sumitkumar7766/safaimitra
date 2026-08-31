@@ -4,18 +4,96 @@ const multer = require("multer");
 const fs = require("fs");
 const os = require("os");
 const axios = require("axios");
-const FormData = require("form-data");
 const mongoose = require("mongoose");
-const Dustbin = require("../model/DustbinModel"); // ✅ Import Dustbin Model
+const Dustbin = require("../model/DustbinModel");
 
 const uploadDir = process.env.VERCEL ? os.tmpdir() : "uploads/";
 if (!process.env.VERCEL && !fs.existsSync("uploads/")) {
   fs.mkdirSync("uploads/", { recursive: true });
 }
 const upload = multer({ dest: uploadDir });
-//radius
-const { isWithinRadius } = require("../utils/geo");
 
+/**
+ * Helper to call Roboflow AI API honestly with Base64 payload
+ */
+async function callRoboflowInference(imagePath) {
+  const modelUrl = process.env.ROBOFLOW_MODEL_URL || "https://classify.roboflow.com/dustbin-status/5";
+  const apiKey = process.env.ROBOFLOW_API_KEY || "7vazEt8rNpsG1ha6iBeu";
+
+  if (!fs.existsSync(imagePath)) {
+    throw new Error("Uploaded image file not found on disk");
+  }
+
+  // 1. Convert image to Base64 (Roboflow Hosted Inference required format)
+  const imageBase64 = fs.readFileSync(imagePath, { encoding: "base64" });
+
+  console.log(`📡 Sending Image to Roboflow (${(imageBase64.length / 1024).toFixed(1)} KB base64)...`);
+
+  const response = await axios.post(
+    `${modelUrl}?api_key=${apiKey}`,
+    imageBase64,
+    {
+      headers: {
+        "Content-Type": "application/x-www-form-urlencoded",
+      },
+      timeout: 30000, // 30s timeout to prevent premature aborts
+    }
+  );
+
+  const data = response.data;
+  console.log("📥 Roboflow Raw Output:", JSON.stringify(data));
+
+  let rawClass = "unknown";
+  let confidence = 0.0;
+
+  // Extract from Roboflow Classification Response
+  if (data.top && typeof data.top === "string") {
+    rawClass = data.top;
+    confidence = Number(data.confidence || 0);
+  } else if (Array.isArray(data.predictions) && data.predictions.length > 0) {
+    const topPred = data.predictions[0];
+    rawClass = topPred.class || topPred.label || "unknown";
+    confidence = Number(topPred.confidence || 0);
+  } else if (data.predictions && typeof data.predictions === "object") {
+    const entries = Object.entries(data.predictions);
+    if (entries.length > 0) {
+      entries.sort((a, b) => (b[1]?.confidence || b[1] || 0) - (a[1]?.confidence || a[1] || 0));
+      rawClass = entries[0][0];
+      confidence = Number(entries[0][1]?.confidence || entries[0][1] || 0);
+    }
+  }
+
+  const normalized = rawClass.toLowerCase();
+  let status = normalized;
+  let label = "Garbage Detected";
+  let severity = "HIGH";
+
+  if (normalized.includes("clean") || normalized.includes("empty")) {
+    status = "clean";
+    label = "Dustbin Clean & Ready";
+    severity = "LOW";
+  } else if (normalized.includes("overflow") || normalized.includes("full")) {
+    status = "overflowing";
+    label = "Garbage Overflow Detected";
+    severity = "HIGH";
+  } else if (normalized.includes("half") || normalized.includes("moderate")) {
+    status = "half_full";
+    label = "Dustbin Partially Full";
+    severity = "MEDIUM";
+  }
+
+  return {
+    rawClass,
+    status,
+    confidence,
+    label,
+    severity,
+    inferenceId: data.inference_id || null,
+    time: data.time || null,
+  };
+}
+
+// ─── UNIFIED PREDICT / VERIFY ROUTE (Driver & Citizen) ─────────────────────────
 router.post(
   ["/predict", "/verify-image", "/citizen/verify-image"],
   upload.single("image"),
@@ -23,13 +101,16 @@ router.post(
     let imagePath;
 
     try {
-      // 1️⃣ Image validation
       if (!req.file) {
-        return res.status(400).json({ success: false, message: "Image required for prediction" });
+        return res.status(400).json({ success: false, message: "Image file is required for prediction" });
       }
 
       imagePath = req.file.path;
       const { dustbinId, latitude, longitude } = req.body;
+
+      console.log(
+        `📸 [Image Upload Received] File: ${req.file.originalname || req.file.filename} (${(req.file.size / 1024).toFixed(1)} KB) | BinID: ${dustbinId || "N/A"}`
+      );
 
       let dustbin = null;
       if (dustbinId && mongoose.Types.ObjectId.isValid(dustbinId)) {
@@ -38,51 +119,23 @@ router.post(
         } catch (e) {}
       }
 
-      // Default Status & Confidence
-      let status = "overflowing";
-      let confidence = 0.94;
-      let label = "Garbage Overflow Detected";
+      // Execute Honest Roboflow AI Prediction
+      const aiResult = await callRoboflowInference(imagePath);
 
-      // 1. Get Prediction from Roboflow if available
-      if (process.env.ROBOFLOW_MODEL_URL && process.env.ROBOFLOW_API_KEY) {
+      console.log(
+        `🤖 [Roboflow Honest Result] Class: "${aiResult.rawClass}" -> Status: "${aiResult.status}" | Confidence: ${(aiResult.confidence * 100).toFixed(2)}%`
+      );
+
+      // Update Dustbin status in Database if valid dustbin
+      if (dustbin && dustbin._id) {
         try {
-          const form = new FormData();
-          form.append("file", fs.createReadStream(imagePath));
-
-          const response = await axios.post(
-            `${process.env.ROBOFLOW_MODEL_URL}?api_key=${process.env.ROBOFLOW_API_KEY}`,
-            form,
-            {
-              headers: {
-                ...form.getHeaders(),
-              },
-              timeout: 10000,
-            }
-          );
-
-          const predictions = response.data?.predictions;
-          if (predictions && predictions.length > 0) {
-            const prediction = predictions[0];
-            confidence = Number(prediction.confidence || 0.92);
-            label = prediction.class || "Garbage Detected";
-            const threshold = Number(process.env.CONFIDENCE_THRESHOLD || 0.6);
-
-            if (confidence >= threshold) {
-              status = label; // e.g., "overflow", "clean", "full"
-            }
-          }
-        } catch (rfErr) {
-          console.warn("Roboflow inference fallback used:", rfErr.message);
-        }
-      }
-
-      // 2. Update Dustbin status if valid dustbin is attached
-      if (dustbin && dustbin._id && status !== "unknown") {
-        try {
+          const isClean = aiResult.status === "clean";
           const updatedBin = await Dustbin.findByIdAndUpdate(
             dustbin._id,
             {
-              lastCleanedAt: status.toLowerCase().includes("clean") ? new Date() : undefined,
+              status: isClean ? "clean" : aiResult.status,
+              fillPercentage: isClean ? 0 : Math.round(aiResult.confidence * 100),
+              lastCleanedAt: isClean ? new Date() : dustbin.lastCleanedAt,
             },
             { new: true }
           );
@@ -96,50 +149,37 @@ router.post(
               });
             }
           }
-        } catch (e) {}
+        } catch (e) {
+          console.warn("Could not sync dustbin model:", e.message);
+        }
       }
 
-      console.log(
-        `🤖 SafaiMitra AI Prediction: [${status.toUpperCase()}] confidence: ${(confidence * 100).toFixed(1)}%`
-      );
-
-      // 3. Return JSON satisfying both Staff and Citizen mobile screens
       return res.json({
         success: true,
         dustbinId: dustbinId || null,
-        status,
-        confidence: (confidence * 100).toFixed(2),
-        label,
+        status: aiResult.status,
+        confidence: (aiResult.confidence * 100).toFixed(2),
+        label: aiResult.label,
         result: {
           verified: true,
-          status,
-          confidence,
-          label: label || "Garbage Overflow Detected",
-          description: "AI vision verified genuine municipal waste accumulation.",
-          severity: status.toLowerCase().includes("clean") ? "LOW" : "HIGH",
-          wasteType: "Mixed Solid Waste / Organic / Plastic",
-          modelEngine: "Roboflow & SafaiMitra CV Engine v2.4",
+          status: aiResult.status,
+          confidence: aiResult.confidence,
+          label: aiResult.label,
+          description: `Roboflow vision classified bin condition as ${aiResult.rawClass}.`,
+          severity: aiResult.severity,
+          wasteType: "Municipal Solid Waste",
+          modelEngine: "Roboflow dustbin-status/5",
+          inferenceId: aiResult.inferenceId,
         },
-        message: "Prediction processed and verified by AI",
+        message: "Prediction processed honestly by Roboflow AI",
       });
     } catch (err) {
-      console.error("❌ Prediction Route Error:", err.message);
-      return res.status(200).json({
-        success: true,
-        status: "overflowing",
-        confidence: "93.50",
-        label: "Garbage Overflow Detected",
-        result: {
-          verified: true,
-          status: "overflowing",
-          confidence: 0.935,
-          label: "Garbage Overflow Detected",
-          description: "AI vision verified genuine municipal waste accumulation.",
-          severity: "HIGH",
-          wasteType: "Mixed Solid Waste",
-          modelEngine: "Roboflow & SafaiMitra CV Engine v2.4",
-        },
-        message: "Prediction processed successfully",
+      console.error("❌ Roboflow Prediction Error:", err.response?.data || err.message);
+
+      return res.status(500).json({
+        success: false,
+        error: err.response?.data || err.message,
+        message: "Roboflow model prediction failed. Please check network/model connectivity.",
       });
     } finally {
       if (imagePath && fs.existsSync(imagePath)) {
@@ -151,71 +191,40 @@ router.post(
   }
 );
 
+// ─── COMPLAINT PREDICTION ROUTE ────────────────────────────────────────────────
 router.post("/predict/complaint", upload.single("image"), async (req, res) => {
   let imagePath;
 
   try {
     if (!req.file) {
-      return res.status(400).json({ message: "Image required" });
+      return res.status(400).json({ message: "Image file required" });
     }
 
     imagePath = req.file.path;
     const dustbinId = req.body.dustbinId;
 
-    // 1. Roboflow se Prediction lena
-    const form = new FormData();
-    form.append("file", fs.createReadStream(imagePath));
+    console.log(`📸 [Complaint Image Received] BinID: ${dustbinId || "N/A"}`);
 
-    const response = await axios.post(
-      `${process.env.ROBOFLOW_MODEL_URL}?api_key=${process.env.ROBOFLOW_API_KEY}`,
-      form,
-      {
-        headers: {
-          ...form.getHeaders(),
-        },
-        timeout: 30000,
-      },
-    );
+    const aiResult = await callRoboflowInference(imagePath);
 
-    const predictions = response.data?.predictions;
-
-    // Default Status
-    let status = "UNKNOWN";
-    let confidence = 0;
-
-    if (predictions && predictions.length > 0) {
-      const prediction = predictions[0];
-      confidence = Number(prediction.confidence || 0);
-      const label = prediction.class; // Backend se small letters me class name aayega
-      const threshold = Number(process.env.CONFIDENCE_THRESHOLD || 0.7);
-
-      if (confidence >= threshold) {
-        // Aapne maanga tha ki backend se data small letter me aaye to use Capital karein
-        // Isliye hum yahan .toUpperCase() use kar rahe hain
-        status = label;
-      }
-    }
-
-    // ❌ DATABASE UPDATE & SOCKET EMIT LOGIC REMOVED ❌
-    // Yahan humne Dustbin.findByIdAndUpdate() wala pura section hata diya hai.
-
-    console.log(
-      `🤖 AI Prediction (Read Only): ${status} with confidence ${(confidence * 100).toFixed(2)}%`,
-    );
-
-    // 2. Sirf JSON return karein Camera/Frontend ko
     return res.json({
+      success: true,
       dustbinId: dustbinId || null,
-      status: status, // Hamesha CAPITAL letter me (CLEAN, EMPTY, OVERFLOW etc.)
-      confidence: (confidence * 100).toFixed(2),
-      message: "AI analysis complete. Database remains unchanged.",
+      status: aiResult.status.toUpperCase(),
+      confidence: (aiResult.confidence * 100).toFixed(2),
+      label: aiResult.label,
+      modelEngine: "Roboflow dustbin-status/5",
+      message: "AI analysis complete via Roboflow.",
     });
   } catch (err) {
-    console.error("❌ ROBOFLOW ERROR:", err.response?.data || err.message);
-    return res.status(500).json({ message: "Prediction failed" });
+    console.error("❌ Complaint Roboflow Error:", err.response?.data || err.message);
+    return res.status(500).json({
+      success: false,
+      message: "Roboflow prediction failed",
+      error: err.message,
+    });
   } finally {
-    // Temp image delete karna zaroori hai
-    if (imagePath) {
+    if (imagePath && fs.existsSync(imagePath)) {
       try {
         fs.unlinkSync(imagePath);
       } catch {}
@@ -224,3 +233,4 @@ router.post("/predict/complaint", upload.single("image"), async (req, res) => {
 });
 
 module.exports = router;
+

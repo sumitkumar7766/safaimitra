@@ -213,73 +213,101 @@ router.post(
   ["/verify-image", "/citizen/verify-image"],
   upload.single("image"),
   async (req, res) => {
+    let imagePath;
     try {
       if (!req.file) {
         return res.status(400).json({ success: false, message: "Image is required for AI verification." });
       }
 
-      const imagePath = req.file.path;
-      let aiResult = {
-        verified: true,
-        status: "garbage_detected",
-        confidence: 0.94,
-        label: "Garbage Overflow Detected",
-        description: "AI vision engine verified valid waste accumulation near dustbin.",
-        severity: "HIGH",
-        wasteType: "Mixed Solid Waste / Plastic / Organic",
-        verifiedAt: new Date().toISOString(),
-      };
+      imagePath = req.file.path;
+      const modelUrl = process.env.ROBOFLOW_MODEL_URL || "https://classify.roboflow.com/dustbin-status/5";
+      const apiKey = process.env.ROBOFLOW_API_KEY || "7vazEt8rNpsG1ha6iBeu";
 
-      // Try Roboflow API if configured
-      if (process.env.ROBOFLOW_MODEL_URL && process.env.ROBOFLOW_API_KEY) {
-        try {
-          const form = new FormData();
-          form.append("file", fs.createReadStream(imagePath));
-          const rfRes = await axios.post(
-            `${process.env.ROBOFLOW_MODEL_URL}?api_key=${process.env.ROBOFLOW_API_KEY}`,
-            form,
-            { headers: { ...form.getHeaders() }, timeout: 8000 }
-          );
-          if (rfRes.data && rfRes.data.predictions) {
-            const preds = rfRes.data.predictions;
-            if (Array.isArray(preds) && preds.length > 0) {
-              const topPred = preds[0];
-              aiResult.label = topPred.class || "Garbage Detected";
-              aiResult.confidence = topPred.confidence || 0.92;
-              aiResult.status = (topPred.class || "").toLowerCase().includes("clean") ? "clean" : "overflowing";
-            }
-          }
-        } catch (rfErr) {
-          console.log("Roboflow live call fallback to local CV engine:", rfErr.message);
+      // 1. Convert to Base64
+      const imageBase64 = fs.readFileSync(imagePath, { encoding: "base64" });
+
+      console.log(`📸 [Citizen AI Verify] Sending ${(imageBase64.length / 1024).toFixed(1)} KB base64 to Roboflow...`);
+
+      const rfRes = await axios.post(
+        `${modelUrl}?api_key=${apiKey}`,
+        imageBase64,
+        {
+          headers: { "Content-Type": "application/x-www-form-urlencoded" },
+          timeout: 30000,
+        }
+      );
+
+      const data = rfRes.data;
+      let rawClass = "unknown";
+      let confidence = 0.0;
+
+      if (data.top && typeof data.top === "string") {
+        rawClass = data.top;
+        confidence = Number(data.confidence || 0);
+      } else if (Array.isArray(data.predictions) && data.predictions.length > 0) {
+        const topPred = data.predictions[0];
+        rawClass = topPred.class || topPred.label || "unknown";
+        confidence = Number(topPred.confidence || 0);
+      } else if (data.predictions && typeof data.predictions === "object") {
+        const entries = Object.entries(data.predictions);
+        if (entries.length > 0) {
+          entries.sort((a, b) => (b[1]?.confidence || b[1] || 0) - (a[1]?.confidence || a[1] || 0));
+          rawClass = entries[0][0];
+          confidence = Number(entries[0][1]?.confidence || entries[0][1] || 0);
         }
       }
 
-      // Cleanup local temp file
-      if (fs.existsSync(imagePath)) {
-        try { fs.unlinkSync(imagePath); } catch (e) {}
+      const normalized = rawClass.toLowerCase();
+      let status = "overflowing";
+      let label = "Garbage Detected";
+      let severity = "HIGH";
+
+      if (normalized.includes("clean") || normalized.includes("empty")) {
+        status = "clean";
+        label = "Dustbin Clean & Ready";
+        severity = "LOW";
+      } else if (normalized.includes("overflow") || normalized.includes("full")) {
+        status = "overflowing";
+        label = "Garbage Overflow Detected";
+        severity = "HIGH";
+      } else if (normalized.includes("half") || normalized.includes("moderate")) {
+        status = "half_full";
+        label = "Dustbin Partially Full";
+        severity = "MEDIUM";
       }
+
+      console.log(`🤖 [Citizen Roboflow Result] Class: "${rawClass}" -> Status: "${status}" | Confidence: ${(confidence * 100).toFixed(2)}%`);
 
       return res.status(200).json({
         success: true,
         message: "AI Waste Image Verified Successfully",
-        result: aiResult,
-      });
-    } catch (err) {
-      console.error("AI Verify Image Error:", err);
-      return res.status(200).json({
-        success: true,
-        message: "AI Image Verification Complete",
         result: {
           verified: true,
-          status: "garbage_detected",
-          confidence: 0.91,
-          label: "Municipal Waste Dump Detected",
-          description: "Visual inspection verified solid waste presence.",
+          status,
+          confidence,
+          label,
+          description: `Roboflow vision classified condition as ${rawClass}.`,
+          severity,
+          wasteType: "Municipal Solid Waste / Plastic / Organic",
+          modelEngine: "Roboflow dustbin-status/5",
+          verifiedAt: new Date().toISOString(),
         },
       });
+    } catch (err) {
+      console.error("❌ Citizen AI Verify Image Error:", err.response?.data || err.message);
+      return res.status(500).json({
+        success: false,
+        message: "Roboflow image verification failed. Please try again.",
+        error: err.response?.data || err.message,
+      });
+    } finally {
+      if (imagePath && fs.existsSync(imagePath)) {
+        try { fs.unlinkSync(imagePath); } catch (e) {}
+      }
     }
   }
 );
+
 
 // 2. CREATE COMPLAINT (Major Socket Update)
 router.post(

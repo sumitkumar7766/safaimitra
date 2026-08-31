@@ -7,23 +7,39 @@ const { off } = require("../model/AdminModel");
 
 // LOGIN ROUTE
 router.post("/login", async (req, res) => {
-  // Frontend se 'username' field mein phone number aayega
-  const { username, password } = req.body;
-  console.log("Citizen login attempt (Phone):", username);
+  const { username, phone, email, password } = req.body;
+  const loginIdentifier = (username || phone || email || "").toString().trim();
+  console.log("Citizen login attempt:", loginIdentifier);
 
   // 1. Validation check
-  if (!username || !password) {
+  if (!loginIdentifier || !password) {
     return res.status(400).json({
       success: false,
-      message: "Mobile number aur Password dono required hain",
+      message: "Mobile number/Email aur Password dono required hain",
     });
   }
 
   try {
-    // 2. passport-local-mongoose ka static authenticate method
-    // Kyunki humne register ke waqt 'username: phone' kiya tha, 
-    // toh ye function automatically database mein phone number check karega.
-    Citizen.authenticate()(username, password, (err, user, info) => {
+    // 2. Flexible lookup: match by username, phone, or email
+    const cleanPhone = loginIdentifier.replace(/[^0-9]/g, "");
+    const user = await Citizen.findOne({
+      $or: [
+        { username: loginIdentifier },
+        { phone: loginIdentifier },
+        { email: loginIdentifier.toLowerCase() },
+        ...(cleanPhone ? [{ phone: cleanPhone }, { username: cleanPhone }] : []),
+      ],
+    });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Mobile number ya Password galat hai",
+      });
+    }
+
+    // 3. Authenticate with passport-local-mongoose using found user's actual username
+    Citizen.authenticate()(user.username, password, (err, authUser, info) => {
       if (err) {
         return res.status(500).json({
           success: false,
@@ -31,31 +47,35 @@ router.post("/login", async (req, res) => {
         });
       }
 
-      // 3. User nahi mila ya password galat hai
-      if (!user) {
+      // 4. User nahi mila ya password galat hai
+      if (!authUser) {
         return res.status(401).json({
           success: false,
           message: "Mobile number ya Password galat hai",
         });
       }
 
-      // 4. JWT generate karo (Role 'Citizen' set kiya hai)
+      // 5. JWT generate karo (Role 'Citizen')
       const token = jwt.sign(
-        { id: user._id, role: "Citizen", name: user.fullName },
-        process.env.JWT_SECRET || "AapkaSecretKey", // Environment variable use karein
+        { id: authUser._id, role: "Citizen", name: authUser.fullName },
+        process.env.JWT_SECRET || "AapkaSecretKey",
         { expiresIn: "7d" }
       );
 
-      // 5. Success Response
+      // 6. Success Response
       return res.json({
         success: true,
         message: "Login successful",
         token,
         user: {
-          id: user._id,
-          officeId: user.officeId,
-          fullName: user.fullName,
-          phone: user.phone,
+          id: authUser._id,
+          _id: authUser._id,
+          officeId: authUser.officeId,
+          fullName: authUser.fullName,
+          name: authUser.fullName,
+          phone: authUser.phone,
+          email: authUser.email,
+          cityName: authUser.cityName,
           role: "Citizen",
         },
       });
