@@ -251,7 +251,6 @@ export default function Vehicle({ goBack }) {
             
             <View style={styles.mapContainer}>
               <MapView
-                provider={PROVIDER_GOOGLE}
                 style={styles.map}
                 initialRegion={{
                   latitude: 23.2520,

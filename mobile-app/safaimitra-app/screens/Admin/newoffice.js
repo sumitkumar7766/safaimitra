@@ -15,7 +15,7 @@ import AsyncStorage from "@react-native-async-storage/async-storage";
 import axios from "axios";
 import { ArrowLeft, Save } from "lucide-react-native";
 
-const API_BASE_URL = "http://10.13.177.129:5001"; 
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, ""); 
 
 // ✅ FIX: Is component ko function ke BAHAR nikal diya
 const InputField = ({ label, value, onChangeText, placeholder, secureTextEntry = false, keyboardType = "default" }) => (

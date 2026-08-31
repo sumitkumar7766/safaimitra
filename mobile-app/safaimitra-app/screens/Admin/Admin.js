@@ -33,7 +33,7 @@ import {
 import NewOffice from "./newoffice"; // Path check kar lena apne hisaab se
 import NewAdmin from "./newadmin"; // Path check kar lena apne hisaab se
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 
 // Added 'goBack' prop here to handle navigation
 export default function OfficeDashboard({ goBack }) {

@@ -29,7 +29,7 @@ import axios from "axios";
 import { io } from "socket.io-client";
 import tw from "twrnc";
 
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 const ORS_API_KEY =
   process.env.NEXT_PUBLIC_ORS_API_KEY ||
   "eyJvcmciOiI1YjNjZTM1OTc4NTExMTAwMDFjZjYyNDgiLCJpZCI6ImU0ZTY1YzcwYTRjOTQ5OGViMDVjMDQ1ZGRlM2VhOWIzIiwiaCI6Im11cm11cjY0In0=";
@@ -182,7 +182,6 @@ export default function VehiclePage({ goBack }) {
     <MapView
       ref={mapRef}
       style={tw`w-full h-full`}
-      provider={PROVIDER_GOOGLE}
       initialRegion={{
         latitude: mapCenter[0],
         longitude: mapCenter[1],

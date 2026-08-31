@@ -63,7 +63,7 @@ import {
 } from "lucide-react-native";
 import EventDustbinRequestScreen from "./EventDustbinRequestScreen";
 
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 const { width, height } = Dimensions.get("window");
 
 export default function CitizenScreen({ navigation, goBack }) {
@@ -1182,7 +1182,6 @@ export default function CitizenScreen({ navigation, goBack }) {
                 <MapView
                   ref={mapRef}
                   showsUserLocation={true}
-                  provider={PROVIDER_GOOGLE}
                   style={{ flex: 1 }}
                   initialRegion={{
                     latitude: userLocation ? userLocation[0] : 23.2599,
@@ -2416,7 +2415,6 @@ export default function CitizenScreen({ navigation, goBack }) {
               ref={fullMapRef}
               showsUserLocation={true}
               showsCompass={true}
-              provider={PROVIDER_GOOGLE}
               style={{ flex: 1 }}
               initialRegion={{
                 latitude: userLocation ? userLocation[0] : 23.2599,

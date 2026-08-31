@@ -41,7 +41,7 @@ import {
   Compass,
 } from "lucide-react-native";
 
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 const { width } = Dimensions.get("window");
 
 const EVENT_TYPES = [

@@ -49,7 +49,7 @@ import StaffDashboard from "./screens/Staff/Staff";
 import CitizenDashboard from "./screens/Citizen/Citizen";
 import UserRegister from "./screens/userRegister";
 
-const API_BASE_URL = process.env.EXPO_PUBLIC_API_BASE_URL || "http://10.5.49.186:5002";
+const API_BASE_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 
 // =========================================================================
 // 🌟 FLUID SPRING ANIMATION & TOUCH FEEDBACK

@@ -24,7 +24,7 @@ import tw from "twrnc";
 import { io } from "socket.io-client";
 
 const { width, height } = Dimensions.get("window");
-const API_URL = process.env.EXPO_PUBLIC_API_BASE_URL;
+const API_URL = (process.env.EXPO_PUBLIC_API_BASE_URL || process.env.EXPO_PUBLIC_API_URL || "https://api.safaimitra.online").replace(/\/+$/, "");
 
 // --- HELPER: Status Styles ---
 // --- HELPER: Web Style Status Colors ---
